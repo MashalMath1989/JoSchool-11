@@ -1,0 +1,140 @@
+
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+  <head>
+    <meta charset="UTF-8" />
+    <link rel="icon" type="image/svg+xml" href="/vite.svg" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+    <title>JoSchool 11</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700&family=Noto+Naskh+Arabic:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+      :root {
+        --color-primary: #0ea5e9;
+        --color-secondary: #1e293b;
+        --color-accent: #16a34a;
+        --color-accent-rgb: 22, 163, 74;
+        --color-background: #f8fafc;
+        --color-text-primary: #1e293b;
+        --color-text-secondary: #94a3b8;
+        --font-body: 'Noto Naskh Arabic', serif;
+        --font-heading: 'Poppins', sans-serif;
+      }
+      
+      .theme-jordan {
+        --color-primary: #F29A2E;
+        --color-secondary: #6B3F1D;
+        --color-accent: #2FB36D;
+        --color-accent-rgb: 47, 179, 109;
+        --color-background: #F8F6F2;
+        --color-text-primary: #222222;
+        --color-text-secondary: #777777;
+      }
+
+      .theme-islamic {
+        --color-primary: #1F7A63;
+        --color-secondary: #145A4A;
+        --color-accent: #D4AF37;
+        --color-accent-rgb: 212, 175, 55;
+        --color-background: #F2F7F5;
+        --color-text-primary: #1E1E1E;
+        --color-text-secondary: #6F6F6F;
+      }
+
+      .theme-arabic {
+        --color-primary: #3A7CA5;
+        --color-secondary: #2F5D7C;
+        --color-accent: #6FB3D2;
+        --color-accent-rgb: 111, 179, 210;
+        --color-background: #F4F8FB;
+        --color-text-primary: #1E1E1E;
+        --color-text-secondary: #6F6F6F;
+      }
+
+      .theme-english {
+        --color-primary: #8BC34A;
+        --color-secondary: #66BB6A;
+        --color-accent: #C5E86C;
+        --color-accent-rgb: 197, 232, 108;
+        --color-background: #F6FBF7;
+        --color-text-primary: #1E1E1E;
+        --color-text-secondary: #6F6F6F;
+      }
+
+      body {
+        font-family: var(--font-body);
+        background-color: var(--color-background);
+        color: var(--color-text-primary);
+        overflow-x: hidden;
+        -webkit-tap-highlight-color: transparent;
+        overscroll-behavior-y: contain;
+        font-size: 12px;
+      }
+      .font-naskh { font-family: var(--font-body); }
+      .font-sans { font-family: var(--font-heading); }
+      
+      /* تحسين الحركة لتكون بدون وميض تماماً */
+      @keyframes fast-fade {
+        from { opacity: 0.95; }
+        to { opacity: 1; }
+      }
+      .transition-smooth {
+        animation: fast-fade 0.1s ease-out forwards;
+      }
+    </style>
+    <script>
+      tailwind.config = {
+        theme: {
+          extend: {
+            colors: {
+              primary: 'var(--color-primary)',
+              secondary: 'var(--color-secondary)',
+              accent: 'var(--color-accent)',
+              'app-bg': 'var(--color-background)',
+              'text-main': 'var(--color-text-primary)',
+              'text-sub': 'var(--color-text-secondary)',
+            },
+            keyframes: {
+              'pulse-inside': {
+                '0%': { transform: 'scale(0.8)', opacity: '0.8' },
+                '100%': { transform: 'scale(1.6)', opacity: '0' },
+              },
+              'soft-pulse': {
+                '0%, 100%': { transform: 'scale(1)', boxShadow: '0 0 20px 0 rgba(var(--color-accent-rgb), 0.4)' },
+                '50%': { transform: 'scale(1.08)', boxShadow: '0 0 30px 10px rgba(var(--color-accent-rgb), 0)' },
+              }
+            },
+            animation: {
+              'pulse-inside': 'pulse-inside 2.5s ease-out infinite',
+              'soft-pulse': 'soft-pulse 3s infinite ease-in-out',
+            },
+          },
+        },
+      }
+    </script>
+  <script type="importmap">
+{
+  "imports": {
+    "react-dom/": "https://aistudiocdn.com/react-dom@^18.2.0/",
+    "react/": "https://aistudiocdn.com/react@^18.2.0/",
+    "react": "https://aistudiocdn.com/react@^18.2.0",
+    "@google/genai": "https://aistudiocdn.com/@google/genai@beta"
+  }
+}
+</script>
+<link rel="stylesheet" href="/index.css">
+</head>
+  <body class="bg-[#f8fafc]">
+    <div id="root">
+      <div style="height: 100vh; display: flex; flex-direction: column; align-items: center; justify-content: center; background-color: #f8fafc; font-family: 'Noto Naskh Arabic', serif;" dir="rtl">
+        <div style="width: 60px; height: 60px; border: 5px solid #e1e7ef; border-top: 5px solid #1d5bfc; border-radius: 50%; animation: spin 1s linear infinite; margin-bottom: 24px;"></div>
+        <h1 style="font-size: 24px; font-weight: 900; color: #1e293b; margin-bottom: 8px;">JoSchool 11</h1>
+        <p style="font-weight: bold; color: #64748b;">جاري بدء التطبيق...</p>
+        <style>@keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }</style>
+      </div>
+    </div>
+    <script type="module" src="/index.tsx"></script>
+  </body>
+</html>

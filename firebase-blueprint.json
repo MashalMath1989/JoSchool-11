@@ -1,0 +1,42 @@
+{
+  "entities": {
+    "User": {
+      "title": "User",
+      "description": "User profile and progress data.",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string" },
+        "email": { "type": "string" },
+        "displayName": { "type": "string" },
+        "completedLessons": { "type": "array", "items": { "type": "string" } },
+        "quizResults": { "type": "array", "items": { "$ref": "#/entities/QuizResult" } },
+        "favoriteQuestions": { "type": "array", "items": { "type": "object" } },
+        "totalTimeSpent": { "type": "number" },
+        "lastActive": { "type": "string", "format": "date-time" }
+      },
+      "required": ["userId", "email"]
+    },
+    "QuizResult": {
+      "title": "QuizResult",
+      "description": "Data for a completed quiz.",
+      "type": "object",
+      "properties": {
+        "subjectId": { "type": "string" },
+        "lessonTitle": { "type": "string" },
+        "score": { "type": "number" },
+        "totalQuestions": { "type": "number" },
+        "date": { "type": "string", "format": "date-time" }
+      }
+    }
+  },
+  "firestore": {
+    "/users/{userId}": {
+      "schema": "User",
+      "description": "User profile and progress."
+    },
+    "/test/connection": {
+      "schema": { "type": "object", "properties": {} },
+      "description": "Used for testing the Firestore connection on app boot."
+    }
+  }
+}
