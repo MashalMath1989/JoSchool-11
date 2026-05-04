@@ -621,10 +621,10 @@ const App: React.FC = () => {
         localStorage.setItem(key, JSON.stringify(appState));
     }, [user, isAuthenticating, getStorageKey, viewHistory, selectedSubject, sessionTitle, currentQuiz, currentQuestionIndex, userAnswers, showResults, currentLessonTitle, currentUnitTitle, examNumber, timer, expandedUnitIndices, expandedLessonKeys, currentPdfUrl, pdfTitle]);
 
-    // Long press recovery mechanism: Press and hold anywhere for 3 seconds to go home
+    // Long press recovery mechanism: Press and hold anywhere for 5 seconds to go home
     useEffect(() => {
         let longPressTimer: NodeJS.Timeout | null = null;
-        const duration = 3000; // 3 seconds
+        const duration = 5000; // 5 seconds
 
         const handleStart = () => {
             longPressTimer = setTimeout(() => {

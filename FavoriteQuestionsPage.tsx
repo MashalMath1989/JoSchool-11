@@ -216,8 +216,18 @@ const FavoriteQuestionsPage: React.FC<FavoriteQuestionsPageProps> = ({
                             
                             <div className="grid grid-cols-1 gap-2 mb-4">
                                 {q.choices.map((choice, cIdx) => {
-                                    const isCorrect = choice.trim() === q.correct_answer.trim();
+                                    const trimmedChoice = choice.trim();
+                                    const trimmedCorrect = String(q.correct_answer).trim();
                                     const choiceLabels = isEnglish ? ['a', 'b', 'c', 'd'] : ['أ', 'ب', 'ج', 'د'];
+                                    
+                                    // Robust check for correct answer
+                                    const isCorrect = 
+                                        trimmedChoice === trimmedCorrect || 
+                                        choiceLabels[cIdx] === trimmedCorrect.toLowerCase() ||
+                                        choiceLabels[cIdx] === trimmedCorrect ||
+                                        ['A', 'B', 'C', 'D'][cIdx] === trimmedCorrect.toUpperCase() ||
+                                        String(cIdx) === trimmedCorrect;
+
                                     return (
                                         <div 
                                             key={cIdx}
