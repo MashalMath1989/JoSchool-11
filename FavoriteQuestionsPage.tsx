@@ -154,6 +154,12 @@ const FavoriteQuestionsPage: React.FC<FavoriteQuestionsPageProps> = ({
                 </div>
             ) : (
                 <div className="space-y-4">
+                    <div className="flex items-center gap-2 mb-2 px-1">
+                        <div className="bg-amber-500/10 text-amber-600 px-3 py-1 rounded-full border border-amber-500/20 flex items-center gap-1.5">
+                            <span className="text-[10px] font-black tracking-wider">عدد الأسئلة:</span>
+                            <span className="text-xs font-black">{filteredQuestions.length}</span>
+                        </div>
+                    </div>
                     {filteredQuestions.map((q, idx) => (
                         <motion.div 
                             key={idx}
@@ -215,9 +221,9 @@ const FavoriteQuestionsPage: React.FC<FavoriteQuestionsPageProps> = ({
                                     return (
                                         <div 
                                             key={cIdx}
-                                            className={`p-3 rounded-lg text-sm font-bold border-2 flex items-center gap-3 border-slate-900 ${isCorrect ? 'bg-emerald-50 text-emerald-700' : 'bg-slate-50 text-slate-600'} flex-row`}
+                                            className={`p-3 rounded-lg text-sm font-bold border flex items-center gap-3 border-slate-900 ${isCorrect ? 'bg-emerald-50 text-emerald-700' : 'bg-slate-50 text-slate-600'} flex-row`}
                                         >
-                                            <div className={`w-7 h-7 rounded-md border-2 flex items-center justify-center shrink-0 font-black text-[10px] ${isCorrect ? 'bg-emerald-500 text-white border-emerald-400' : 'bg-white text-slate-400 border-slate-200'}`}>
+                                            <div className={`w-7 h-7 rounded-md border flex items-center justify-center shrink-0 font-black text-[10px] ${isCorrect ? 'bg-emerald-500 text-white border-emerald-400' : 'bg-white text-slate-400 border-slate-200'}`}>
                                                 {choiceLabels[cIdx]}
                                             </div>
                                             <span className={`flex-1 ${isEnglish ? 'text-left font-sans' : 'text-right font-naskh'}`}>{renderTextWithUnderline(choice)}</span>

@@ -42,8 +42,9 @@ const AuthPage: React.FC = () => {
                 setError('المتصفح حظر النافذة المنبثقة. يرجى تفعيل السماح بالنوافذ المنبثقة لهذا الموقع.');
             } else if (err.code === 'auth/network-request-failed') {
                 setError('فشل في الاتصال. يرجى التحقق من اتصال الإنترنت الخاص بك.');
-            } else if (err.code === 'auth/internal-error' || err.code === 'auth/auth-domain-config-required') {
-                setError('حدث خطأ في الإعدادات. جرب فتح التطبيق في المتصفح مباشرة بدلاً من المعاينة.');
+            } else if (err.code === 'auth/internal-error' || err.code === 'auth/auth-domain-config-required' || err.code === 'auth/unauthorized-domain') {
+                const currentDomain = window.location.hostname;
+                setError(`يجب إضافة النطاق (${currentDomain}) إلى قائمة "Authorized domains" في إعدادات Firebase Console (Authentication > Settings).`);
             } else {
                 setError(`خطأ: ${err.message || 'فشل تسجيل الدخول. حاول مجدداً.'}`);
             }
