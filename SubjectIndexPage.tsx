@@ -201,17 +201,83 @@ const SubjectIndexPage: React.FC<SubjectIndexPageProps> = ({
                     </div>
                 ) : units.map((unit, uIdx) => {
                     const isExpanded = expandedUnitIndices.includes(uIdx);
+                    
+                    const calculateUnitProgress = (unit: Unit) => {
+                        let totalExams = 0;
+                        let completedExams = 0;
+                        const results = userProgress.quizResults || [];
+
+                        if (selectedSubject.id === SubjectName.Arabic || selectedSubject.id === SubjectName.English) {
+                            totalExams = unit.lessons.length;
+                            unit.lessons.forEach(lesson => {
+                                const isPassed = results.some((r: any) => 
+                                    r.subjectId === selectedSubject.id && 
+                                    r.lessonTitle === lesson.title &&
+                                    (r.score / r.totalQuestions) >= 0.5
+                                );
+                                if (isPassed) completedExams++;
+                            });
+                        } else {
+                            unit.lessons.forEach(lesson => {
+                                const chunks = getLessonChunksCount(selectedSubject.id, lesson.title) || 5;
+                                totalExams += chunks;
+                                for (let i = 1; i <= chunks; i++) {
+                                    const examLabel = selectedSubject.id === SubjectName.English ? `Exam (${i})` : `امتحان (${i})`;
+                                    const fullTitle = `${lesson.title} - ${examLabel}`;
+                                    const isPassed = results.some((r: any) => 
+                                        r.subjectId === selectedSubject.id && 
+                                        r.lessonTitle === fullTitle &&
+                                        (r.score / r.totalQuestions) >= 0.5
+                                    );
+                                    if (isPassed) completedExams++;
+                                }
+                            });
+                            
+                            // Unit exam
+                            totalExams += 1;
+                            const unitOrdinal = unit.title.split(':')[0];
+                            const examLabel = selectedSubject.id === SubjectName.English ? 'Exam (1)' : 'امتحان (1)';
+                            const unitExamTitle = `${unitOrdinal} - ${examLabel}`;
+                            if (results.some((r: any) => 
+                                r.subjectId === selectedSubject.id && 
+                                r.lessonTitle === unitExamTitle &&
+                                (r.score / r.totalQuestions) >= 0.5
+                            )) {
+                                completedExams++;
+                            }
+                        }
+
+                        return totalExams > 0 ? (completedExams / totalExams) * 100 : 0;
+                    };
+
+                    const unitProgress = calculateUnitProgress(unit);
+
                     return (
                         <div key={uIdx} className="bg-white rounded-lg shadow-sm overflow-hidden border border-slate-900 transition-all duration-300">
                             <button
                                 onClick={() => toggleUnit(uIdx)}
                                 dir={selectedSubject.id === SubjectName.English ? "ltr" : "rtl"}
-                                className={`w-full p-5 flex items-center justify-between transition-colors ${isExpanded ? 'bg-slate-50' : 'bg-white'} ${selectedSubject.id === SubjectName.English ? 'text-left' : 'text-right'}`}
+                                className={`w-full p-5 flex flex-col transition-colors ${isExpanded ? 'bg-slate-50' : 'bg-white'}`}
                             >
-                                <h3 className={`text-sm sm:text-base font-black text-slate-800 flex-1 ${selectedSubject.id === SubjectName.English ? 'mr-4' : 'ml-4'}`}>{unit.title}</h3>
-                                <div className={`w-10 h-10 rounded-full flex items-center justify-center transition-all ${isExpanded ? 'bg-primary text-white rotate-180' : 'bg-slate-100 text-slate-400'}`}>
-                                    <ChevronDownIcon className="w-6 h-6" />
+                                <div className="w-full flex items-center justify-between">
+                                    <h3 className={`text-sm sm:text-base font-black text-slate-800 flex-1 ${selectedSubject.id === SubjectName.English ? 'mr-4 text-left' : 'ml-4 text-right'}`}>{unit.title}</h3>
+                                    <div className={`w-10 h-10 rounded-full flex items-center justify-center transition-all ${isExpanded ? 'bg-primary text-white rotate-180' : 'bg-slate-100 text-slate-400'}`}>
+                                        <ChevronDownIcon className="w-6 h-6" />
+                                    </div>
                                 </div>
+                                
+                                {unitProgress > 0 && (
+                                    <div className="w-full mt-3 px-1 flex items-center gap-3">
+                                        <div className="flex-1 h-1.5 bg-slate-100 rounded-full overflow-hidden border border-slate-200">
+                                            <motion.div 
+                                                initial={{ width: 0 }}
+                                                animate={{ width: `${unitProgress}%` }}
+                                                className="h-full bg-emerald-500"
+                                            />
+                                        </div>
+                                        <span className="text-[10px] sm:text-xs font-black text-emerald-600 whitespace-nowrap shrink-0">{Math.round(unitProgress)}%</span>
+                                    </div>
+                                )}
                             </button>
 
                             <AnimatePresence>

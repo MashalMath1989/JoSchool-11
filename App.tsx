@@ -1515,6 +1515,8 @@ const App: React.FC = () => {
                     return (
                         <LandingPage 
                             subjectsData={subjectsData} 
+                            subjectIndexData={subjectIndexData}
+                            userProgress={userProgress}
                             navigateTo={(view, subject, title) => {
                                 if (subject) setSelectedSubject(subject);
                                 navigateTo(view, title);

@@ -7,77 +7,167 @@ import { User } from 'firebase/auth';
 
 interface LandingPageProps {
     subjectsData: Subject[];
+    subjectIndexData: { [key: string]: any[] };
+    userProgress: any;
     navigateTo: (view: any, subject?: Subject, title?: string) => void;
     View: any;
     user: User | null;
     handleLogout: () => void;
 }
 
-const SubjectGrid = ({ subjects, title, navigateTo, View, showAchievements }: { subjects: Subject[], title: string, navigateTo: any, View: any, showAchievements?: boolean }) => (
-    <div className="mb-6">
-        <div className="flex items-center justify-between mb-3 px-2 text-right">
-            <div className="flex items-center gap-3">
-                <div className="w-2.5 h-8 bg-yellow-400 rounded-full"></div>
-                <h2 className="text-xl sm:text-2xl font-black text-slate-800 leading-tight">{title}</h2>
-            </div>
-            {showAchievements && (
-                <motion.button
-                    whileHover={{ scale: 1.1 }}
-                    whileTap={{ scale: 0.9 }}
-                    onClick={() => navigateTo(View.Progress)}
-                    className="w-10 h-10 bg-white border border-slate-900 rounded-lg shadow-sm flex items-center justify-center active:scale-95 transition-all hover:bg-slate-50"
-                >
-                    <span className="text-xl">📊</span>
-                </motion.button>
-            )}
-        </div>
+const SubjectGrid = ({ 
+    subjects, 
+    title, 
+    navigateTo, 
+    View, 
+    showAchievements,
+    subjectIndexData,
+    userProgress
+}: { 
+    subjects: Subject[], 
+    title: string, 
+    navigateTo: any, 
+    View: any, 
+    showAchievements?: boolean,
+    subjectIndexData: { [key: string]: any[] },
+    userProgress: any
+}) => {
+    const calculateProgress = (subject: Subject) => {
+        const semesterKey = `${subject.id}-${subject.semester}`;
+        const units = subjectIndexData[semesterKey] || subjectIndexData[subject.id] || [];
+        
+        let totalExams = 0;
+        let completedExams = 0;
 
-        <div className="bg-gradient-to-br from-sky-400 to-slate-800 p-3 sm:p-6 rounded-xl shadow-2xl border border-slate-900">
-            <div className="grid grid-cols-2 gap-3 sm:gap-4">
-                {subjects.map((subject) => {
-                    const isAvailable = 
-                        subject.id === SubjectName.JordanHistory || 
-                        subject.id === SubjectName.IslamicEducation || 
-                        subject.id === SubjectName.English ||
-                        (subject.semester === Semester.First && subject.id === SubjectName.Arabic);
-                    
-                    return (
-                        <motion.div
-                            key={`${subject.id}-${subject.semester}`}
-                            whileHover={{ scale: 1.02 }}
-                            whileTap={{ scale: 0.98 }}
-                            onClick={() => navigateTo(View.SubjectIndex, subject)}
-                            className="bg-white rounded-lg p-2 sm:p-3 shadow-lg border border-slate-900 cursor-pointer flex flex-row items-center gap-2 sm:gap-4 transition-all hover:shadow-xl group relative overflow-hidden h-20 sm:h-24"
-                        >
-                            <div className="w-10 h-14 sm:w-14 sm:h-18 rounded-lg overflow-hidden shadow-sm shrink-0 z-10">
-                                <img 
-                                    src={subject.coverImage} 
-                                    alt={subject.id} 
-                                    className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500" 
-                                    referrerPolicy="no-referrer" 
-                                />
-                            </div>
-                            <div className="flex-1 text-right z-10 min-w-0">
-                                <h3 className={`text-xs sm:text-xl font-black text-slate-800 truncate mb-0.5 sm:mb-1 ${subject.fontClass}`}>{subject.id}</h3>
-                                <div className="flex items-center gap-1 sm:gap-2">
-                                    <span className={`text-[7px] sm:text-[10px] font-bold ${isAvailable ? 'text-emerald-500' : 'text-slate-400'}`}>
-                                        {isAvailable ? 'متاح' : 'قريباً'}
-                                    </span>
-                                    {isAvailable && (
-                                        <div className="w-1 h-1 sm:w-1.5 sm:h-1.5 rounded-full bg-emerald-500 animate-pulse"></div>
-                                    )}
-                                </div>
-                            </div>
-                        </motion.div>
+        const results = userProgress.quizResults || [];
+
+        units.forEach(unit => {
+            if (subject.id === SubjectName.Arabic || subject.id === SubjectName.English) {
+                // Each lesson is one exam
+                totalExams += unit.lessons.length;
+                unit.lessons.forEach((lesson: any) => {
+                    const isPassed = results.some((r: any) => 
+                        r.subjectId === subject.id && 
+                        r.lessonTitle === lesson.title &&
+                        (r.score / r.totalQuestions) >= 0.5
                     );
-                })}
+                    if (isPassed) completedExams++;
+                });
+            } else {
+                // Lessons have chunks (default 5 if not found) + 1 unit exam
+                unit.lessons.forEach((lesson: any) => {
+                    const chunks = 5; // Simplified for landing page or we could import getLessonChunksCount
+                    totalExams += chunks;
+                    for (let i = 1; i <= chunks; i++) {
+                        const examLabel = `امتحان (${i})`;
+                        const fullTitle = `${lesson.title} - ${examLabel}`;
+                        const isPassed = results.some((r: any) => 
+                            r.subjectId === subject.id && 
+                            r.lessonTitle === fullTitle &&
+                            (r.score / r.totalQuestions) >= 0.5
+                        );
+                        if (isPassed) completedExams++;
+                    }
+                });
+                
+                // Unit exam
+                totalExams += 1;
+                const unitOrdinal = unit.title.split(':')[0];
+                const unitExamTitle = `${unitOrdinal} - امتحان (1)`;
+                if (results.some((r: any) => r.subjectId === subject.id && r.lessonTitle === unitExamTitle && (r.score / r.totalQuestions) >= 0.5)) {
+                    completedExams++;
+                }
+            }
+        });
+
+        return totalExams > 0 ? (completedExams / totalExams) * 100 : 0;
+    };
+
+    return (
+        <div className="mb-6">
+            <div className="flex items-center justify-between mb-3 px-2 text-right">
+                <div className="flex items-center gap-3">
+                    <div className="w-2.5 h-8 bg-yellow-400 rounded-full"></div>
+                    <h2 className="text-xl sm:text-2xl font-black text-slate-800 leading-tight">{title}</h2>
+                </div>
+                {showAchievements && (
+                    <motion.button
+                        whileHover={{ scale: 1.1 }}
+                        whileTap={{ scale: 0.9 }}
+                        onClick={() => navigateTo(View.Progress)}
+                        className="w-10 h-10 bg-white border border-slate-900 rounded-lg shadow-sm flex items-center justify-center active:scale-95 transition-all hover:bg-slate-50"
+                    >
+                        <span className="text-xl">📊</span>
+                    </motion.button>
+                )}
+            </div>
+
+            <div className="bg-gradient-to-br from-sky-400 to-slate-800 p-3 sm:p-6 rounded-xl shadow-2xl border border-slate-900">
+                <div className="grid grid-cols-2 gap-3 sm:gap-4">
+                    {subjects.map((subject) => {
+                        const isAvailable = 
+                            subject.id === SubjectName.JordanHistory || 
+                            subject.id === SubjectName.IslamicEducation || 
+                            subject.id === SubjectName.English ||
+                            (subject.semester === Semester.First && subject.id === SubjectName.Arabic);
+                        
+                        const progress = calculateProgress(subject);
+                        
+                        return (
+                            <motion.div
+                                key={`${subject.id}-${subject.semester}`}
+                                whileHover={{ scale: 1.02 }}
+                                whileTap={{ scale: 0.98 }}
+                                onClick={() => navigateTo(View.SubjectIndex, subject)}
+                                className="bg-white rounded-lg p-2 sm:p-3 shadow-lg border border-slate-900 cursor-pointer flex flex-col transition-all hover:shadow-xl group relative overflow-hidden h-24 sm:h-28"
+                            >
+                                <div className="flex flex-row items-center gap-2 sm:gap-4 flex-1 min-w-0">
+                                    <div className="w-10 h-14 sm:w-14 sm:h-18 rounded-lg overflow-hidden shadow-sm shrink-0 z-10 border border-slate-100">
+                                        <img 
+                                            src={subject.coverImage} 
+                                            alt={subject.id} 
+                                            className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500" 
+                                            referrerPolicy="no-referrer" 
+                                        />
+                                    </div>
+                                    <div className="flex-1 text-right z-10 min-w-0">
+                                        <h3 className={`text-[13px] sm:text-[21px] font-black text-slate-800 truncate mb-0.5 sm:mb-1 ${subject.fontClass}`}>{subject.id}</h3>
+                                        <div className="flex items-center gap-1 sm:gap-2">
+                                            <span className={`text-[7px] sm:text-[10px] font-bold ${isAvailable ? 'text-emerald-500' : 'text-slate-400'}`}>
+                                                {isAvailable ? 'متاح' : 'قريباً'}
+                                            </span>
+                                            {isAvailable && (
+                                                <div className="w-1 h-1 sm:w-1.5 sm:h-1.5 rounded-full bg-emerald-500 animate-pulse"></div>
+                                            )}
+                                        </div>
+                                    </div>
+                                </div>
+                                
+                                {isAvailable && progress > 0 && (
+                                    <div className="w-full mt-2 flex items-center gap-2">
+                                        <div className="flex-1 h-1.5 bg-slate-100 rounded-full overflow-hidden border border-slate-200">
+                                            <motion.div 
+                                                initial={{ width: 0 }}
+                                                animate={{ width: `${progress}%` }}
+                                                className="h-full bg-emerald-500"
+                                            />
+                                        </div>
+                                        <span className="text-[8px] sm:text-[10px] font-black text-emerald-600 shrink-0">{Math.round(progress)}%</span>
+                                    </div>
+                                )}
+                            </motion.div>
+                        );
+                    })}
+                </div>
             </div>
         </div>
-    </div>
-);
+    );
+};
 
 const LandingPage: React.FC<LandingPageProps> = ({
     subjectsData,
+    subjectIndexData,
+    userProgress,
     navigateTo,
     View,
     user,
@@ -142,8 +232,23 @@ const LandingPage: React.FC<LandingPageProps> = ({
                 </div>
             </div>
             
-            <SubjectGrid subjects={firstSemesterSubjects} title="الفصل الأول" navigateTo={navigateTo} View={View} showAchievements={true} />
-            <SubjectGrid subjects={secondSemesterSubjects} title="الفصل الثاني" navigateTo={navigateTo} View={View} />
+            <SubjectGrid 
+                subjects={firstSemesterSubjects} 
+                title="الفصل الأول" 
+                navigateTo={navigateTo} 
+                View={View} 
+                showAchievements={true} 
+                subjectIndexData={subjectIndexData}
+                userProgress={userProgress}
+            />
+            <SubjectGrid 
+                subjects={secondSemesterSubjects} 
+                title="الفصل الثاني" 
+                navigateTo={navigateTo} 
+                View={View} 
+                subjectIndexData={subjectIndexData}
+                userProgress={userProgress}
+            />
 
             {/* Additional Sessions Section */}
             <div className="grid grid-cols-2 gap-4 mt-4">
