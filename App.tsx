@@ -635,44 +635,6 @@ const App: React.FC = () => {
         return () => clearTimeout(timeout);
     }, [user, isAuthenticating, getStorageKey, viewHistory, selectedSubject, sessionTitle, currentQuiz, currentQuestionIndex, userAnswers, showResults, currentLessonTitle, currentUnitTitle, examNumber, timer, expandedUnitIndices, expandedLessonKeys, currentPdfUrl, pdfTitle]);
 
-    // Long press recovery mechanism: Press and hold anywhere for 5 seconds to go home
-    useEffect(() => {
-        let longPressTimer: NodeJS.Timeout | null = null;
-        const duration = 5000; // 5 seconds
-
-        const handleStart = () => {
-            longPressTimer = setTimeout(() => {
-                console.log("Recovery: Long press detected. Returning home...");
-                goToHome();
-                if (window.navigator && window.navigator.vibrate) {
-                    window.navigator.vibrate([100, 50, 100]);
-                }
-            }, duration);
-        };
-
-        const handleEnd = () => {
-            if (longPressTimer) {
-                clearTimeout(longPressTimer);
-                longPressTimer = null;
-            }
-        };
-
-        window.addEventListener('touchstart', handleStart, { passive: true });
-        window.addEventListener('touchend', handleEnd);
-        window.addEventListener('mousedown', handleStart);
-        window.addEventListener('mouseup', handleEnd);
-        window.addEventListener('mouseleave', handleEnd);
-
-        return () => {
-            if (longPressTimer) clearTimeout(longPressTimer);
-            window.removeEventListener('touchstart', handleStart);
-            window.removeEventListener('touchend', handleEnd);
-            window.removeEventListener('mousedown', handleStart);
-            window.removeEventListener('mouseup', handleEnd);
-            window.removeEventListener('mouseleave', handleEnd);
-        };
-    }, [goToHome]);
-
     // Reset quiz states when leaving the Quiz view completely
     useEffect(() => {
         // Essential safety check - if history is missing or corrupted, reset to landing
@@ -691,13 +653,21 @@ const App: React.FC = () => {
             setUserAnswers([]);
             setTimer(0);
         }
-        
-        // Data integrity checks
-        if (currentView === View.SubjectIndex && !selectedSubject && !isAuthenticating && user) {
-            console.warn("SubjectIndex view active but no subject selected. Redirecting home.");
-            goToHome();
+    }, [viewHistory]);
+
+    // Rehydrate browser history when loading state from localStorage
+    // Only run when isAuthenticating becomes false (initial load)
+    const hasRehydratedRef = useRef(false);
+    useEffect(() => {
+        if (!isAuthenticating && viewHistory.length > 1 && !hasRehydratedRef.current) {
+            hasRehydratedRef.current = true;
+            console.log("Initial history rehydration...");
+            window.history.replaceState({ view: viewHistory[0], historyIndex: 0 }, '');
+            for (let i = 1; i < viewHistory.length; i++) {
+                window.history.pushState({ view: viewHistory[i], historyIndex: i }, '');
+            }
         }
-    }, [viewHistory, selectedSubject, goToHome, isAuthenticating, user]);
+    }, [isAuthenticating, viewHistory]);
 
     const fetchExams = useCallback(() => {
         setIsBackgroundFetching(true);
@@ -867,7 +837,8 @@ const App: React.FC = () => {
         } else if (currentView === View.Landing) {
             setShowExitConfirmation(true);
         } else {
-            // Use window.history.back() to trigger popstate handler correctly
+            // Set flag to bypass confirmation in popstate
+            isNavigatingBackRef.current = true;
             window.history.back();
         }
     }, [currentView, showResults, setShowBackConfirmation, setShowExitConfirmation]);
