@@ -20,7 +20,7 @@ interface SubjectIndexPageProps {
     onBack: () => void;
 }
 
-const SubjectIndexPage: React.FC<SubjectIndexPageProps> = ({
+const SubjectIndexPage: React.FC<SubjectIndexPageProps> = React.memo(({
     selectedSubject,
     subjectIndexData,
     expandedUnitIndices,
@@ -375,6 +375,6 @@ const SubjectIndexPage: React.FC<SubjectIndexPageProps> = ({
             </div>
         </div>
     );
-};
+});
 
 export default SubjectIndexPage;

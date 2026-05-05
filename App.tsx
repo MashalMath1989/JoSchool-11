@@ -325,7 +325,13 @@ const cleanAndParseJson = (text: string) => {
 
     try {
         const data = JSON.parse(cleanedText);
-        return Array.isArray(data) ? data : data.questions;
+        if (Array.isArray(data)) return data;
+        if (data.questions && Array.isArray(data.questions)) return data.questions;
+        if (data.exam && Array.isArray(data.exam)) return data.exam;
+        // Search for any array property if neither 'questions' nor 'exam' exists
+        const arrayKey = Object.keys(data).find(key => Array.isArray(data[key]));
+        if (arrayKey) return data[arrayKey];
+        return null;
     } catch (e) {
         if (!cleanedText.includes('404')) {
             throw e;
@@ -440,75 +446,77 @@ const App: React.FC = () => {
     // Effect to handle user identity and isolated state loading
     useEffect(() => {
         const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
-            const prevUid = user?.uid;
-            const newUid = currentUser?.uid;
+            setUser(prevUser => {
+                const prevUid = prevUser?.uid;
+                const newUid = currentUser?.uid;
 
-            // Only act if user identity changed or it's first load
-            if (prevUid !== newUid || isAuthenticating) {
-                setUser(currentUser);
-                setIsAuthenticating(false);
+                // Only act if user identity changed or it's first load
+                if (prevUid !== newUid || isAuthenticating) {
+                    setIsAuthenticating(false);
 
-                // 1. Reset/Load progress
-                const progressKey = getStorageKey('user_progress', newUid);
-                const savedProgress = localStorage.getItem(progressKey);
-                if (savedProgress) {
-                    try {
-                        const parsed = JSON.parse(savedProgress);
-                        const sanitizedFavorites = parsed?.favoriteQuestions 
-                            ? parsed.favoriteQuestions.filter((q: any) => typeof q === 'object' && q !== null)
-                            : [];
-                        setUserProgress({
-                            ...getDefaultProgress(),
-                            ...parsed,
-                            favoriteQuestions: sanitizedFavorites
-                        });
-                    } catch (e) {
+                    // 1. Reset/Load progress
+                    const progressKey = getStorageKey('user_progress', newUid);
+                    const savedProgress = localStorage.getItem(progressKey);
+                    if (savedProgress) {
+                        try {
+                            const parsed = JSON.parse(savedProgress);
+                            const sanitizedFavorites = parsed?.favoriteQuestions 
+                                ? parsed.favoriteQuestions.filter((q: any) => typeof q === 'object' && q !== null)
+                                : [];
+                            setUserProgress({
+                                ...getDefaultProgress(),
+                                ...parsed,
+                                favoriteQuestions: sanitizedFavorites
+                            });
+                        } catch (e) {
+                            setUserProgress(getDefaultProgress());
+                        }
+                    } else {
                         setUserProgress(getDefaultProgress());
                     }
-                } else {
-                    setUserProgress(getDefaultProgress());
-                }
 
-                // 2. Reset/Load session state
-                const state = loadStateForUser(newUid);
-                if (state) {
-                    if (state.viewHistory) setViewHistory(state.viewHistory);
-                    if (state.selectedSubject) setSelectedSubject(state.selectedSubject);
-                    if (state.sessionTitle) setSessionTitle(state.sessionTitle);
-                    if (state.currentQuiz) setCurrentQuiz(state.currentQuiz);
-                    if (state.currentQuestionIndex !== undefined) setCurrentQuestionIndex(state.currentQuestionIndex);
-                    if (state.userAnswers) setUserAnswers(state.userAnswers);
-                    if (state.showResults !== undefined) setShowResults(state.showResults);
-                    if (state.timer !== undefined) setTimer(state.timer);
-                    if (state.currentPdfUrl) setCurrentPdfUrl(state.currentPdfUrl);
-                    if (state.pdfTitle) setPdfTitle(state.pdfTitle);
-                    if (state.currentLessonTitle) setCurrentLessonTitle(state.currentLessonTitle);
-                    if (state.currentUnitTitle) setCurrentUnitTitle(state.currentUnitTitle);
-                    if (state.examNumber !== undefined) setExamNumber(state.examNumber);
-                    if (state.expandedUnitIndices) setExpandedUnitIndices(state.expandedUnitIndices);
-                    if (state.expandedLessonKeys) setExpandedLessonKeys(state.expandedLessonKeys);
-                } else {
-                    // Start fresh for new account or guest
-                    setViewHistory([View.Landing]);
-                    setSelectedSubject(null);
-                    setSessionTitle('');
-                    setCurrentQuiz([]);
-                    setCurrentQuestionIndex(0);
-                    setUserAnswers([]);
-                    setShowResults(false);
-                    setTimer(0);
-                    setCurrentPdfUrl('');
-                    setPdfTitle('');
-                    setCurrentLessonTitle('');
-                    setCurrentUnitTitle('');
-                    setExamNumber(null);
-                    setExpandedUnitIndices([]);
-                    setExpandedLessonKeys([]);
+                    // 2. Reset/Load session state
+                    const state = loadStateForUser(newUid);
+                    if (state) {
+                        if (state.viewHistory) setViewHistory(state.viewHistory);
+                        if (state.selectedSubject) setSelectedSubject(state.selectedSubject);
+                        if (state.sessionTitle) setSessionTitle(state.sessionTitle);
+                        if (state.currentQuiz) setCurrentQuiz(state.currentQuiz);
+                        if (state.currentQuestionIndex !== undefined) setCurrentQuestionIndex(state.currentQuestionIndex);
+                        if (state.userAnswers) setUserAnswers(state.userAnswers);
+                        if (state.showResults !== undefined) setShowResults(state.showResults);
+                        if (state.timer !== undefined) setTimer(state.timer);
+                        if (state.currentPdfUrl) setCurrentPdfUrl(state.currentPdfUrl);
+                        if (state.pdfTitle) setPdfTitle(state.pdfTitle);
+                        if (state.currentLessonTitle) setCurrentLessonTitle(state.currentLessonTitle);
+                        if (state.currentUnitTitle) setCurrentUnitTitle(state.currentUnitTitle);
+                        if (state.examNumber !== undefined) setExamNumber(state.examNumber);
+                        if (state.expandedUnitIndices) setExpandedUnitIndices(state.expandedUnitIndices);
+                        if (state.expandedLessonKeys) setExpandedLessonKeys(state.expandedLessonKeys);
+                    } else {
+                        // Start fresh for new account or guest
+                        setViewHistory([View.Landing]);
+                        setSelectedSubject(null);
+                        setSessionTitle('');
+                        setCurrentQuiz([]);
+                        setCurrentQuestionIndex(0);
+                        setUserAnswers([]);
+                        setShowResults(false);
+                        setTimer(0);
+                        setCurrentPdfUrl('');
+                        setPdfTitle('');
+                        setCurrentLessonTitle('');
+                        setCurrentUnitTitle('');
+                        setExamNumber(null);
+                        setExpandedUnitIndices([]);
+                        setExpandedLessonKeys([]);
+                    }
                 }
-            }
+                return currentUser;
+            });
         });
         return () => unsubscribe();
-    }, [user, isAuthenticating, getStorageKey, loadStateForUser, getDefaultProgress]);
+    }, [getStorageKey, loadStateForUser, getDefaultProgress, isAuthenticating]); // Removed user from deps but kept isAuthenticating
 
     useEffect(() => {
         const key = getStorageKey('user_progress', user?.uid);
@@ -597,28 +605,34 @@ const App: React.FC = () => {
     const [expandedLessonKeys, setExpandedLessonKeys] = useState<string[]>([]);
 
     // Save state to localStorage on any change (now isolated per user)
+    // Debounced to avoid heavy writes on every timer tick
     useEffect(() => {
         if (!user && isAuthenticating) return; // Wait for initial auth attempt
         
-        const appState = {
-            viewHistory,
-            selectedSubject,
-            sessionTitle,
-            currentQuiz,
-            currentQuestionIndex,
-            userAnswers,
-            showResults,
-            currentLessonTitle,
-            currentUnitTitle,
-            examNumber,
-            timer,
-            expandedUnitIndices,
-            expandedLessonKeys,
-            currentPdfUrl,
-            pdfTitle
+        const saveState = () => {
+            const appState = {
+                viewHistory,
+                selectedSubject,
+                sessionTitle,
+                currentQuiz,
+                currentQuestionIndex,
+                userAnswers,
+                showResults,
+                currentLessonTitle,
+                currentUnitTitle,
+                examNumber,
+                timer,
+                expandedUnitIndices,
+                expandedLessonKeys,
+                currentPdfUrl,
+                pdfTitle
+            };
+            const key = getStorageKey('app_state', user?.uid);
+            localStorage.setItem(key, JSON.stringify(appState));
         };
-        const key = getStorageKey('app_state', user?.uid);
-        localStorage.setItem(key, JSON.stringify(appState));
+
+        const timeout = setTimeout(saveState, timer > 0 ? 2000 : 500); // Save less frequently during active exams
+        return () => clearTimeout(timeout);
     }, [user, isAuthenticating, getStorageKey, viewHistory, selectedSubject, sessionTitle, currentQuiz, currentQuestionIndex, userAnswers, showResults, currentLessonTitle, currentUnitTitle, examNumber, timer, expandedUnitIndices, expandedLessonKeys, currentPdfUrl, pdfTitle]);
 
     // Long press recovery mechanism: Press and hold anywhere for 5 seconds to go home
@@ -679,11 +693,11 @@ const App: React.FC = () => {
         }
         
         // Data integrity checks
-        if (currentView === View.SubjectIndex && !selectedSubject) {
+        if (currentView === View.SubjectIndex && !selectedSubject && !isAuthenticating && user) {
             console.warn("SubjectIndex view active but no subject selected. Redirecting home.");
             goToHome();
         }
-    }, [currentView, viewHistory, selectedSubject, goToHome]);
+    }, [viewHistory, selectedSubject, goToHome, isAuthenticating, user]);
 
     const fetchExams = useCallback(() => {
         setIsBackgroundFetching(true);
@@ -707,7 +721,12 @@ const App: React.FC = () => {
                     ? (item as any).subject 
                     : set.subject;
                 
-                if (examsDatabase[subjectKey]?.[item.title]) return;
+                if (examsDatabase[subjectKey]?.[item.title] && !(item as any).forceUpdate) return;
+                
+                // If forceUpdate is true, clear the existing data to ensure we get the fresh one
+                if ((item as any).forceUpdate && examsDatabase[subjectKey]) {
+                    delete examsDatabase[subjectKey]![item.title];
+                }
 
                 const p = fetch(item.url)
                     .then(res => {
@@ -1214,22 +1233,31 @@ const App: React.FC = () => {
 
     useEffect(() => {
         if (currentView === View.Quiz && !showResults && timer > 0) {
-            timerRef.current = setInterval(() => {
-                setTimer(prev => {
-                    if (prev <= 1) {
-                        handleFinish();
-                        return 0;
-                    }
-                    return prev - 1;
-                });
-            }, 1000);
+            // Only start interval if not already running
+            if (!timerRef.current) {
+                timerRef.current = setInterval(() => {
+                    setTimer(prev => {
+                        if (prev <= 1) {
+                            handleFinish();
+                            return 0;
+                        }
+                        return prev - 1;
+                    });
+                }, 1000);
+            }
         } else {
-            if (timerRef.current) clearInterval(timerRef.current);
+            if (timerRef.current) {
+                clearInterval(timerRef.current);
+                timerRef.current = null;
+            }
         }
         return () => {
-            if (timerRef.current) clearInterval(timerRef.current);
+            if (timerRef.current) {
+                clearInterval(timerRef.current);
+                timerRef.current = null;
+            }
         };
-    }, [currentView, showResults, timer, handleFinish]);
+    }, [currentView, showResults, handleFinish]); // Removed timer from deps
 
     const handleAnswer = (choice: string) => {
         const newAnswers = [...userAnswers];
@@ -1309,8 +1337,12 @@ const App: React.FC = () => {
             // Fetch all missing exams using Promise.all to load everything for the mock exam
             const fetchPromises = allExams.map(async (exam) => {
                 let questions = getQuizzesForLesson(subjectId, exam.title);
-                if ((!questions || questions.length === 0) && exam.url) {
+                if (((!questions || questions.length === 0) || (exam as any).forceUpdate) && exam.url) {
                     try {
+                        // If forceUpdate, clear it first
+                        if ((exam as any).forceUpdate && examsDatabase[subjectId]) {
+                            delete examsDatabase[subjectId]![exam.title];
+                        }
                         const res = await fetch(exam.url);
                         const text = await res.text();
                         const qs = cleanAndParseJson(text);
@@ -1394,6 +1426,11 @@ const App: React.FC = () => {
         if (!examInfo || !examInfo.url) {
             alert('عذراً، هذا الامتحان غير متوفر حالياً.');
             return;
+        }
+
+        // Handle forceUpdate for session exams
+        if (examInfo.forceUpdate) {
+            updateDatabase(subjectId, examInfo.title, []); // Clear cache
         }
 
         const isEnglish = subjectId === SubjectName.English;

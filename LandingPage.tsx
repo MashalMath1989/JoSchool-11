@@ -15,7 +15,7 @@ interface LandingPageProps {
     handleLogout: () => void;
 }
 
-const SubjectGrid = ({ 
+const SubjectGrid = React.memo(({ 
     subjects, 
     title, 
     navigateTo, 
@@ -84,8 +84,8 @@ const SubjectGrid = ({
     };
 
     return (
-        <div className="mb-2">
-            <div className="flex items-center justify-between mb-1 px-2 text-right">
+        <div className="mb-1">
+            <div className="flex items-center justify-between mb-0.5 px-2 text-right">
                 <div className="flex items-center gap-2">
                     <div className="w-2 h-6 bg-yellow-400 rounded-full"></div>
                     <h2 className="text-lg sm:text-xl font-black text-slate-800 leading-tight">{title}</h2>
@@ -102,8 +102,8 @@ const SubjectGrid = ({
                 )}
             </div>
 
-            <div className="bg-gradient-to-br from-sky-400 to-slate-800 p-2 sm:p-3 rounded-xl shadow-2xl border border-slate-900">
-                <div className="grid grid-cols-2 gap-2 sm:gap-2.5">
+            <div className="bg-gradient-to-br from-sky-400 to-slate-800 p-1.5 sm:p-2.5 rounded-xl shadow-2xl border border-slate-900">
+                <div className="grid grid-cols-2 gap-1.5 sm:gap-2.5">
                     {subjects.map((subject) => {
                         const isAvailable = 
                             subject.id === SubjectName.JordanHistory || 
@@ -119,10 +119,10 @@ const SubjectGrid = ({
                                 whileHover={{ scale: 1.02 }}
                                 whileTap={{ scale: 0.98 }}
                                 onClick={() => navigateTo(View.SubjectIndex, subject)}
-                                className="bg-white rounded-lg p-1.5 sm:p-2 shadow-lg border border-slate-900 cursor-pointer flex flex-col transition-all hover:shadow-xl group relative overflow-hidden h-20 sm:h-24"
+                                className="bg-white rounded-lg p-1 sm:p-1.5 shadow-lg border border-slate-900 cursor-pointer flex flex-col transition-all hover:shadow-xl group relative overflow-hidden h-16 sm:h-20"
                             >
-                                <div className="flex flex-row items-center gap-1.5 sm:gap-3 flex-1 min-w-0">
-                                    <div className="w-8 h-12 sm:w-12 sm:h-16 rounded-lg overflow-hidden shadow-sm shrink-0 z-10 border border-slate-100">
+                                <div className="flex flex-row items-center gap-1 sm:gap-2 flex-1 min-w-0">
+                                    <div className="w-8 h-10 sm:w-11 sm:h-14 rounded-lg overflow-hidden shadow-sm shrink-0 z-10 border border-slate-100">
                                         <img 
                                             src={subject.coverImage} 
                                             alt={subject.id} 
@@ -131,7 +131,7 @@ const SubjectGrid = ({
                                         />
                                     </div>
                                     <div className="flex-1 text-right z-10 min-w-0">
-                                        <h3 className={`text-[10.5px] sm:text-[18.5px] tracking-tighter font-black text-slate-800 truncate mb-0.5 sm:mb-1 ${subject.fontClass}`}>{subject.id}</h3>
+                                        <h3 className={`text-[9.5px] sm:text-[18.5px] tracking-tighter font-black text-slate-800 mb-0.5 sm:mb-1 whitespace-nowrap ${subject.fontClass}`}>{subject.id}</h3>
                                         <div className="flex items-center gap-1.5 sm:gap-2">
                                             <span className={`text-[8px] sm:text-[11px] font-bold ${isAvailable ? 'text-emerald-500' : 'text-slate-400'}`}>
                                                 {isAvailable ? 'متاح' : 'قريباً'}
@@ -162,9 +162,9 @@ const SubjectGrid = ({
             </div>
         </div>
     );
-};
+});
 
-const LandingPage: React.FC<LandingPageProps> = ({
+const LandingPage: React.FC<LandingPageProps> = React.memo(({
     subjectsData,
     subjectIndexData,
     userProgress,
@@ -290,6 +290,6 @@ const LandingPage: React.FC<LandingPageProps> = ({
             </div>
         </div>
     );
-};
+});
 
 export default LandingPage;

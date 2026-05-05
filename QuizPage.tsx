@@ -23,7 +23,7 @@ interface QuizPageProps {
     isFavoriteDisabled?: boolean;
 }
 
-const QuizPage: React.FC<QuizPageProps> = ({
+const QuizPage: React.FC<QuizPageProps> = React.memo(({
     currentQuiz = [],
     currentQuestionIndex = 0,
     userAnswers = [],
@@ -163,6 +163,6 @@ const QuizPage: React.FC<QuizPageProps> = ({
             </div>
         </div>
     );
-};
+});
 
 export default QuizPage;
