@@ -131,13 +131,13 @@ const SubjectGrid = ({
                                         />
                                     </div>
                                     <div className="flex-1 text-right z-10 min-w-0">
-                                        <h3 className={`text-[13px] sm:text-[21px] font-black text-slate-800 truncate mb-0.5 sm:mb-1 ${subject.fontClass}`}>{subject.id}</h3>
-                                        <div className="flex items-center gap-1 sm:gap-2">
-                                            <span className={`text-[7px] sm:text-[10px] font-bold ${isAvailable ? 'text-emerald-500' : 'text-slate-400'}`}>
+                                        <h3 className={`${subject.id === SubjectName.IslamicEducation ? 'text-[11px] sm:text-[19px] tracking-tighter' : subject.id === SubjectName.English ? 'text-[13px] sm:text-[21px] tracking-tighter' : 'text-[15px] sm:text-[24px]'} font-black text-slate-800 truncate mb-0.5 sm:mb-1 ${subject.fontClass}`}>{subject.id}</h3>
+                                        <div className="flex items-center gap-1.5 sm:gap-2">
+                                            <span className={`text-[8px] sm:text-[11px] font-bold ${isAvailable ? 'text-emerald-500' : 'text-slate-400'}`}>
                                                 {isAvailable ? 'متاح' : 'قريباً'}
                                             </span>
                                             {isAvailable && (
-                                                <div className="w-1 h-1 sm:w-1.5 sm:h-1.5 rounded-full bg-emerald-500 animate-pulse"></div>
+                                                <div className="w-1.5 h-1.5 sm:w-2 sm:h-2 rounded-full bg-emerald-500 animate-pulse"></div>
                                             )}
                                         </div>
                                     </div>
@@ -152,7 +152,7 @@ const SubjectGrid = ({
                                                 className="h-full bg-emerald-500"
                                             />
                                         </div>
-                                        <span className="text-[8px] sm:text-[10px] font-black text-emerald-600 shrink-0">{Math.round(progress)}%</span>
+                                        <span className="text-[10px] sm:text-xs font-black text-emerald-600 shrink-0">{Math.round(progress)}%</span>
                                     </div>
                                 )}
                             </motion.div>
