@@ -84,11 +84,11 @@ const SubjectGrid = ({
     };
 
     return (
-        <div className="mb-6">
-            <div className="flex items-center justify-between mb-3 px-2 text-right">
-                <div className="flex items-center gap-3">
-                    <div className="w-2.5 h-8 bg-yellow-400 rounded-full"></div>
-                    <h2 className="text-xl sm:text-2xl font-black text-slate-800 leading-tight">{title}</h2>
+        <div className="mb-2">
+            <div className="flex items-center justify-between mb-1 px-2 text-right">
+                <div className="flex items-center gap-2">
+                    <div className="w-2 h-6 bg-yellow-400 rounded-full"></div>
+                    <h2 className="text-lg sm:text-xl font-black text-slate-800 leading-tight">{title}</h2>
                 </div>
                 {showAchievements && (
                     <motion.button
@@ -102,8 +102,8 @@ const SubjectGrid = ({
                 )}
             </div>
 
-            <div className="bg-gradient-to-br from-sky-400 to-slate-800 p-3 sm:p-6 rounded-xl shadow-2xl border border-slate-900">
-                <div className="grid grid-cols-2 gap-3 sm:gap-4">
+            <div className="bg-gradient-to-br from-sky-400 to-slate-800 p-2 sm:p-3 rounded-xl shadow-2xl border border-slate-900">
+                <div className="grid grid-cols-2 gap-2 sm:gap-2.5">
                     {subjects.map((subject) => {
                         const isAvailable = 
                             subject.id === SubjectName.JordanHistory || 
@@ -119,10 +119,10 @@ const SubjectGrid = ({
                                 whileHover={{ scale: 1.02 }}
                                 whileTap={{ scale: 0.98 }}
                                 onClick={() => navigateTo(View.SubjectIndex, subject)}
-                                className="bg-white rounded-lg p-2 sm:p-3 shadow-lg border border-slate-900 cursor-pointer flex flex-col transition-all hover:shadow-xl group relative overflow-hidden h-24 sm:h-28"
+                                className="bg-white rounded-lg p-1.5 sm:p-2 shadow-lg border border-slate-900 cursor-pointer flex flex-col transition-all hover:shadow-xl group relative overflow-hidden h-20 sm:h-24"
                             >
-                                <div className="flex flex-row items-center gap-2 sm:gap-4 flex-1 min-w-0">
-                                    <div className="w-10 h-14 sm:w-14 sm:h-18 rounded-lg overflow-hidden shadow-sm shrink-0 z-10 border border-slate-100">
+                                <div className="flex flex-row items-center gap-1.5 sm:gap-3 flex-1 min-w-0">
+                                    <div className="w-8 h-12 sm:w-12 sm:h-16 rounded-lg overflow-hidden shadow-sm shrink-0 z-10 border border-slate-100">
                                         <img 
                                             src={subject.coverImage} 
                                             alt={subject.id} 
@@ -131,7 +131,7 @@ const SubjectGrid = ({
                                         />
                                     </div>
                                     <div className="flex-1 text-right z-10 min-w-0">
-                                        <h3 className={`${subject.id === SubjectName.IslamicEducation ? 'text-[11px] sm:text-[19px] tracking-tighter' : subject.id === SubjectName.English ? 'text-[13px] sm:text-[21px] tracking-tighter' : 'text-[15px] sm:text-[24px]'} font-black text-slate-800 truncate mb-0.5 sm:mb-1 ${subject.fontClass}`}>{subject.id}</h3>
+                                        <h3 className={`text-[10.5px] sm:text-[18.5px] tracking-tighter font-black text-slate-800 truncate mb-0.5 sm:mb-1 ${subject.fontClass}`}>{subject.id}</h3>
                                         <div className="flex items-center gap-1.5 sm:gap-2">
                                             <span className={`text-[8px] sm:text-[11px] font-bold ${isAvailable ? 'text-emerald-500' : 'text-slate-400'}`}>
                                                 {isAvailable ? 'متاح' : 'قريباً'}
@@ -144,8 +144,8 @@ const SubjectGrid = ({
                                 </div>
                                 
                                 {isAvailable && progress > 0 && (
-                                    <div className="w-full mt-2 flex items-center gap-2">
-                                        <div className="flex-1 h-1.5 bg-slate-100 rounded-full overflow-hidden border border-slate-200">
+                                    <div className="w-full mt-1 flex items-center gap-2">
+                                        <div className="flex-1 h-1 bg-slate-100 rounded-full overflow-hidden border border-slate-200">
                                             <motion.div 
                                                 initial={{ width: 0 }}
                                                 animate={{ width: `${progress}%` }}
@@ -179,7 +179,7 @@ const LandingPage: React.FC<LandingPageProps> = ({
     return (
         <div className="container mx-auto p-4 max-w-2xl text-right" dir="rtl">
             {/* Header - Non-sticky */}
-            <div className="mb-8 mt-2">
+            <div className="mb-4 mt-1">
                 <div className="relative flex items-center justify-between min-h-[64px]">
                     {/* Logout Button (Right side in RTL) */}
                     {user && (
