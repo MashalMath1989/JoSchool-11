@@ -43,19 +43,45 @@ const SubjectIndexPage: React.FC<SubjectIndexPageProps> = React.memo(({
     
     const isLoaded = selectedSubject.id === SubjectName.English || isSubjectLoaded(selectedSubject.id as SubjectName);
 
-    const getExamProgressStyle = (lessonTitle: string, examNumber: number) => {
+    const getExamStatus = (lessonTitle: string, examNumber: number) => {
         const isEnglish = selectedSubject.id === SubjectName.English;
         const examLabel = isEnglish ? `Exam (${examNumber})` : `امتحان (${examNumber})`;
         const fullTitle = `${lessonTitle} - ${examLabel}`;
 
-        // Check for perfect score
-        const hasPerfectScore = userProgress.quizResults?.some((r: any) => 
-            r.subjectId === selectedSubject.id && 
-            r.lessonTitle === fullTitle && 
-            r.score === 40
-        );
+        const results = userProgress.quizResults?.filter((r: any) => 
+            r.subjectId === selectedSubject.id && r.lessonTitle === fullTitle
+        ) || [];
 
-        if (hasPerfectScore) {
+        if (results.length === 0) return null;
+        const bestScore = Math.max(...results.map(r => r.score));
+        
+        if (bestScore === 40) return 'perfect';
+        if (bestScore >= 20) return 'passed';
+        return 'failed';
+    };
+
+    const getUnitExamStatus = (unitTitle: string) => {
+        const unitOrdinal = unitTitle.split(':')[0];
+        const isEnglish = selectedSubject.id === SubjectName.English;
+        const examLabel = isEnglish ? 'Exam (1)' : 'امتحان (1)';
+        const fullTitle = `${unitOrdinal} - ${examLabel}`;
+
+        const results = userProgress.quizResults?.filter((r: any) => 
+            r.subjectId === selectedSubject.id && r.lessonTitle === fullTitle
+        ) || [];
+
+        if (results.length === 0) return null;
+        const bestScore = Math.max(...results.map(r => r.score));
+        
+        if (bestScore === 40) return 'perfect';
+        if (bestScore >= 20) return 'passed';
+        return 'failed';
+    };
+
+    const getExamProgressStyle = (lessonTitle: string, examNumber: number) => {
+        const status = getExamStatus(lessonTitle, examNumber);
+
+        if (status === 'perfect') {
             return {
                 backgroundColor: '#10b981',
                 color: 'white',
@@ -63,6 +89,9 @@ const SubjectIndexPage: React.FC<SubjectIndexPageProps> = React.memo(({
             };
         }
 
+        const isEnglish = selectedSubject.id === SubjectName.English;
+        const examLabel = isEnglish ? `Exam (${examNumber})` : `امتحان (${examNumber})`;
+        const fullTitle = `${lessonTitle} - ${examLabel}`;
         const key = `${selectedSubject.id}_${fullTitle}`;
         const progress = userProgress.examProgresses?.[key];
 
@@ -77,19 +106,9 @@ const SubjectIndexPage: React.FC<SubjectIndexPageProps> = React.memo(({
     };
 
     const getUnitExamProgressStyle = (unitTitle: string) => {
-        const unitOrdinal = unitTitle.split(':')[0];
-        const isEnglish = selectedSubject.id === SubjectName.English;
-        const examLabel = isEnglish ? 'Exam (1)' : 'امتحان (1)';
-        const fullTitle = `${unitOrdinal} - ${examLabel}`;
+        const status = getUnitExamStatus(unitTitle);
 
-        // Check for perfect score
-        const hasPerfectScore = userProgress.quizResults?.some((r: any) => 
-            r.subjectId === selectedSubject.id && 
-            r.lessonTitle === fullTitle && 
-            r.score === 40
-        );
-
-        if (hasPerfectScore) {
+        if (status === 'perfect') {
             return {
                 backgroundColor: '#10b981',
                 color: 'white',
@@ -97,6 +116,10 @@ const SubjectIndexPage: React.FC<SubjectIndexPageProps> = React.memo(({
             };
         }
 
+        const unitOrdinal = unitTitle.split(':')[0];
+        const isEnglish = selectedSubject.id === SubjectName.English;
+        const examLabel = isEnglish ? 'Exam (1)' : 'امتحان (1)';
+        const fullTitle = `${unitOrdinal} - ${examLabel}`;
         const key = `${selectedSubject.id}_${fullTitle}`;
         const progress = userProgress.examProgresses?.[key];
 
@@ -110,11 +133,21 @@ const SubjectIndexPage: React.FC<SubjectIndexPageProps> = React.memo(({
         return {};
     };
 
-    const hasPerfectComprehensive = userProgress.quizResults?.some((r: any) => 
-        r.subjectId === selectedSubject.id && 
-        r.lessonTitle.includes(selectedSubject.id === SubjectName.English ? 'Comprehensive Exam' : 'امتحان شامل') && 
-        r.score === 40
-    );
+    const getComprehensiveExamStatus = () => {
+        const fullTitle = selectedSubject.id === SubjectName.English ? 'Comprehensive Exam' : 'امتحان شامل';
+        const results = userProgress.quizResults?.filter((r: any) => 
+            r.subjectId === selectedSubject.id && r.lessonTitle.includes(fullTitle)
+        ) || [];
+
+        if (results.length === 0) return null;
+        const bestScore = Math.max(...results.map(r => r.score));
+        
+        if (bestScore === 40) return 'perfect';
+        if (bestScore >= 20) return 'passed';
+        return 'failed';
+    };
+
+    const comprehensiveStatus = getComprehensiveExamStatus();
 
     return (
         <div className="container mx-auto p-4 max-w-2xl pt-1.5 pb-8" dir="rtl">
@@ -175,11 +208,15 @@ const SubjectIndexPage: React.FC<SubjectIndexPageProps> = React.memo(({
 
                         <button 
                             onClick={handleStartComprehensiveExam}
-                            className={`w-full p-3 sm:p-4 rounded-xl shadow-md flex items-center justify-between px-3 sm:px-6 active:scale-95 transition-transform border-2 border-slate-900 ${hasPerfectComprehensive ? 'bg-emerald-500' : 'bg-gradient-to-r from-primary to-secondary'}`}
+                            className={`w-full p-3 sm:p-4 rounded-xl shadow-md flex flex-col items-center justify-center px-3 sm:px-6 active:scale-95 transition-transform border-2 border-slate-900 relative ${comprehensiveStatus === 'perfect' ? 'bg-emerald-500' : 'bg-gradient-to-r from-primary to-secondary'}`}
                         >
-                            <span className="font-black text-sm sm:text-lg text-white flex-1 text-center">امتحان شامل</span>
-                            <div className="w-6 h-6 sm:w-10 sm:h-10 flex items-center justify-center shrink-0 order-first">
-                                <StarIcon className="w-5 h-5 sm:w-8 sm:h-8 text-white fill-white" />
+                            {comprehensiveStatus === 'passed' && <span className="absolute top-1 text-[8px] sm:text-[10px] leading-tight text-white/90 font-black">ناجح</span>}
+                            {comprehensiveStatus === 'failed' && <span className="absolute top-1 text-[8px] sm:text-[10px] leading-tight text-white/90 font-black">مكمل</span>}
+                            <div className="flex items-center justify-between w-full">
+                                <span className="font-black text-sm sm:text-lg text-white flex-1 text-center">امتحان شامل</span>
+                                <div className="w-6 h-6 sm:w-10 sm:h-10 flex items-center justify-center shrink-0 order-first">
+                                    <StarIcon className="w-5 h-5 sm:w-8 sm:h-8 text-white fill-white" />
+                                </div>
                             </div>
                         </button>
                     </div>
@@ -192,12 +229,6 @@ const SubjectIndexPage: React.FC<SubjectIndexPageProps> = React.memo(({
                         <div className="text-5xl mb-4">✨</div>
                         <h3 className="text-2xl font-black text-slate-800 mb-2">قريباً...</h3>
                         <p className="text-slate-500 font-bold">نعمل حالياً على تجهيز فهرس المادة والاختبارات</p>
-                    </div>
-                ) : !isLoaded ? (
-                    <div className="bg-white rounded-xl p-12 text-center shadow-sm border border-slate-50 flex flex-col items-center justify-center">
-                        <Loader2 className="w-10 h-10 text-primary animate-spin mb-4" />
-                        <h3 className="text-lg font-black text-slate-800 mb-2">جاري تجهيز الاختبارات...</h3>
-                        <p className="text-slate-400 font-bold text-xs">نحن نجهز لك أفضل تجربة مراجعة، لحظات فقط</p>
                     </div>
                 ) : units.map((unit, uIdx) => {
                     const isExpanded = expandedUnitIndices.includes(uIdx);
@@ -213,7 +244,7 @@ const SubjectIndexPage: React.FC<SubjectIndexPageProps> = React.memo(({
                                 const isPassed = results.some((r: any) => 
                                     r.subjectId === selectedSubject.id && 
                                     r.lessonTitle === lesson.title &&
-                                    (r.score / r.totalQuestions) >= 0.5
+                                    r.score >= 20
                                 );
                                 if (isPassed) completedExams++;
                             });
@@ -227,7 +258,7 @@ const SubjectIndexPage: React.FC<SubjectIndexPageProps> = React.memo(({
                                     const isPassed = results.some((r: any) => 
                                         r.subjectId === selectedSubject.id && 
                                         r.lessonTitle === fullTitle &&
-                                        (r.score / r.totalQuestions) >= 0.5
+                                        r.score >= 20
                                     );
                                     if (isPassed) completedExams++;
                                 }
@@ -241,7 +272,7 @@ const SubjectIndexPage: React.FC<SubjectIndexPageProps> = React.memo(({
                             if (results.some((r: any) => 
                                 r.subjectId === selectedSubject.id && 
                                 r.lessonTitle === unitExamTitle &&
-                                (r.score / r.totalQuestions) >= 0.5
+                                r.score >= 20
                             )) {
                                 completedExams++;
                             }
@@ -284,7 +315,7 @@ const SubjectIndexPage: React.FC<SubjectIndexPageProps> = React.memo(({
                                 {isExpanded && (
                                     <motion.div
                                         initial={{ height: 0, opacity: 0 }}
-                                        animate={{ height: 'auto', opacity: 1 }}
+                                        animate={{ height: "auto", opacity: 1 }}
                                         exit={{ height: 0, opacity: 0 }}
                                         className="overflow-hidden"
                                     >
@@ -294,23 +325,27 @@ const SubjectIndexPage: React.FC<SubjectIndexPageProps> = React.memo(({
                                                     className="flex flex-wrap gap-3 justify-center py-2" 
                                                     dir={selectedSubject.id === SubjectName.English ? "ltr" : "rtl"}
                                                 >
-                                                    {unit.lessons.map((lesson, lIdx) => (
+                                                    {unit.lessons.map((lesson, lIdx) => {
+                                                        const status = getExamStatus(lesson.title, 1);
+                                                        return (
                                                             <button
                                                                 key={lIdx}
                                                                 onClick={() => handleStartQuiz(lesson, undefined, unit.title)}
                                                                 style={getExamProgressStyle(lesson.title, 1)}
-                                                                className={`w-11 h-11 rounded-lg border-2 border-slate-900 font-black text-sm flex items-center justify-center active:scale-90 transition-transform shadow-sm ${getExamProgressStyle(lesson.title, 1).backgroundColor ? '' : 'text-primary bg-white hover:bg-primary hover:text-white'}`}
+                                                                className={`w-11 h-11 rounded-lg border-2 border-slate-900 font-black flex flex-col items-center justify-center active:scale-90 transition-transform shadow-sm relative ${getExamProgressStyle(lesson.title, 1).backgroundColor ? '' : 'text-primary bg-white hover:bg-primary hover:text-white'}`}
                                                             >
-                                                                {lIdx + 1}
+                                                                {status === "passed" && <span className="absolute top-0.5 text-[6px] leading-tight text-emerald-600 font-black">ناجح</span>}
+                                                                {status === "failed" && <span className="absolute top-0.5 text-[6px] leading-tight text-red-600 font-black">مكمل</span>}
+                                                                <span className="text-sm mt-0.5">{lIdx + 1}</span>
                                                             </button>
-                                                    ))}
+                                                        );
+                                                    })}
                                                 </div>
                                             ) : (
                                                 <div className="space-y-3">
                                                     {unit.lessons.map((lesson, lIdx) => {
                                                         const lessonKey = `${uIdx}-${lIdx}`;
                                                         const isLessonExpanded = expandedLessonKeys.includes(lessonKey);
-                                                        const isCompleted = userProgress.completedLessons.includes(lesson.title);
                                                         
                                                         return (
                                                             <div key={lIdx} className="bg-white rounded-lg shadow-sm border border-slate-900 overflow-hidden transition-all">
@@ -330,21 +365,26 @@ const SubjectIndexPage: React.FC<SubjectIndexPageProps> = React.memo(({
                                                                     {isLessonExpanded && (
                                                                         <motion.div
                                                                             initial={{ height: 0, opacity: 0 }}
-                                                                            animate={{ height: 'auto', opacity: 1 }}
+                                                                            animate={{ height: "auto", opacity: 1 }}
                                                                             exit={{ height: 0, opacity: 0 }}
                                                                             className="px-5 pb-5"
                                                                         >
                                                                             <div className="flex flex-wrap gap-3 justify-center pt-2">
-                                                                                {Array.from({ length: getLessonChunksCount(selectedSubject.id, lesson.title) || 5 }).map((_, i) => (
-                                                                                    <button
-                                                                                        key={i}
-                                                                                        onClick={() => handleStartQuiz(lesson, i, unit.title)}
-                                                                                        style={getExamProgressStyle(lesson.title, i + 1)}
-                                                                                        className={`w-11 h-11 rounded-lg border-2 border-slate-900 font-black text-sm flex items-center justify-center active:scale-90 transition-transform ${getExamProgressStyle(lesson.title, i + 1).backgroundColor ? '' : 'text-primary bg-white hover:bg-primary hover:text-white'}`}
-                                                                                    >
-                                                                                        {i + 1}
-                                                                                    </button>
-                                                                                ))}
+                                                                                {Array.from({ length: getLessonChunksCount(selectedSubject.id, lesson.title) || 5 }).map((_, i) => {
+                                                                                    const status = getExamStatus(lesson.title, i + 1);
+                                                                                    return (
+                                                                                        <button
+                                                                                            key={i}
+                                                                                            onClick={() => handleStartQuiz(lesson, i, unit.title)}
+                                                                                            style={getExamProgressStyle(lesson.title, i + 1)}
+                                                                                            className={`w-11 h-11 rounded-lg border-2 border-slate-900 font-black flex flex-col items-center justify-center active:scale-90 transition-transform relative ${getExamProgressStyle(lesson.title, i + 1).backgroundColor ? '' : 'text-primary bg-white hover:bg-primary hover:text-white'}`}
+                                                                                        >
+                                                                                            {status === "passed" && <span className="absolute top-0.5 text-[6px] leading-tight text-emerald-600 font-black">ناجح</span>}
+                                                                                            {status === "failed" && <span className="absolute top-0.5 text-[6px] leading-tight text-red-600 font-black">مكمل</span>}
+                                                                                            <span className="text-sm mt-0.5">{i + 1}</span>
+                                                                                        </button>
+                                                                                    );
+                                                                                })}
                                                                             </div>
                                                                         </motion.div>
                                                                     )}
@@ -354,15 +394,22 @@ const SubjectIndexPage: React.FC<SubjectIndexPageProps> = React.memo(({
                                                     })}
 
                                                     {/* Unit Exam Card */}
-                                                    <button
-                                                         onClick={() => handleStartUnitExam(unit, uIdx)}
-                                                         style={getUnitExamProgressStyle(unit.title)}
-                                                         className={`w-full mt-3 border-2 border-slate-900 p-3.5 rounded-lg shadow-sm flex items-center justify-center px-4 active:scale-95 transition-transform group ${getUnitExamProgressStyle(unit.title).backgroundColor ? '' : 'bg-white hover:bg-primary'}`}
-                                                     >
-                                                        <span className={`font-black text-sm sm:text-base text-center ${getUnitExamProgressStyle(unit.title).backgroundColor ? 'text-white' : 'text-primary group-hover:text-white'}`}>
-                                                            امتحان {unit.title.split(':')[0]}
-                                                        </span>
-                                                    </button>
+                                                    {(() => {
+                                                        const status = getUnitExamStatus(unit.title);
+                                                        return (
+                                                            <button
+                                                                 onClick={() => handleStartUnitExam(unit, uIdx)}
+                                                                 style={getUnitExamProgressStyle(unit.title)}
+                                                                 className={`w-full mt-3 border-2 border-slate-900 p-3.5 rounded-lg shadow-sm flex flex-col items-center justify-center px-4 active:scale-95 transition-transform group relative ${getUnitExamProgressStyle(unit.title).backgroundColor ? '' : 'bg-white hover:bg-primary'}`}
+                                                             >
+                                                                {status === "passed" && <span className="absolute top-1 text-[8px] leading-tight text-emerald-600 font-black group-hover:text-white">ناجح</span>}
+                                                                {status === "failed" && <span className="absolute top-1 text-[8px] leading-tight text-red-600 font-black group-hover:text-white">مكمل</span>}
+                                                                <span className={`font-black text-sm sm:text-base text-center mt-1 ${getUnitExamProgressStyle(unit.title).backgroundColor ? 'text-white' : 'text-primary group-hover:text-white'}`}>
+                                                                    امتحان {unit.title.split(':')[0]}
+                                                                </span>
+                                                            </button>
+                                                        );
+                                                    })()}
                                                 </div>
                                             )}
                                         </div>

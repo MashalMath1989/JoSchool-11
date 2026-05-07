@@ -691,33 +691,27 @@ const App: React.FC = () => {
                     ? (item as any).subject 
                     : set.subject;
                 
-                if (examsDatabase[subjectKey]?.[item.title] && !(item as any).forceUpdate) return;
-                
-                // If forceUpdate is true, clear the existing data to ensure we get the fresh one
-                if ((item as any).forceUpdate && examsDatabase[subjectKey]) {
-                    delete examsDatabase[subjectKey]![item.title];
-                }
-
-                const p = fetch(item.url)
+                const p = fetch(`${item.url}${item.url.includes('?') ? '&' : '?'}t=${Date.now()}`, {
+                    cache: 'no-store',
+                    headers: {
+                        'Cache-Control': 'no-cache',
+                        'Pragma': 'no-cache'
+                    }
+                })
                     .then(res => {
                         if (!res.ok) return null;
                         return res.text();
                     })
                     .then(text => {
                         if (!text) return;
-                        return new Promise<void>(resolve => {
-                            setTimeout(() => {
-                                try {
-                                    const questions = cleanAndParseJson(text);
-                                    if (questions && questions.length > 0) {
-                                        updateDatabase(subjectKey, item.title, questions);
-                                    }
-                                } catch (parseError) {
-                                    console.error(`Failed to parse JSON for ${item.url}:`, parseError);
-                                }
-                                resolve();
-                            }, 0);
-                        });
+                        try {
+                            const questions = cleanAndParseJson(text);
+                            if (questions && questions.length > 0) {
+                                updateDatabase(subjectKey, item.title, questions);
+                            }
+                        } catch (parseError) {
+                            console.error(`Failed to parse JSON for ${item.url}:`, parseError);
+                        }
                     })
                     .catch(e => {});
                 allPromises.push(p);
@@ -739,7 +733,7 @@ const App: React.FC = () => {
             window.history.replaceState({ view: View.Landing, historyIndex: 0 }, '');
         }
 
-        // Start background data fetch
+        // Start background data fetch immediately
         fetchExams();
     }, [fetchExams]);
 
@@ -758,8 +752,10 @@ const App: React.FC = () => {
         if (selectedSubject) {
             const subjectExams = getExamsForSubject(selectedSubject.id as SubjectName);
             subjectExams.forEach(item => {
-                if (item.url && !examsDatabase[selectedSubject.id as SubjectName]?.[item.title]) {
-                    fetch(item.url)
+                if (item.url) {
+                    fetch(`${item.url}${item.url.includes('?') ? '&' : '?'}t=${Date.now()}`, {
+                        cache: 'no-store'
+                    })
                         .then(res => {
                             if (!res.ok) return null;
                             return res.text();

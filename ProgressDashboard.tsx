@@ -10,9 +10,10 @@ const ProgressDashboard: React.FC<ProgressDashboardProps> = ({
     userProgress
 }) => {
     const totalLessons = userProgress.completedLessons.length;
-    const totalQuizzes = userProgress.quizResults.length;
+    const passedQuizzes = userProgress.quizResults.filter(r => r.score >= 20);
+    const totalQuizzes = passedQuizzes.length;
     const averageScore = totalQuizzes > 0 
-        ? Math.round(userProgress.quizResults.reduce((acc, r) => acc + r.score, 0) / totalQuizzes)
+        ? Math.round(passedQuizzes.reduce((acc, r) => acc + r.score, 0) / totalQuizzes)
         : 0;
     
     const formatTime = (seconds: number) => {
@@ -74,8 +75,8 @@ const ProgressDashboard: React.FC<ProgressDashboardProps> = ({
                         سجل الامتحانات ({totalQuizzes})
                     </h3>
                     <div className="space-y-3 max-h-64 overflow-y-auto pr-2 custom-scrollbar">
-                        {userProgress.quizResults.length > 0 ? (
-                            [...userProgress.quizResults].reverse().map((r, i) => (
+                        {passedQuizzes.length > 0 ? (
+                            [...passedQuizzes].reverse().map((r, i) => (
                                 <div key={i} className="bg-app-bg/50 p-4 rounded-lg flex items-center justify-between border-r-4 border-primary shadow-sm border border-slate-900">
                                     <div className="text-right">
                                         <div className="font-black text-text-main text-sm leading-tight mb-1">{r.lessonTitle}</div>

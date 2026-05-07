@@ -49,7 +49,7 @@ const SubjectGrid = React.memo(({
                     const isPassed = results.some((r: any) => 
                         r.subjectId === subject.id && 
                         r.lessonTitle === lesson.title &&
-                        (r.score / r.totalQuestions) >= 0.5
+                        r.score >= 20
                     );
                     if (isPassed) completedExams++;
                 });
@@ -64,7 +64,7 @@ const SubjectGrid = React.memo(({
                         const isPassed = results.some((r: any) => 
                             r.subjectId === subject.id && 
                             r.lessonTitle === fullTitle &&
-                            (r.score / r.totalQuestions) >= 0.5
+                            r.score >= 20
                         );
                         if (isPassed) completedExams++;
                     }
@@ -74,7 +74,7 @@ const SubjectGrid = React.memo(({
                 totalExams += 1;
                 const unitOrdinal = unit.title.split(':')[0];
                 const unitExamTitle = `${unitOrdinal} - امتحان (1)`;
-                if (results.some((r: any) => r.subjectId === subject.id && r.lessonTitle === unitExamTitle && (r.score / r.totalQuestions) >= 0.5)) {
+                if (results.some((r: any) => r.subjectId === subject.id && r.lessonTitle === unitExamTitle && r.score >= 20)) {
                     completedExams++;
                 }
             }
