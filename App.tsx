@@ -4,7 +4,7 @@ import { Loader2, ExternalLink, AlertCircle, LogOut } from 'lucide-react';
 import { View, Subject, SubjectName, Question, Semester, UserProgress, QuizResult } from './types';
 import { subjectsData, subjectIndexData } from './data';
 import { getQuizzesForLesson, getLessonChunksCount, getQuizzesForUnit } from './services/quizService';
-import { updateDatabase, examsDatabase, loadFromCache, saveToCache } from './data/examsDatabase';
+import { updateDatabase, examsDatabase } from './data/examsDatabase';
 import { ArrowLeftIcon, ChevronDownIcon, StarIcon, XIcon, CheckIcon, BookOpenIcon, BookmarkIcon, BookmarkOutlineIcon, RefreshIcon, ChevronLeftIcon, ChevronRightIcon, ClockIcon, TrophyIcon, CheckCircleIcon, UserIcon } from './data/Icons';
 import { auth } from './firebase';
 import { SESSION_2008_EXAMS, SESSION_2008_SUP_EXAMS } from './data/exams';
@@ -720,20 +720,21 @@ const App: React.FC = () => {
 
         Promise.all(allPromises).finally(() => {
             setIsBackgroundFetching(false);
-            saveToCache();
+            // We no longer save to localStorage to ensure the next session always gets the latest from GitHub
+            // saveToCache();
         });
     }, []);
 
     useEffect(() => {
-        // Load data from cache once on mount
-        loadFromCache();
+        // Clear legacy exams cache to ensure freshness for all users
+        localStorage.removeItem('alshamel_exams_cache');
         
         // Initial setup for browser history to handle back button on Landing page
         if (!window.history.state || !window.history.state.view) {
             window.history.replaceState({ view: View.Landing, historyIndex: 0 }, '');
         }
 
-        // Start background data fetch immediately
+        // Start background data fetch immediately to ensure freshness
         fetchExams();
     }, [fetchExams]);
 
@@ -945,7 +946,9 @@ const App: React.FC = () => {
                 const examConfig = subjectExams.find(e => e.title === lesson.title);
                 
                 if (examConfig && examConfig.url) {
-                    const res = await fetch(examConfig.url);
+                    const res = await fetch(`${examConfig.url}${examConfig.url.includes('?') ? '&' : '?'}t=${Date.now()}`, {
+                        cache: 'no-store'
+                    });
                     if (res.ok) {
                         const text = await res.text();
                         const fetchedQuestions = cleanAndParseJson(text);
