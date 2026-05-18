@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { auth, googleProvider } from './firebase';
-import { signInWithPopup, signInWithEmailAndPassword, createUserWithEmailAndPassword, updateProfile, browserPopupRedirectResolver } from 'firebase/auth';
+import { signInWithPopup, signInWithEmailAndPassword, createUserWithEmailAndPassword, updateProfile } from 'firebase/auth';
 import { motion } from 'framer-motion';
 import { AlertCircle } from 'lucide-react';
 
@@ -25,7 +25,7 @@ const AuthPage: React.FC = () => {
             });
 
             // Execution of popup login
-            const result = await signInWithPopup(auth, googleProvider, browserPopupRedirectResolver);
+            const result = await signInWithPopup(auth, googleProvider);
             
             if (result.user) {
                 console.log("User signed in successfully:", result.user.email);
@@ -35,7 +35,7 @@ const AuthPage: React.FC = () => {
             
             // Comprehensive error handling for best user experience
             if (err.code === 'auth/popup-closed-by-user') {
-                setError('تم إغلاق نافذة تسجيل الدخول. يرجى المحاولة مرة أخرى والتأكد من عدم إغلاق النافذة يدوياً.');
+                setError('تم إغلاق نافذة تسجيل الدخول. يرجى المحاولة مرة أخرى والتأكد من إكمال عملية الدخول في النافذة المنبثقة.');
             } else if (err.code === 'auth/cancelled-popup-request') {
                 // Ignore silently as this usually means another request was initiated
             } else if (err.code === 'auth/popup-blocked') {
@@ -55,6 +55,12 @@ const AuthPage: React.FC = () => {
 
     const handleAuth = async (e: React.FormEvent) => {
         e.preventDefault();
+        
+        if (password.length < 6) {
+            setError('يجب أن تتكون كلمة المرور من 6 أحرف على الأقل.');
+            return;
+        }
+
         setLoading(true);
         setError('');
         try {
@@ -73,7 +79,7 @@ const AuthPage: React.FC = () => {
             } else if (err.code === 'auth/email-already-in-use') {
                 setError('البريد الإلكتروني مستخدم بالفعل.');
             } else if (err.code === 'auth/weak-password') {
-                setError('كلمة المرور ضعيفة جداً.');
+                setError('كلمة المرور ضعيفة جداً. يجب أن تكون 6 أحرف على الأقل.');
             } else if (err.code === 'auth/network-request-failed') {
                 setError('فشل الاتصال بالشبكة. يرجى التحقق من الإنترنت.');
             } else {
@@ -151,10 +157,22 @@ const AuthPage: React.FC = () => {
                     <div className="pt-2">
                         <button 
                             type="submit"
-                            disabled={loading}
+                            disabled={loading || googleLoading}
                             className="w-full bg-[#1d5bfc] hover:bg-[#1648d1] text-white py-3 rounded-lg font-black text-lg shadow-[0px_4px_0px_0px_rgba(0,0,0,0.15)] active:translate-y-1 active:shadow-none transition-all flex items-center justify-center gap-3 disabled:opacity-50 border border-slate-900"
                         >
-                            {loading ? 'جاري التحميل...' : (isLogin ? 'دخول' : 'تسجيل')}
+                            {loading ? (
+                                <div className="flex items-center gap-2">
+                                    <div className="relative w-5 h-5">
+                                        <div className="absolute inset-0 border-2 border-white/20 rounded-full"></div>
+                                        <motion.div 
+                                            animate={{ rotate: 360 }}
+                                            transition={{ repeat: Infinity, duration: 1, ease: "linear" }}
+                                            className="absolute inset-0 border-2 border-white border-t-transparent rounded-full"
+                                        />
+                                    </div>
+                                    <span>جاري التحميل...</span>
+                                </div>
+                            ) : (isLogin ? 'دخول' : 'تسجيل')}
                         </button>
                     </div>
                 </form>
@@ -175,11 +193,14 @@ const AuthPage: React.FC = () => {
                 >
                     {googleLoading ? (
                         <div className="flex items-center gap-2">
-                            <motion.div 
-                                animate={{ rotate: 360 }}
-                                transition={{ repeat: Infinity, duration: 1, ease: "linear" }}
-                                className="w-4 h-4 border-2 border-primary border-t-transparent rounded-full"
-                            />
+                            <div className="relative w-5 h-5">
+                                <div className="absolute inset-0 border-2 border-slate-100 rounded-full"></div>
+                                <motion.div 
+                                    animate={{ rotate: 360 }}
+                                    transition={{ repeat: Infinity, duration: 1, ease: "linear" }}
+                                    className="absolute inset-0 border-2 border-[#1d5bfc] border-t-transparent rounded-full"
+                                />
+                            </div>
                             <span className="text-base text-[#2d3a4b]">جاري الاتصال...</span>
                         </div>
                     ) : (

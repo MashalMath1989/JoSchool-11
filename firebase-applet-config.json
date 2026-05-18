@@ -1,10 +1,9 @@
 {
-  "projectId": "joschool11",
-  "appId": "1:257891603671:web:b92b52578f2cf104024c92",
   "apiKey": "AIzaSyD_o8nRm8oI7X-lHfgLE_nwS5EUieZHddw",
   "authDomain": "joschool11.firebaseapp.com",
-  "firestoreDatabaseId": "(default)",
+  "projectId": "joschool11",
   "storageBucket": "joschool11.firebasestorage.app",
   "messagingSenderId": "257891603671",
+  "appId": "1:257891603671:web:b92b52578f2cf104024c92",
   "measurementId": "G-23L04PSZSR"
 }

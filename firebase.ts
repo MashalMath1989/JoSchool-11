@@ -5,10 +5,14 @@ import firebaseConfig from './firebase-applet-config.json';
 
 const app = initializeApp(firebaseConfig);
 
-// Initialize Firestore with long polling to improve reliability in restricted environments like iframes
+// Initialize Firestore with settings optimized for restricted environments (like iframes)
+if (!firebaseConfig.apiKey || firebaseConfig.projectId === 'YOUR_PROJECT_ID') {
+    console.warn("Firebase configuration is missing or using placeholders. Please run 'set_up_firebase'.");
+}
+
 export const db = initializeFirestore(app, {
-    experimentalForceLongPolling: true
-});
+    experimentalForceLongPolling: true,
+}, (firebaseConfig as any).firestoreDatabaseId || '(default)');
 
 export const auth = getAuth(app);
 export const googleProvider = new GoogleAuthProvider();

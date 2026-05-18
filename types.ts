@@ -12,6 +12,7 @@ export enum View {
   PdfViewer,
   Progress,
   Favorites,
+  MoEResults,
 }
 
 export enum Grade {
@@ -70,6 +71,7 @@ export interface QuizResult {
   score: number;
   totalQuestions: number;
   date: string;
+  userAnswers?: (string | undefined)[];
 }
 
 export interface FavoriteQuestion extends Question {

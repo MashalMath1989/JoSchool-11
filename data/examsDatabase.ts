@@ -31,9 +31,9 @@ export const updateDatabase = (subject: SubjectName, lessonTitle: string, questi
         }
 
         examsDatabase[subject]![lessonTitle] = chunks;
-        // console.log(`[AlShamel DB] Loaded ${questions.length} questions for ${lessonTitle}`);
+        // console.log(`[JoSchool DB] Loaded ${questions.length} questions for ${lessonTitle}`);
     } catch (e) {
-        console.error("[AlShamel DB] Update failed", e);
+        console.error("[JoSchool DB] Update failed", e);
     }
 };
 
@@ -42,10 +42,10 @@ export const updateDatabase = (subject: SubjectName, lessonTitle: string, questi
  */
 export const saveToCache = () => {
     try {
-        localStorage.setItem('alshamel_exams_cache', JSON.stringify(examsDatabase));
-        console.log("[AlShamel DB] Saved to cache");
+        localStorage.setItem('joschool_exams_cache', JSON.stringify(examsDatabase));
+        console.log("[JoSchool DB] Saved to cache");
     } catch (e) {
-        console.warn("[AlShamel DB] Cache save failed (likely quota exceeded)", e);
+        console.warn("[JoSchool DB] Cache save failed (likely quota exceeded)", e);
     }
 };
 
@@ -54,15 +54,15 @@ export const saveToCache = () => {
  */
 export const loadFromCache = () => {
     try {
-        const cached = localStorage.getItem('alshamel_exams_cache');
+        const cached = localStorage.getItem('joschool_exams_cache');
         if (cached) {
             const parsed = JSON.parse(cached);
             Object.assign(examsDatabase, parsed);
-            console.log("[AlShamel DB] Loaded from cache");
+            console.log("[JoSchool DB] Loaded from cache");
             return true;
         }
     } catch (e) {
-        console.error("[AlShamel DB] Cache load failed", e);
+        console.error("[JoSchool DB] Cache load failed", e);
     }
     return false;
 };

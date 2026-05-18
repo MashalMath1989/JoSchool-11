@@ -67,10 +67,21 @@ const ResultsPage: React.FC<ResultsPageProps> = ({
         return false;
     };
 
+    const getSubjectMaxMark = (subjectId: string | undefined) => {
+        switch (subjectId) {
+            case SubjectName.IslamicEducation: return 60;
+            case SubjectName.Arabic: return 100;
+            case SubjectName.English: return 100;
+            case SubjectName.JordanHistory: return 40;
+            default: return 40;
+        }
+    };
+
+    const maxMark = getSubjectMaxMark(selectedSubject?.id);
     const score = userAnswers.reduce((acc, ans, idx) => acc + (checkIsCorrect(currentQuiz[idx], ans) ? 1 : 0), 0);
     const totalQuestions = currentQuiz.length || 1;
-    const markFrom40 = Math.round((score / totalQuestions) * 40);
-    const isPassed = markFrom40 >= 20;
+    const finalMark = Math.round((score / totalQuestions) * maxMark);
+    const isPassed = finalMark >= (maxMark / 2);
     const pdfRef = useRef<HTMLDivElement>(null);
     const printPdfRef = useRef<HTMLDivElement>(null);
     const [isExporting, setIsExporting] = useState(false);
@@ -118,40 +129,28 @@ const ResultsPage: React.FC<ResultsPageProps> = ({
                 subjectId: selectedSubject.id,
                 lessonTitle: currentLessonTitle,
                 examNumber: examNumber,
-                score: markFrom40,
+                score: score, // Save the raw number of correct answers
                 totalQuestions: totalQuestions,
-                date: new Date().toISOString()
+                date: new Date().toISOString(),
+                userAnswers: userAnswers
             };
             setUserProgress(prev => ({
                 ...prev,
                 quizResults: [...prev.quizResults, newResult]
             }));
         }
-    }, [selectedSubject, currentLessonTitle, examNumber, markFrom40, totalQuestions, setUserProgress]);
+    }, [selectedSubject, currentLessonTitle, examNumber, finalMark, totalQuestions, setUserProgress, userAnswers]);
 
     return (
-        <div className="container mx-auto p-4 max-w-2xl text-center pt-10 relative" dir={isEnglish ? 'ltr' : 'rtl'}>
-            {/* زر الرجوع */}
-            <div className={`absolute top-4 z-10 ${isEnglish ? 'left-4' : 'right-4'}`}>
-                <button 
-                    onClick={goBack}
-                    className="p-3 bg-white text-slate-600 rounded-lg font-black shadow-lg flex items-center justify-center border-2 border-slate-900 hover:text-primary transition-all active:scale-95"
-                >
-                    {isEnglish ? <ChevronLeftIcon className="w-6 h-6" strokeWidth={3} /> : <ChevronRightIcon className="w-6 h-6" strokeWidth={3} />}
-                </button>
-            </div>
+        <div className="container mx-auto p-4 max-w-2xl text-center pt-10" dir={isEnglish ? 'ltr' : 'rtl'}>
+            {/* Back button moved inside card */}
 
-            {/* زر التصدير في الزاوية العلوية */}
+            {/* زر التصدير في الزاوية العلوية - REMOVED per user request to move inside card */}
+            {/* 
             <div className={`absolute top-4 z-10 ${isEnglish ? 'right-4' : 'left-4'}`}>
-                <button 
-                    onClick={() => setShowExportDialog(true)} 
-                    disabled={isExporting}
-                    className="p-3 bg-white text-primary rounded-lg font-black shadow-lg flex items-center justify-center gap-2 border-2 border-slate-900 hover:bg-primary hover:text-white transition-all active:scale-95 disabled:opacity-50"
-                >
-                    <DownloadIcon className="w-5 h-5" />
-                    <span className="text-xs">تصدير PDF</span>
-                </button>
+                ...
             </div>
+            */}
 
             {/* حوار اختيار نوع التصدير */}
             {showExportDialog && (
@@ -200,46 +199,87 @@ const ResultsPage: React.FC<ResultsPageProps> = ({
 
             {/* رسالة التحميل */}
             {isExporting && (
-                <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[100] flex items-center justify-center p-6">
-                    <div className="bg-white rounded-xl p-8 max-w-xs w-full text-center shadow-2xl animate-in fade-in zoom-in duration-300">
-                        <div className="w-16 h-16 border-4 border-primary border-t-transparent rounded-full animate-spin mx-auto mb-6"></div>
-                        <h3 className="text-lg font-black text-text-main mb-2">جاري تحميل ملف النتيجة</h3>
-                        <p className="text-text-sub text-xs font-bold">يرجى الانتظار قليلاً...</p>
-                    </div>
+                <div className="fixed inset-0 bg-black/60 backdrop-blur-md z-[110] flex items-center justify-center p-6">
+                    <motion.div 
+                        initial={{ opacity: 0, scale: 0.9 }}
+                        animate={{ opacity: 1, scale: 1 }}
+                        className="bg-white rounded-[2rem] p-10 max-w-xs w-full text-center shadow-2xl border-2 border-slate-900"
+                    >
+                        <div className="relative w-24 h-24 mx-auto mb-8 flex items-center justify-center">
+                            <div className="absolute inset-0 border-4 border-slate-100 rounded-full"></div>
+                            <motion.div 
+                                className="absolute inset-0 border-4 border-[#1d5bfc] rounded-full border-t-transparent"
+                                animate={{ rotate: 360 }}
+                                transition={{ duration: 1, repeat: Infinity, ease: "linear" }}
+                            />
+                            <div className="w-16 h-16 bg-white rounded-2xl p-2 shadow-sm border border-slate-100 flex items-center justify-center overflow-hidden">
+                                <img src="https://i.postimg.cc/y8GJVJ52/1777447368581.png" alt="JoSchool" className="w-full h-auto object-contain" />
+                            </div>
+                        </div>
+                        <h3 className="text-xl font-black text-slate-800 mb-2">جاري التحميل...</h3>
+                        <p className="text-slate-500 text-sm font-black leading-relaxed">
+                            انتظر لحظات لحين اكتمال التحميل
+                        </p>
+                    </motion.div>
                 </div>
             )}
 
             {/* ملخص النتيجة */}
-            <div className="bg-white rounded-xl p-8 shadow-2xl border-t-4 border-primary mb-10 text-center border border-slate-900">
+            <div className="bg-white rounded-xl p-8 shadow-2xl border-t-4 border-primary mb-10 text-center border border-slate-900 relative">
+                {/* زر الرجوع داخل البطاقة */}
+                <div className={`absolute top-4 ${isEnglish ? 'left-4' : 'right-4'}`}>
+                    <button 
+                        onClick={goBack}
+                        className="p-2.5 bg-slate-100 text-slate-600 rounded-lg shadow-sm border border-slate-900 hover:text-primary transition-all active:scale-95"
+                        title="رجوع"
+                    >
+                        {isEnglish ? <ChevronLeftIcon className="w-5 h-5" strokeWidth={3} /> : <ChevronRightIcon className="w-5 h-5" strokeWidth={3} />}
+                    </button>
+                </div>
+
                 <div className={`w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-6 shadow-xl ${isPassed ? 'bg-emerald-500 animate-bounce' : 'bg-red-500'}`}>
                     {isPassed ? <StarIcon className="w-8 h-8 text-white" /> : <XIcon className="w-8 h-8 text-white" />}
                 </div>
                 <h2 className={`text-lg font-black mb-6 ${isPassed ? 'text-emerald-600' : 'text-red-600'}`}>{isPassed ? 'أحسنت يا بطل!' : 'حاول مرة أخرى'}</h2>
-                <div className="flex justify-center items-baseline gap-2 mb-8">
-                    <span className="text-2xl font-black text-text-main">{markFrom40}</span>
-                    <span className="text-base font-black text-text-sub/30">/ 40</span>
+                <div className="flex justify-center items-baseline gap-2 mb-2">
+                    <span className="text-2xl font-black text-text-main">{finalMark}</span>
+                    <span className="text-base font-black text-text-sub/30">/ {maxMark}</span>
                 </div>
-                <div className="flex justify-center flex-wrap gap-4 px-4 overflow-hidden">
+                <div className="flex justify-center gap-4 text-[8px] font-bold text-text-sub/60 mb-8">
+                    <span>{isEnglish ? 'Correct:' : 'الإجابات الصحيحة:'} {score}</span>
+                    <span>{isEnglish ? 'Incorrect:' : 'الإجابات الخاطئة:'} {totalQuestions - score}</span>
+                </div>
+                
+                <div className="grid grid-cols-2 gap-3 w-full max-w-sm mx-auto">
+                    {/* Row 1: Home and Export */}
                     <button 
                         onClick={goToHome} 
-                        className="flex-1 min-w-[120px] max-w-[160px] py-4 bg-slate-900 text-white rounded-lg font-black shadow-xl border border-slate-900 border-b-4 hover:bg-slate-800 active:scale-95 transition-all text-sm"
+                        className="py-4 bg-slate-900 text-white rounded-lg font-black shadow-xl border-2 border-slate-900 hover:bg-slate-800 active:scale-95 transition-all text-sm"
                     >
                         الرئيسية
                     </button>
                     <button 
+                        onClick={() => setShowExportDialog(true)} 
+                        disabled={isExporting}
+                        className="py-4 bg-white text-primary rounded-lg font-black shadow-lg flex items-center justify-center gap-2 border-2 border-slate-900 hover:bg-primary hover:text-white transition-all active:scale-95 disabled:opacity-50 text-xs"
+                    >
+                        <DownloadIcon className="w-5 h-5" />
+                        <span>تصدير PDF</span>
+                    </button>
+
+                    {/* Row 2: Back to Index and Retry */}
+                    <button 
                         onClick={onBackToIndex} 
-                        className="flex-1 min-w-[120px] max-w-[160px] py-4 bg-primary text-white rounded-lg font-black shadow-xl border border-slate-900 border-b-4 hover:brightness-110 active:scale-95 transition-all text-sm"
+                        className="py-4 bg-primary text-white rounded-lg font-black shadow-xl border-2 border-slate-900 hover:brightness-110 active:scale-95 transition-all text-xs"
                     >
                         {onBackToIndexLabel || (isEnglish ? 'Back to Index' : 'العودة للفهرس')}
                     </button>
-                    {!isPassed && (
-                        <button 
-                            onClick={goBack} 
-                            className="flex-1 min-w-[120px] max-w-[160px] py-4 bg-secondary text-white rounded-lg font-black shadow-xl border border-slate-900 border-b-4 hover:brightness-110 active:scale-95 transition-all text-sm"
-                        >
-                            إعادة المحاولة
-                        </button>
-                    )}
+                    <button 
+                        onClick={goBack} 
+                        className="py-4 bg-secondary text-white rounded-lg font-black shadow-xl border-2 border-slate-900 hover:brightness-110 active:scale-95 transition-all text-xs"
+                    >
+                        إعادة المحاولة
+                    </button>
                 </div>
             </div>
 
@@ -386,7 +426,7 @@ const ResultsPage: React.FC<ResultsPageProps> = ({
                             fontWeight: '900', 
                             color: isPassed ? '#10b981' : '#ef4444'
                         }}>
-                            {markFrom40}
+                            {finalMark}
                         </div>
                         <div style={{ 
                             height: '3px', 
@@ -402,7 +442,7 @@ const ResultsPage: React.FC<ResultsPageProps> = ({
                             fontWeight: '900', 
                             color: 'black'
                         }}>
-                            40
+                            {maxMark}
                         </div>
                     </div>
 
@@ -580,7 +620,7 @@ const ResultsPage: React.FC<ResultsPageProps> = ({
                             fontWeight: 'bold',
                             color: isPassed ? '#059669' : '#dc2626'
                         }}>
-                            {markFrom40}
+                            {finalMark}
                         </div>
                         <div style={{ 
                             height: '3px', 
@@ -596,7 +636,7 @@ const ResultsPage: React.FC<ResultsPageProps> = ({
                             fontWeight: 'bold',
                             color: 'black'
                         }}>
-                            40
+                            {maxMark}
                         </div>
                     </div>
 

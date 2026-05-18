@@ -4,7 +4,7 @@ import { Loader2, ExternalLink, AlertCircle, LogOut } from 'lucide-react';
 import { View, Subject, SubjectName, Question, Semester, UserProgress, QuizResult } from './types';
 import { subjectsData, subjectIndexData } from './data';
 import { getQuizzesForLesson, getLessonChunksCount, getQuizzesForUnit } from './services/quizService';
-import { updateDatabase, examsDatabase } from './data/examsDatabase';
+import { updateDatabase, examsDatabase, loadFromCache, saveToCache } from './data/examsDatabase';
 import { ArrowLeftIcon, ChevronDownIcon, StarIcon, XIcon, CheckIcon, BookOpenIcon, BookmarkIcon, BookmarkOutlineIcon, RefreshIcon, ChevronLeftIcon, ChevronRightIcon, ClockIcon, TrophyIcon, CheckCircleIcon, UserIcon } from './data/Icons';
 import { auth } from './firebase';
 import { SESSION_2008_EXAMS, SESSION_2008_SUP_EXAMS } from './data/exams';
@@ -19,6 +19,7 @@ import PdfViewerScreen from './PdfViewerScreen';
 import ProgressDashboard from './ProgressDashboard';
 import FavoriteQuestionsPage from './FavoriteQuestionsPage';
 import SessionSubjectsPage from './SessionSubjectsPage';
+import MoEResultsPage from './MoEResultsPage';
 import AuthPage from './AuthPage';
 
 // روابط امتحانات مادة تاريخ الأردن - الفصل الأول
@@ -669,73 +670,89 @@ const App: React.FC = () => {
         }
     }, [isAuthenticating, viewHistory]);
 
-    const fetchExams = useCallback(() => {
+    const fetchExams = useCallback(async () => {
         setIsBackgroundFetching(true);
         const examSets = [
+            { subject: SubjectName.JordanHistory, exams: [...HISTORY_U1_EXAMS, ...HISTORY_U2_EXAMS, ...HISTORY_U3_EXAMS] },
+            { subject: SubjectName.IslamicEducation, exams: [...ISLAMIC_U1_EXAMS, ...ISLAMIC_U2_EXAMS, ...ISLAMIC_U3_EXAMS, ...ISLAMIC_U4_EXAMS] },
+            { subject: SubjectName.Arabic, exams: ARABIC_EXAMS.slice(0, 30) }, // First 30 Arabic exams first
+            { subject: SubjectName.English, exams: [...ENGLISH_U1_EXAMS, ...ENGLISH_U2_EXAMS, ...ENGLISH_U3_EXAMS, ...ENGLISH_U4_EXAMS, ...ENGLISH_U5_EXAMS] },
             { subject: "SESSION_2008", exams: SESSION_2008_EXAMS },
             { subject: "SESSION_2008_SUP", exams: SESSION_2008_SUP_EXAMS },
-            { subject: SubjectName.JordanHistory, exams: [...HISTORY_U1_EXAMS, ...HISTORY_U2_EXAMS, ...HISTORY_U3_EXAMS, ...HISTORY_S2_U4_EXAMS, ...HISTORY_S2_U5_EXAMS, ...HISTORY_S2_U6_EXAMS, ...HISTORY_S2_U7_EXAMS, ...HISTORY_S2_U8_EXAMS] },
-            { subject: SubjectName.IslamicEducation, exams: [...ISLAMIC_U1_EXAMS, ...ISLAMIC_U2_EXAMS, ...ISLAMIC_U3_EXAMS, ...ISLAMIC_U4_EXAMS, ...ISLAMIC_S2_U1_EXAMS, ...ISLAMIC_S2_U2_EXAMS, ...ISLAMIC_S2_U3_EXAMS, ...ISLAMIC_S2_U4_EXAMS] },
-            { subject: SubjectName.Arabic, exams: ARABIC_EXAMS },
-            { subject: SubjectName.English, exams: [...ENGLISH_U1_EXAMS, ...ENGLISH_U2_EXAMS, ...ENGLISH_U3_EXAMS, ...ENGLISH_U4_EXAMS, ...ENGLISH_U5_EXAMS, ...ENGLISH_U6_EXAMS, ...ENGLISH_U7_EXAMS, ...ENGLISH_U8_EXAMS, ...ENGLISH_U9_EXAMS, ...ENGLISH_U10_EXAMS] }
+            // Remaining exams
+            { subject: SubjectName.JordanHistory, exams: [...HISTORY_S2_U4_EXAMS, ...HISTORY_S2_U5_EXAMS, ...HISTORY_S2_U6_EXAMS, ...HISTORY_S2_U7_EXAMS, ...HISTORY_S2_U8_EXAMS] },
+            { subject: SubjectName.IslamicEducation, exams: [...ISLAMIC_S2_U1_EXAMS, ...ISLAMIC_S2_U2_EXAMS, ...ISLAMIC_S2_U3_EXAMS, ...ISLAMIC_S2_U4_EXAMS] },
+            { subject: SubjectName.Arabic, exams: ARABIC_EXAMS.slice(30) },
+            { subject: SubjectName.English, exams: [...ENGLISH_U6_EXAMS, ...ENGLISH_U7_EXAMS, ...ENGLISH_U8_EXAMS, ...ENGLISH_U9_EXAMS, ...ENGLISH_U10_EXAMS] }
         ];
 
-        const allPromises: Promise<void>[] = [];
-
-        examSets.forEach(set => {
-            set.exams.forEach(item => {
-                if (!item.url) return;
+        for (const set of examSets) {
+            // Processing in larger parallel batches for JSON files (very small size)
+            const batchSize = 6; 
+            for (let i = 0; i < set.exams.length; i += batchSize) {
+                const batch = set.exams.slice(i, i + batchSize);
                 
-                // Skip if already in database
-                const subjectKey = (set.subject === "SESSION_2008" || set.subject === "SESSION_2008_SUP") 
-                    ? (item as any).subject 
-                    : set.subject;
-                
-                const p = fetch(`${item.url}${item.url.includes('?') ? '&' : '?'}t=${Date.now()}`, {
-                    cache: 'no-store',
-                    headers: {
-                        'Cache-Control': 'no-cache',
-                        'Pragma': 'no-cache'
-                    }
-                })
-                    .then(res => {
-                        if (!res.ok) return null;
-                        return res.text();
-                    })
-                    .then(text => {
+                await Promise.all(batch.map(async (item) => {
+                    if (!item.url) return;
+                    
+                    const subjectKey = (set.subject as any === "SESSION_2008" || set.subject as any === "SESSION_2008_SUP") 
+                        ? (item as any).subject 
+                        : set.subject;
+                    
+                    // Skip if already in database or if we are already fetching it
+                    if (examsDatabase[subjectKey]?.[item.title]) return;
+                    
+                    try {
+                        const res = await fetch(`${item.url}${item.url.includes('?') ? '&' : '?'}bv=1`, {
+                            cache: 'force-cache'
+                        });
+                        
+                        if (!res.ok) return;
+                        const text = await res.text();
                         if (!text) return;
+                        
                         try {
                             const questions = cleanAndParseJson(text);
                             if (questions && questions.length > 0) {
                                 updateDatabase(subjectKey, item.title, questions);
                             }
                         } catch (parseError) {
-                            console.error(`Failed to parse JSON for ${item.url}:`, parseError);
+                            // Silently ignore
                         }
-                    })
-                    .catch(e => {});
-                allPromises.push(p);
-            });
-        });
+                    } catch (e: any) {
+                        // Silently ignore network errors in background
+                    }
+                }));
 
-        Promise.all(allPromises).finally(() => {
-            setIsBackgroundFetching(false);
-            // We no longer save to localStorage to ensure the next session always gets the latest from GitHub
-            // saveToCache();
-        });
+                // Save to cache after each set of batches to keep progress
+                if (i % (batchSize * 2) === 0) {
+                    saveToCache();
+                }
+                
+                // Very small delay to keep UI responsive
+                await new Promise(resolve => setTimeout(resolve, 30));
+            }
+        }
+
+        saveToCache();
+        setIsBackgroundFetching(false);
     }, []);
 
     useEffect(() => {
-        // Clear legacy exams cache to ensure freshness for all users
-        localStorage.removeItem('alshamel_exams_cache');
+        // Load database from cache on startup
+        loadFromCache();
         
         // Initial setup for browser history to handle back button on Landing page
         if (!window.history.state || !window.history.state.view) {
             window.history.replaceState({ view: View.Landing, historyIndex: 0 }, '');
         }
 
-        // Start background data fetch immediately to ensure freshness
-        fetchExams();
+        // Start background data fetch with a small delay to prioritize app startup
+        const timeout = setTimeout(() => {
+            fetchExams();
+        }, 1500);
+        
+        return () => clearTimeout(timeout);
     }, [fetchExams]);
 
     const getExamsForSubject = (subject: SubjectName) => {
@@ -750,32 +767,59 @@ const App: React.FC = () => {
 
     // مراقبة تغيير المادة المختارة لتسريع تحميل اختباراتها إذا لم تكن محملة
     useEffect(() => {
+        let isCancelled = false;
+
         if (selectedSubject) {
             const subjectExams = getExamsForSubject(selectedSubject.id as SubjectName);
-            subjectExams.forEach(item => {
-                if (item.url) {
-                    fetch(`${item.url}${item.url.includes('?') ? '&' : '?'}t=${Date.now()}`, {
-                        cache: 'no-store'
-                    })
-                        .then(res => {
-                            if (!res.ok) return null;
-                            return res.text();
-                        })
-                        .then(text => {
+            
+            const fetchSelectedSubjectExams = async () => {
+                // Determine which ones are missing
+                const missing = subjectExams.filter(item => 
+                    !examsDatabase[selectedSubject.id as SubjectName]?.[item.title] && item.url
+                );
+
+                if (missing.length === 0) return;
+
+                // Priority fetching in small batches
+                const batchSize = 4;
+                for (let i = 0; i < missing.length; i += batchSize) {
+                    if (isCancelled) break;
+                    const batch = missing.slice(i, i + batchSize);
+
+                    await Promise.all(batch.map(async (item) => {
+                        try {
+                            const res = await fetch(`${item.url}${item.url.includes('?') ? '&' : '?'}t=${Date.now()}`, {
+                                cache: 'no-store'
+                            });
+                            
+                            if (isCancelled) return;
+                            if (!res.ok) return;
+                            
+                            const text = await res.text();
                             if (!text) return;
-                            try {
-                                const questions = cleanAndParseJson(text);
-                                if (questions) {
-                                    updateDatabase(selectedSubject.id as SubjectName, item.title, questions);
-                                }
-                            } catch (e) {
-                                console.error(`Failed to prioritize ${item.title}`, e);
+                            
+                            const questions = cleanAndParseJson(text);
+                            if (questions && questions.length > 0) {
+                                updateDatabase(selectedSubject.id as SubjectName, item.title, questions);
                             }
-                        })
-                        .catch(err => console.error(`Failed to prioritize ${item.title}`, err));
+                        } catch (err: any) {
+                            // Ignore errors in background
+                        }
+                    }));
+
+                    // Save periodically
+                    saveToCache();
+                    
+                    if (!isCancelled) await new Promise(resolve => setTimeout(resolve, 100));
                 }
-            });
+            };
+            
+            fetchSelectedSubjectExams();
         }
+
+        return () => {
+            isCancelled = true;
+        };
     }, [selectedSubject]);
 
     useEffect(() => {
@@ -1291,19 +1335,28 @@ const App: React.FC = () => {
         navigateTo(View.Quiz);
     };
 
-    const handleStartMockExam = async (subjectId: SubjectName) => {
-        setIsLoadingExam(true);
+    const handleStartMockExam = useCallback(async (subjectId: SubjectName) => {
+        // Find the subject object to set it as selected
+        const subject = subjectsData.find(s => s.id === subjectId);
+        if (subject) setSelectedSubject(subject);
+
+        const allExams = getExamsForSubject(subjectId);
+        if (allExams.length === 0) {
+            alert('عذراً، هذا الامتحان غير متوفر حالياً.');
+            return;
+        }
+
+        // Check if all exams are already loaded
+        const missingExams = allExams.filter(exam => {
+            const questions = getQuizzesForLesson(subjectId, exam.title);
+            return (!questions || questions.length === 0) || (exam as any).forceUpdate;
+        });
+
+        if (missingExams.length > 0) {
+            setIsLoadingExam(true);
+        }
+
         try {
-            // Find the subject object to set it as selected
-            const subject = subjectsData.find(s => s.id === subjectId);
-            if (subject) setSelectedSubject(subject);
-
-            const allExams = getExamsForSubject(subjectId);
-            if (allExams.length === 0) {
-                alert('عذراً، هذا الامتحان غير متوفر حالياً.');
-                return;
-            }
-
             // Fetch all missing exams using Promise.all to load everything for the mock exam
             const fetchPromises = allExams.map(async (exam) => {
                 let questions = getQuizzesForLesson(subjectId, exam.title);
@@ -1329,7 +1382,7 @@ const App: React.FC = () => {
 
             const results = await Promise.all(fetchPromises);
             
-            // Sampling logic: ensure 40 questions with at least one from each lesson
+            // Sampling logic...
             const guaranteedQuestions: Question[] = [];
             const allRemainingQuestions: Question[] = [];
             
@@ -1369,8 +1422,10 @@ const App: React.FC = () => {
             finalQuestions = finalQuestions.sort(() => Math.random() - 0.5);
 
             const isEnglish = subjectId === SubjectName.English;
-            const examTitle = isEnglish ? 'Mock Exam' : 'امتحان تجريبي';
-            startSessionExam(examTitle, finalQuestions);
+            const examLabel = isEnglish ? 'Exam (1)' : 'امتحان (1)';
+            const fullLessonTitle = `دورة تجريبية - ${subjectId} - ${examLabel}`;
+            
+            startSessionExam(fullLessonTitle, finalQuestions);
 
         } catch (error) {
             console.error("Error starting mock exam:", error);
@@ -1378,7 +1433,7 @@ const App: React.FC = () => {
         } finally {
             setIsLoadingExam(false);
         }
-    };
+    }, [subjectsData, getExamsForSubject, getQuizzesForLesson, examsDatabase, startSessionExam]);
 
     const handleStartSessionExam = (subjectId: SubjectName, sessionName: string) => {
         if (sessionName === 'الدورة التجريبية') {
@@ -1461,8 +1516,12 @@ const App: React.FC = () => {
         navigateTo(View.Quiz);
     };
 
-    const handleLogout = () => {
-        setShowLogoutConfirmation(true);
+    const handleLogout = (skipConfirm = false) => {
+        if (skipConfirm === true) {
+            confirmLogout();
+        } else {
+            setShowLogoutConfirmation(true);
+        }
     };
 
     const confirmLogout = async () => {
@@ -1489,19 +1548,216 @@ const App: React.FC = () => {
         }));
     };
 
+    const handleViewSessionResult = useCallback((subjectId: SubjectName, sessionName: string, providedResult?: QuizResult) => {
+        let baseTitle = "";
+        const isEnglish = subjectId === SubjectName.English;
+        const examLabel = isEnglish ? 'Exam (1)' : 'امتحان (1)';
+
+        if (sessionName === 'دورة 2008') {
+            const exam = SESSION_2008_EXAMS.find(e => e.subject === subjectId);
+            if (exam) baseTitle = exam.title;
+        } else if (sessionName === 'دورة 2008 تكميلي') {
+            const exam = SESSION_2008_SUP_EXAMS.find(e => e.subject === subjectId);
+            if (exam) baseTitle = exam.title;
+        } else if (sessionName === 'الدورة التجريبية') {
+            baseTitle = `دورة تجريبية - ${subjectId}`;
+        }
+
+        const fullLessonTitle = `${baseTitle} - ${examLabel}`;
+        const mockExamTitle = isEnglish ? 'Mock Exam' : 'امتحان تجريبي';
+
+        // Use provided result or find the best one
+        const result = providedResult || userProgress.quizResults
+            .filter(r => r.subjectId === subjectId && (
+                r.lessonTitle === fullLessonTitle || 
+                (sessionName === 'الدورة التجريبية' && r.lessonTitle === mockExamTitle) ||
+                (baseTitle !== "" && r.lessonTitle.includes(baseTitle))
+            ))
+            .sort((a, b) => {
+                if (a.userAnswers && !b.userAnswers) return -1;
+                if (!a.userAnswers && b.userAnswers) return 1;
+                return (b.score / b.totalQuestions) - (a.score / a.totalQuestions);
+            })[0];
+
+        if (!result) {
+            alert('عذراً، لم يتم العثور على نتيجة لهذا الامتحان.');
+            return;
+        }
+
+        if (!result.userAnswers) {
+            alert('عذراً، تفاصيل الإجابات غير متوفرة لهذا الامتحان (تم الحفظ قبل التحديث).');
+            return;
+        }
+
+        const subject = subjectsData.find(s => s.id === subjectId);
+        if (subject) setSelectedSubject(subject);
+
+        const setupResultView = (qs: Question[]) => {
+            setCurrentLessonTitle(result.lessonTitle); // Use the title from the result for consistency
+            setCurrentQuiz(qs);
+            setUserAnswers(result.userAnswers!);
+            setExamNumber(result.examNumber || null);
+            setShowResults(true);
+            navigateTo(View.Quiz);
+        };
+
+        if (sessionName === 'الدورة التجريبية') {
+            // For mock/experimental, we don't have a single lesson title, so we use all subject questions
+            const allExams = getExamsForSubject(subjectId);
+            const allQs: Question[] = [];
+            allExams.forEach(e => {
+                const qs = getQuizzesForLesson(subjectId, e.title);
+                if (qs) allQs.push(...qs);
+            });
+
+            if (allQs.length > 0) {
+                // Since mock exam is 40 questions (or less), and we don't know which 40 were picked,
+                // this is a bit tricky. However, most session exams are static.
+                // For mock, we only have the answers. We need the original questions.
+                // If it's a mock exam, we'll try to find the questions by their text/number if we had to,
+                // but usually the user has them in the database.
+                setupResultView(allQs); // This might show more questions than answered, but ResultsPage handles it
+            } else {
+                alert('عذراً، يجب تحميل دروس المادة أولاً لاستعراض النتيجة.');
+            }
+            return;
+        }
+
+        const questions = getQuizzesForLesson(subjectId, baseTitle);
+        if (!questions || questions.length === 0) {
+            const sessionExams = sessionName === 'دورة 2008' ? SESSION_2008_EXAMS : SESSION_2008_SUP_EXAMS;
+            const examInfo = sessionExams.find(e => e.subject === subjectId);
+            if (!examInfo || !examInfo.url) {
+                alert('عذراً، محتوى هذا الامتحان غير متوفر حالياً.');
+                return;
+            }
+
+            setIsLoadingExam(true);
+            fetch(examInfo.url)
+                .then(res => res.text())
+                .then(text => {
+                    const qs = cleanAndParseJson(text);
+                    if (qs && qs.length > 0) {
+                        updateDatabase(subjectId, baseTitle, qs);
+                        setupResultView(qs);
+                    } else {
+                        alert('عذراً، لم نتمكن من استعادة أسئلة الامتحان.');
+                    }
+                })
+                .catch(() => alert('فشل استعادة الامتحان. يرجى المحاولة لاحقاً.'))
+                .finally(() => setIsLoadingExam(false));
+        } else {
+            setupResultView(questions);
+        }
+    }, [userProgress.quizResults, subjectsData, navigateTo, getExamsForSubject, getQuizzesForLesson]);
+
+    const handleResetExamResult = (subjectId: SubjectName, lessonTitle: string) => {
+        setUserProgress(prev => {
+            const newResults = prev.quizResults.filter(r => 
+                !(r.subjectId === subjectId && r.lessonTitle === lessonTitle)
+            );
+            const newProgresses = { ...prev.examProgresses };
+            const key = `${subjectId}_${lessonTitle}`;
+            if (newProgresses[key]) {
+                newProgresses[key] = {
+                    ...newProgresses[key],
+                    currentQuestionIndex: 0,
+                    userAnswers: [],
+                    lastUpdated: new Date().toISOString()
+                };
+            }
+            return {
+                ...prev,
+                lastActive: new Date().toISOString(),
+                quizResults: newResults,
+                examProgresses: newProgresses
+            };
+        });
+    };
+
+    const handleResetSession = (sessionName: string) => {
+        const sessionSubjects = [
+            SubjectName.JordanHistory,
+            SubjectName.IslamicEducation,
+            SubjectName.Arabic,
+            SubjectName.English
+        ];
+
+        const sessionExams = sessionName === 'دورة 2008' ? SESSION_2008_EXAMS : SESSION_2008_SUP_EXAMS;
+        
+        setUserProgress(prev => {
+            let newResults = [...prev.quizResults];
+            const newProgresses = { ...prev.examProgresses };
+
+            sessionSubjects.forEach(subjectId => {
+                let baseTitle = "";
+                if (sessionName === 'دورة 2008' || sessionName === 'دورة 2008 تكميلي') {
+                    const exam = sessionExams.find(e => e.subject === subjectId);
+                    if (exam) baseTitle = exam.title;
+                } else if (sessionName === 'الدورة التجريبية') {
+                    baseTitle = `دورة تجريبية - ${subjectId}`;
+                }
+
+                if (baseTitle) {
+                    const isEnglish = subjectId === SubjectName.English;
+                    const examLabel = isEnglish ? 'Exam (1)' : 'امتحان (1)';
+                    const lessonTitle = `${baseTitle} - ${examLabel}`;
+                    
+                    // Filter out the results
+                    newResults = newResults.filter(r => 
+                        !(r.subjectId === subjectId && (r.lessonTitle === lessonTitle || r.lessonTitle.includes(baseTitle)))
+                    );
+
+                    // Also check for legacy titles
+                    const mockExamTitle = isEnglish ? 'Mock Exam' : 'امتحان تجريبي';
+                    if (sessionName === 'الدورة التجريبية') {
+                        newResults = newResults.filter(r => 
+                            !(r.subjectId === subjectId && r.lessonTitle === mockExamTitle)
+                        );
+                    }
+
+                    // Reset progress
+                    const key = `${subjectId}_${lessonTitle}`;
+                    if (newProgresses[key]) {
+                        newProgresses[key] = {
+                            ...newProgresses[key],
+                            currentQuestionIndex: 0,
+                            userAnswers: [],
+                            lastUpdated: new Date().toISOString()
+                        };
+                    }
+                }
+            });
+
+            return {
+                ...prev,
+                lastActive: new Date().toISOString(),
+                quizResults: newResults,
+                examProgresses: newProgresses
+            };
+        });
+    };
+
     const currentViewComponent = () => {
         try {
             // Log current view state for debugging
             if (isAuthenticating) {
                 console.log("App: Authenticating...");
                 return (
-                    <div className="flex flex-col items-center justify-center min-h-[60vh] py-20 translate-y-[-10%]">
-                        <div className="relative mb-6">
-                            <div className="w-16 h-16 border-4 border-blue-100 rounded-full"></div>
-                            <Loader2 className="w-16 h-16 text-blue-600 animate-spin absolute top-0 left-0" />
+                    <div className="flex flex-col items-center justify-center min-h-[70vh] py-20 px-6 text-center">
+                        <div className="relative w-28 h-28 mx-auto mb-10 flex items-center justify-center">
+                            <div className="absolute inset-0 border-4 border-slate-100 rounded-full"></div>
+                            <motion.div 
+                                className="absolute inset-0 border-4 border-[#1d5bfc] rounded-full border-t-transparent"
+                                animate={{ rotate: 360 }}
+                                transition={{ duration: 1, repeat: Infinity, ease: "linear" }}
+                            />
+                            <div className="w-20 h-20 bg-white rounded-2xl p-2 shadow-sm border border-slate-100 flex items-center justify-center overflow-hidden">
+                                <img src="https://i.postimg.cc/y8GJVJ52/1777447368581.png" alt="JoSchool" className="w-full h-auto object-contain" />
+                            </div>
                         </div>
-                        <p className="font-black text-slate-800 text-lg animate-pulse">جاري التحقق من الهوية...</p>
-                        <p className="text-slate-400 text-[10px] mt-2 font-bold">يرجى الانتظار قليلاً</p>
+                        <h3 className="text-2xl font-black text-slate-800 mb-2">جاري التحقق من الهوية...</h3>
+                        <p className="text-slate-500 font-bold text-sm">يرجى الانتظار قليلاً</p>
                     </div>
                 );
             }
@@ -1667,7 +1923,19 @@ const App: React.FC = () => {
                             onBack={goToHome}
                             sessionTitle={sessionTitle}
                             handleStartSessionExam={handleStartSessionExam}
+                            handleResetExamResult={handleResetExamResult}
+                            handleResetSession={handleResetSession}
+                            handleViewSessionResult={handleViewSessionResult}
                             userProgress={userProgress}
+                        />
+                    );
+                case View.MoEResults:
+                    return (
+                        <MoEResultsPage 
+                            userProgress={userProgress}
+                            userName={user?.displayName || ''}
+                            onBack={goBack}
+                            sessionTitle={sessionTitle}
                         />
                     );
                 default: 
@@ -1716,14 +1984,27 @@ const App: React.FC = () => {
                         initial={{ opacity: 0 }}
                         animate={{ opacity: 1 }}
                         exit={{ opacity: 0 }}
-                        className="fixed inset-0 z-[10001] bg-white/60 backdrop-blur-md flex flex-col items-center justify-center p-6 text-center"
+                        className="fixed inset-0 z-[10001] bg-white/70 backdrop-blur-md flex flex-col items-center justify-center p-6 text-center"
                     >
-                        <div className="relative">
-                            <div className="w-20 h-20 border-4 border-primary/20 rounded-full"></div>
-                            <div className="w-20 h-20 border-4 border-primary border-t-transparent rounded-full animate-spin absolute top-0 left-0"></div>
-                        </div>
-                        <h3 className="text-xl font-black text-text-main mt-8 mb-2">جاري تحضير الامتحان...</h3>
-                        <p className="text-text-sub font-bold text-sm">لحظات قليلة ونبدأ!</p>
+                        <motion.div 
+                            initial={{ scale: 0.9, opacity: 0 }}
+                            animate={{ scale: 1, opacity: 1 }}
+                            className="bg-white rounded-[2.5rem] p-12 shadow-2xl border-2 border-slate-900 max-w-xs w-full"
+                        >
+                            <div className="relative w-28 h-28 mx-auto mb-10 flex items-center justify-center">
+                                <div className="absolute inset-0 border-4 border-slate-100 rounded-full"></div>
+                                <motion.div 
+                                    className="absolute inset-0 border-4 border-[#1d5bfc] rounded-full border-t-transparent"
+                                    animate={{ rotate: 360 }}
+                                    transition={{ duration: 1, repeat: Infinity, ease: "linear" }}
+                                />
+                                <div className="w-20 h-20 bg-white rounded-2xl p-2 shadow-sm border border-slate-100 flex items-center justify-center overflow-hidden">
+                                    <img src="https://i.postimg.cc/y8GJVJ52/1777447368581.png" alt="JoSchool" className="w-full h-auto object-contain" />
+                                </div>
+                            </div>
+                            <h3 className="text-2xl font-black text-slate-800 mb-3">جاري تحضير الامتحان...</h3>
+                            <p className="text-slate-500 font-bold text-sm">لحظات قليلة ونبدأ!</p>
+                        </motion.div>
                     </motion.div>
                 )}
             </AnimatePresence>
@@ -1732,10 +2013,10 @@ const App: React.FC = () => {
                 <button 
                     onClick={goBack}
                     className={`fixed top-4 z-[9999] p-3 bg-white border border-slate-900 rounded-full shadow-lg text-slate-600 hover:text-primary transition-all active:scale-95 
-                        ${(isEnglish || currentView === View.SessionSubjects || currentView === View.Favorites || currentView === View.Progress || currentView === View.PdfViewer) ? 'left-4' : 'right-4'}`}
-                    title={isEnglish ? "Back" : "رجوع"}
+                        ${((isEnglish || currentView === View.SessionSubjects || currentView === View.Favorites || currentView === View.Progress || currentView === View.PdfViewer) && currentView !== View.MoEResults) ? 'left-4' : 'right-4'}`}
+                    title={(isEnglish && currentView !== View.MoEResults) ? "Back" : "رجوع"}
                 >
-                    {(isEnglish || currentView === View.SessionSubjects || currentView === View.Favorites || currentView === View.Progress || currentView === View.PdfViewer) ? <ChevronLeftIcon className="w-6 h-6" strokeWidth={3} /> : <ChevronRightIcon className="w-6 h-6" strokeWidth={3} />}
+                    {((isEnglish || currentView === View.SessionSubjects || currentView === View.Favorites || currentView === View.Progress || currentView === View.PdfViewer) && currentView !== View.MoEResults) ? <ChevronLeftIcon className="w-6 h-6" strokeWidth={3} /> : <ChevronRightIcon className="w-6 h-6" strokeWidth={3} />}
                 </button>
             )}
 
