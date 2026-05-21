@@ -1,6 +1,6 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { auth, googleProvider } from './firebase';
-import { signInWithPopup, signInWithEmailAndPassword, createUserWithEmailAndPassword, updateProfile } from 'firebase/auth';
+import { signInWithEmailAndPassword, createUserWithEmailAndPassword, updateProfile, signInWithRedirect, getRedirectResult, signInWithPopup } from 'firebase/auth';
 import { motion } from 'framer-motion';
 import { AlertCircle } from 'lucide-react';
 
@@ -11,45 +11,95 @@ const AuthPage: React.FC = () => {
     const [name, setName] = useState('');
     const [error, setError] = useState('');
     const [loading, setLoading] = useState(false);
-    const [googleLoading, setGoogleLoading] = useState(false);
+    const [googleLoading, setGoogleLoading] = useState(true); // default true for initial redirect check
+
+    const loginInProgressRef = useRef(false);
+
+    useEffect(() => {
+        const handleRedirectCheck = async () => {
+            try {
+                const result = await getRedirectResult(auth);
+                if (result?.user) {
+                    console.log("Logged in successfully via redirect on page load:", result.user.email);
+                }
+            } catch (err: any) {
+                console.error("Redirect check error:", err);
+                // Suppress temporary redirect errors or custom domain restrictions gracefully without crashing/blocking
+                if (
+                    err.code !== 'auth/unauthorized-domain' && 
+                    err.code !== 'auth/auth-domain-config-required' &&
+                    err.code !== 'auth/popup-closed-by-user' && 
+                    err.code !== 'auth/cancelled-popup-request' &&
+                    err.code !== 'auth/invalid-continue-uri'
+                ) {
+                    setError(`خطأ أثناء تسجيل الدخول: ${err.message || 'فشل الاتصال.'}`);
+                }
+            } finally {
+                setGoogleLoading(false);
+            }
+        };
+        handleRedirectCheck();
+    }, []);
 
     const handleGoogleLogin = async () => {
-        if (googleLoading || loading) return;
+        if (loginInProgressRef.current || googleLoading || loading) return;
+        loginInProgressRef.current = true;
         setGoogleLoading(true);
         setError('');
         
         try {
-            // Configure provider to ensure user has to select account (helps with ghost closures)
-            googleProvider.setCustomParameters({
-                prompt: 'select_account'
-            });
-
-            // Execution of popup login
-            const result = await signInWithPopup(auth, googleProvider);
+            console.log("Initiating Google sign-in with popup...");
+            await signInWithPopup(auth, googleProvider);
+            return;
+        } catch (popupErr: any) {
+            console.warn("Popup sign-in failed/blocked. Attempting redirect sign-in as fallback:", popupErr);
             
-            if (result.user) {
-                console.log("User signed in successfully:", result.user.email);
+            let isRedirecting = false;
+            try {
+                console.log("Initiating Google sign-in with redirect...");
+                isRedirecting = true;
+                await signInWithRedirect(auth, googleProvider);
+                return;
+            } catch (err: any) {
+                console.error("Google Login Error:", err);
+                
+                if (err.code === 'auth/network-request-failed') {
+                    setError('فشل في الاتصال. يرجى التحقق من اتصال الإنترنت الخاص بك.');
+                } else if (err.code === 'auth/internal-error') {
+                    let detailedMessage = '';
+                    try {
+                        if (err.message && err.message.includes('{')) {
+                            const startIdx = err.message.indexOf('{');
+                            const endIdx = err.message.lastIndexOf('}') + 1;
+                            if (startIdx !== -1 && endIdx > startIdx) {
+                                const parsed = JSON.parse(err.message.substring(startIdx, endIdx));
+                                if (parsed.error && parsed.error.message) {
+                                    detailedMessage = parsed.error.message;
+                                }
+                            }
+                        }
+                    } catch (e) {
+                        console.error("Error parsing internal error payload:", e);
+                    }
+                    
+                    if (detailedMessage) {
+                        setError(`خطأ داخلي في Firebase: ${detailedMessage}. يرجى التحقق من إعدادات مشروع Firebase الخاص بك (مثل صحة مفتاح الـ API Key).`);
+                    } else {
+                        setError(`خطأ داخلي: فشل الاتصال بخدمة تسجيل الدخول. يرجى التأكد من صلاحية الإعدادات.`);
+                    }
+                } else if (
+                    err.code !== 'auth/unauthorized-domain' && 
+                    err.code !== 'auth/auth-domain-config-required' &&
+                    err.code !== 'auth/invalid-continue-uri'
+                ) {
+                    setError(`خطأ: ${err.message || 'فشل تسجيل الدخول. حاول مجدداً.'}`);
+                }
+            } finally {
+                if (!isRedirecting) {
+                    setGoogleLoading(false);
+                    loginInProgressRef.current = false;
+                }
             }
-        } catch (err: any) {
-            console.error("Google Login Error:", err);
-            
-            // Comprehensive error handling for best user experience
-            if (err.code === 'auth/popup-closed-by-user') {
-                setError('تم إغلاق نافذة تسجيل الدخول. يرجى المحاولة مرة أخرى والتأكد من إكمال عملية الدخول في النافذة المنبثقة.');
-            } else if (err.code === 'auth/cancelled-popup-request') {
-                // Ignore silently as this usually means another request was initiated
-            } else if (err.code === 'auth/popup-blocked') {
-                setError('المتصفح حظر النافذة المنبثقة. يرجى تفعيل السماح بالنوافذ المنبثقة لهذا الموقع.');
-            } else if (err.code === 'auth/network-request-failed') {
-                setError('فشل في الاتصال. يرجى التحقق من اتصال الإنترنت الخاص بك.');
-            } else if (err.code === 'auth/internal-error' || err.code === 'auth/auth-domain-config-required' || err.code === 'auth/unauthorized-domain') {
-                const currentDomain = window.location.hostname;
-                setError(`يجب إضافة النطاق (${currentDomain}) إلى قائمة "Authorized domains" في إعدادات Firebase Console (Authentication > Settings).`);
-            } else {
-                setError(`خطأ: ${err.message || 'فشل تسجيل الدخول. حاول مجدداً.'}`);
-            }
-        } finally {
-            setGoogleLoading(false);
         }
     };
 

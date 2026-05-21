@@ -1,9 +1,15 @@
-import { initializeApp } from 'firebase/app';
+import { getApps, getApp, initializeApp } from 'firebase/app';
 import { getAuth, GoogleAuthProvider } from 'firebase/auth';
-import { initializeFirestore, doc, getDocFromServer } from 'firebase/firestore';
+import { initializeFirestore, getFirestore, doc, getDocFromServer } from 'firebase/firestore';
 import firebaseConfig from './firebase-applet-config.json';
 
-const app = initializeApp(firebaseConfig);
+// Initialize App safely by checking if an instance already exists (prevents Fast Refresh/HMR errors)
+let app;
+try {
+    app = getApp();
+} catch (e) {
+    app = initializeApp(firebaseConfig);
+}
 
 // Initialize Firestore with settings optimized for restricted environments (like iframes)
 if (!firebaseConfig.apiKey || firebaseConfig.projectId === 'YOUR_PROJECT_ID') {
@@ -12,10 +18,17 @@ if (!firebaseConfig.apiKey || firebaseConfig.projectId === 'YOUR_PROJECT_ID') {
     console.log("Initializing Firestore for project:", firebaseConfig.projectId);
 }
 
-export const db = initializeFirestore(app, {
-    experimentalForceLongPolling: true,
-}, (firebaseConfig as any).firestoreDatabaseId || '(default)');
+// Safely obtain Firestore db instance to prevent duplicate initialization
+let dbInstance;
+try {
+    dbInstance = initializeFirestore(app, {
+        experimentalForceLongPolling: true,
+    }, (firebaseConfig as any).firestoreDatabaseId || '(default)');
+} catch (error) {
+    dbInstance = getFirestore(app, (firebaseConfig as any).firestoreDatabaseId || '(default)');
+}
 
+export const db = dbInstance;
 export const auth = getAuth(app);
 export const googleProvider = new GoogleAuthProvider();
 
