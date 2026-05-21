@@ -1,9 +1,10 @@
 {
-  "apiKey": "AIzaSyD_o8nRm8oI7X-lHfgLE_nwS5EUieZHddw",
-  "authDomain": "joschool11.firebaseapp.com",
-  "projectId": "joschool11",
-  "storageBucket": "joschool11.firebasestorage.app",
-  "messagingSenderId": "257891603671",
-  "appId": "1:257891603671:web:b92b52578f2cf104024c92",
-  "measurementId": "G-23L04PSZSR"
+  "projectId": "shamell-12",
+  "appId": "1:774445161506:web:7769e3ee3d7d16b1bc3e7b",
+  "apiKey": "AIzaSyBKT322IGkj101_5S7MlROxtAvbRXcL2nk",
+  "authDomain": "shamell-12.firebaseapp.com",
+  "firestoreDatabaseId": "ai-studio-da200166-857c-427c-bf0f-08c0c7985248",
+  "storageBucket": "shamell-12.firebasestorage.app",
+  "messagingSenderId": "774445161506",
+  "measurementId": ""
 }

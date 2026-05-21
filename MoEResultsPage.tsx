@@ -79,7 +79,7 @@ const MoEResultsPage: React.FC<MoEResultsPageProps> = ({
         // Brief delay to allow React to update the DOM with printing styles
         setTimeout(() => {
             const opt = {
-                margin: [10, 10, 10, 10],
+                margin: [5, 10, 5, 10],
                 filename: `JoSchool11_Result_${userName || 'Student'}.pdf`,
                 image: { type: 'jpeg', quality: 0.98 },
                 html2canvas: { 
@@ -89,7 +89,8 @@ const MoEResultsPage: React.FC<MoEResultsPageProps> = ({
                     scrollY: 0,
                     windowWidth: 1200 // Force a wider capture context for PDF
                 },
-                jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' }
+                jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' },
+                pagebreak: { mode: ['avoid-all', 'css', 'legacy'] }
             };
             
             html2pdf().set(opt).from(element).save().then(() => {
@@ -135,9 +136,14 @@ const MoEResultsPage: React.FC<MoEResultsPageProps> = ({
             {/* Header Content */}
             <div 
                 ref={reportRef} 
-                className={`w-full flex flex-col items-center bg-white shadow-md border border-gray-100 rounded-lg transition-all duration-0 ${isPrinting ? 'max-w-3xl p-8 min-h-[280mm]' : 'max-w-xl p-6 h-auto'}`}
+                className={`w-full flex flex-col items-center bg-white shadow-md border border-gray-100 rounded-lg transition-all duration-0 relative overflow-hidden ${isPrinting ? 'max-w-3xl p-8 min-h-[270mm]' : 'max-w-xl p-6 h-auto'}`}
+                style={{
+                    backgroundImage: isPrinting ? 'url("data:image/svg+xml,%3Csvg width=\'600\' height=\'400\' xmlns=\'http://www.w3.org/2000/svg\'%3E%3Ctext x=\'50%25\' y=\'50%25\' font-family=\'sans-serif\' font-size=\'36\' font-weight=\'bold\' fill=\'rgba(0,0,0,0.06)\' text-anchor=\'middle\' transform=\'rotate(-25 300 200)\'%3EJoSchool11.netlify.app%3C/text%3E%3C/svg%3E")' : 'none',
+                    backgroundRepeat: 'repeat',
+                    backgroundAttachment: 'local'
+                }}
             >
-                <div className={`${isPrinting ? 'w-24 h-24 mb-4' : 'w-16 h-16 mb-2'} border border-slate-900 rounded-xl p-1 bg-white shadow-sm overflow-hidden`}>
+                <div className={`${isPrinting ? 'w-24 h-24 mb-4' : 'w-16 h-16 mb-2'} border border-slate-900 rounded-xl p-1 bg-white shadow-sm overflow-hidden z-10`}>
                     <img 
                         src="https://i.postimg.cc/y8GJVJ52/1777447368581.png" 
                         alt="JoSchool Logo" 
@@ -156,7 +162,7 @@ const MoEResultsPage: React.FC<MoEResultsPageProps> = ({
                 </div>
 
                 {/* Student Info */}
-                <div className={`w-full flex flex-col gap-3 text-black ${isPrinting ? 'text-xl mb-6' : 'text-lg mb-10'}`}>
+                <div className={`w-full flex flex-col gap-3 text-black z-10 ${isPrinting ? 'text-xl mb-6' : 'text-lg mb-10'}`}>
                     <div className="flex gap-2 border-b border-gray-100 pb-1">
                         <span className="font-bold">رقم الجلوس :</span>
                         <span>{seatNumber}</span>
@@ -178,7 +184,7 @@ const MoEResultsPage: React.FC<MoEResultsPageProps> = ({
                 </div>
 
                 {/* Results Table */}
-                <div className={`w-full bg-white rounded-sm border border-gray-300 shadow-sm overflow-hidden ${isPrinting ? 'mb-4' : 'mb-6'}`}>
+                <div className={`w-full bg-white rounded-sm border border-gray-300 shadow-sm overflow-hidden z-10 ${isPrinting ? 'mb-4' : 'mb-6'}`}>
                     <table className="w-full border-collapse table-fixed">
                         <thead>
                             <tr className={`bg-gray-50 text-gray-700 border-b border-gray-300 ${isPrinting ? 'text-lg' : 'text-sm'}`}>
@@ -202,14 +208,19 @@ const MoEResultsPage: React.FC<MoEResultsPageProps> = ({
                 </div>
 
                 {/* Alert */}
-                <p className="text-[#8B0000] font-bold text-center px-4 mb-6 leading-relaxed text-sm">
+                <p className="text-[#8B0000] font-bold text-center px-4 mb-6 leading-relaxed text-sm z-10">
                     * من شروط الالتحاق بالجامعات حصول الطالب على (50) بالمئة على الأقل من النهاية العظمى لكل مبحث
                 </p>
 
                 {/* Date and Time Timestamp */}
-                <div className={`w-full text-center border-t border-gray-100 ${isPrinting ? 'mt-auto pt-4' : 'mt-4 pt-4'}`}>
+                <div className={`w-full text-center border-t border-gray-100 z-10 ${isPrinting ? 'mt-auto pt-4' : 'mt-4 pt-4'}`}>
                     <p className="text-gray-400 text-[10px] font-medium leading-none">تم إصدار هذه الوثيقة إلكترونياً من منصة JoSchool11</p>
                     <p className={`${isPrinting ? 'text-base' : 'text-xs'} text-gray-500 mt-1 font-bold`}>{currentTime}</p>
+                    {isPrinting && (
+                        <div style={{ marginTop: '20px', color: '#C8922A', fontWeight: 'black', fontSize: '16px', borderTop: '2px solid #C8922A', paddingTop: '15px' }}>
+                            زوروا موقعنا: JoSchool11.netlify.app
+                        </div>
+                    )}
                 </div>
             </div>
 

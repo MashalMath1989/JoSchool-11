@@ -8,6 +8,8 @@ const app = initializeApp(firebaseConfig);
 // Initialize Firestore with settings optimized for restricted environments (like iframes)
 if (!firebaseConfig.apiKey || firebaseConfig.projectId === 'YOUR_PROJECT_ID') {
     console.warn("Firebase configuration is missing or using placeholders. Please run 'set_up_firebase'.");
+} else {
+    console.log("Initializing Firestore for project:", firebaseConfig.projectId);
 }
 
 export const db = initializeFirestore(app, {
@@ -34,8 +36,13 @@ async function testConnection() {
 
         if (isPermissionError) {
             console.log("Firestore reachable (Permission Denied). This indicates a successful network connection.");
-        } else if (error instanceof Error && (error.message.includes('the client is offline') || error.message.includes('failed-precondition'))) {
-            console.error("Please check your Firebase configuration or internet connection. Connectivity to Firestore failed.");
+        } else if (error instanceof Error && (error.message.includes('the client is offline') || error.message.includes('failed-precondition') || (error as any).code === 'unavailable')) {
+            console.error("Please check your Firebase configuration (Project ID, API Key) or internet connection. Connectivity to Firestore failed (unavailable).");
+            console.error("Diagnostic info:", {
+                projectId: firebaseConfig.projectId,
+                authDomain: firebaseConfig.authDomain,
+                databaseId: (firebaseConfig as any).firestoreDatabaseId || '(default)'
+            });
         } else {
             console.error("Firestore connection test error:", error);
         }

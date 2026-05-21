@@ -1,4 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
+import { motion } from 'framer-motion';
 import html2pdf from 'html2pdf.js';
 import { StarIcon, XIcon, CheckIcon, BookmarkIcon, BookmarkOutlineIcon, ShareIcon, FlagIcon, DownloadIcon, ChevronLeftIcon, ChevronRightIcon } from './data/Icons';
 import { Question, Subject, SubjectName, UserProgress, QuizResult } from './types';
@@ -105,7 +106,8 @@ const ResultsPage: React.FC<ResultsPageProps> = ({
                 scrollX: 0,
                 scrollY: 0
             },
-            jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' }
+            jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' },
+            pagebreak: { mode: ['avoid-all', 'css', 'legacy'] }
         };
 
         // Temporarily show the element for capture
@@ -399,10 +401,32 @@ const ResultsPage: React.FC<ResultsPageProps> = ({
                     backgroundColor: 'white',
                     width: '740px',
                     fontFamily: 'system-ui, -apple-system, sans-serif',
-                    boxSizing: 'border-box'
+                    boxSizing: 'border-box',
+                    position: 'relative',
+                    backgroundImage: 'url("data:image/svg+xml,%3Csvg width=\'600\' height=\'400\' xmlns=\'http://www.w3.org/2000/svg\'%3E%3Ctext x=\'50%25\' y=\'50%25\' font-family=\'sans-serif\' font-size=\'36\' font-weight=\'900\' fill=\'rgba(0,0,0,0.06)\' text-anchor=\'middle\' transform=\'rotate(-25 300 200)\'%3EJoSchool11.netlify.app%3C/text%3E%3C/svg%3E")',
+                    backgroundRepeat: 'repeat',
+                    backgroundAttachment: 'local'
                 }}
             >
-                <div style={{ textAlign: 'center', marginBottom: '20px', borderBottom: '4px solid #3b82f6', paddingBottom: '10px', position: 'relative', paddingTop: '0px' }}>
+                <div style={{ textAlign: 'center', marginBottom: '20px', borderBottom: '4px solid #3b82f6', paddingBottom: '10px', position: 'relative', paddingTop: '0px', zIndex: 1 }}>
+                    {/* App Logo & Brand */}
+                    <div style={{
+                        position: 'absolute',
+                        top: '12px',
+                        [isEnglish ? 'left' : 'right']: '15px',
+                        display: 'flex',
+                        flexDirection: 'column',
+                        alignItems: 'center',
+                        zIndex: 10
+                    }}>
+                        <img 
+                            src="https://i.postimg.cc/y8GJVJ52/1777447368581.png" 
+                            alt="Logo" 
+                            style={{ width: '45px', height: '45px', objectFit: 'contain' }} 
+                        />
+                        <span style={{ fontSize: '10px', fontWeight: '900', color: '#1e293b', marginTop: '2px' }}>JoSchool11</span>
+                    </div>
+
                     {/* Result Square */}
                     <div style={{
                         position: 'absolute',
@@ -467,8 +491,8 @@ const ResultsPage: React.FC<ResultsPageProps> = ({
                     </div>
                 </div>
 
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-                    {currentQuiz.map((q, idx) => {
+                <div style={{ position: 'relative', zIndex: 1, display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                        {currentQuiz.map((q, idx) => {
                         const userAnswer = userAnswers[idx];
                         const isCorrect = checkIsCorrect(q, userAnswer);
                         
@@ -492,7 +516,10 @@ const ResultsPage: React.FC<ResultsPageProps> = ({
                                     }}>
                                         {idx + 1}
                                     </div>
-                                    <div style={{ fontSize: '15px', fontWeight: 'bold', color: '#334155', lineHeight: '1.4', flex: 1 }}>{renderTextWithUnderline(q.question)}</div>
+                                    <div style={{ fontSize: '15px', fontWeight: 'bold', color: '#334155', lineHeight: '1.4', flex: 1 }}>
+                                        {isEnglish && <span style={{ marginRight: '5px' }}>{idx + 1}.</span>}
+                                        {renderTextWithUnderline(q.question)}
+                                    </div>
                                     <div style={{ fontSize: '18px', color: isCorrect ? '#10b981' : '#ef4444', fontWeight: '900', flexShrink: 0 }}>
                                         {isCorrect ? '✓' : '✗'}
                                     </div>
@@ -548,7 +575,15 @@ const ResultsPage: React.FC<ResultsPageProps> = ({
                                                 }}>
                                                     {isEnglish ? ['A', 'B', 'C', 'D'][cIdx] : ['أ', 'ب', 'ج', 'د'][cIdx]}
                                                 </span>
-                                                <span style={{ lineHeight: '1.1' }}>{renderTextWithUnderline(choice)}</span>
+                                                <span style={{ 
+                                                    lineHeight: '1.1',
+                                                    textDecoration: isCorrectChoice ? 'underline' : 'none',
+                                                    textDecorationColor: isCorrectChoice ? 'black' : 'inherit',
+                                                    textUnderlineOffset: isCorrectChoice ? '4px' : '0',
+                                                    textDecorationThickness: isCorrectChoice ? '1.5px' : '0'
+                                                }}>
+                                                    {renderTextWithUnderline(choice)}
+                                                </span>
                                             </div>
                                         );
                                     })}
@@ -576,8 +611,9 @@ const ResultsPage: React.FC<ResultsPageProps> = ({
                     })}
                 </div>
                 
-                <div style={{ textAlign: 'center', marginTop: '40px', paddingTop: '20px', borderTop: '1px solid #e2e8f0', color: '#94a3b8', fontSize: '12px' }}>
+                <div style={{ textAlign: 'center', marginTop: '40px', paddingTop: '20px', borderTop: '1px solid #e2e8f0', color: '#94a3b8', fontSize: '12px', position: 'relative', zIndex: 1 }}>
                     تم استخراج هذه النتيجة عبر تطبيق JoSchool 11 - منصة التعليم التفاعلية
+                    <div style={{ marginTop: '10px', color: '#3b82f6', fontWeight: 'bold', fontSize: '14px' }}>زوروا موقعنا: JoSchool11.netlify.app</div>
                 </div>
             </div>
 
@@ -593,10 +629,32 @@ const ResultsPage: React.FC<ResultsPageProps> = ({
                     width: '790px',
                     fontFamily: 'serif',
                     color: 'black',
-                    boxSizing: 'border-box'
+                    boxSizing: 'border-box',
+                    position: 'relative',
+                    backgroundImage: 'url("data:image/svg+xml,%3Csvg width=\'700\' height=\'500\' xmlns=\'http://www.w3.org/2000/svg\'%3E%3Ctext x=\'50%25\' y=\'50%25\' font-family=\'serif\' font-size=\'40\' font-weight=\'bold\' fill=\'rgba(0,0,0,0.06)\' text-anchor=\'middle\' transform=\'rotate(-25 350 250)\'%3EJoSchool11.netlify.app%3C/text%3E%3C/svg%3E")',
+                    backgroundRepeat: 'repeat',
+                    backgroundAttachment: 'local'
                 }}
             >
-                <div style={{ textAlign: 'center', marginBottom: '30px', borderBottom: '2px solid black', paddingBottom: '15px', position: 'relative', paddingTop: '5px' }}>
+                <div style={{ textAlign: 'center', marginBottom: '30px', borderBottom: '2px solid black', paddingBottom: '15px', position: 'relative', paddingTop: '5px', zIndex: 1 }}>
+                    {/* App Logo & Brand */}
+                    <div style={{
+                        position: 'absolute',
+                        top: '-5px',
+                        [isEnglish ? 'left' : 'right']: '50px',
+                        display: 'flex',
+                        flexDirection: 'column',
+                        alignItems: 'center',
+                        zIndex: 10
+                    }}>
+                        <img 
+                            src="https://i.postimg.cc/y8GJVJ52/1777447368581.png" 
+                            alt="Logo" 
+                            style={{ width: '60px', height: '60px', objectFit: 'contain' }} 
+                        />
+                        <span style={{ fontSize: '12px', fontWeight: 'bold', color: 'black', marginTop: '5px' }}>JoSchool11</span>
+                    </div>
+
                     {/* Result Square */}
                     <div style={{
                         position: 'absolute',
@@ -663,7 +721,7 @@ const ResultsPage: React.FC<ResultsPageProps> = ({
                     </div>
                 </div>
 
-                <div style={{ fontSize: '17px', width: '100%' }}>
+                <div style={{ fontSize: '17px', width: '100%', position: 'relative', zIndex: 1 }}>
                     {currentQuiz.map((q, idx) => {
                         const userAnswer = userAnswers[idx];
                         const isCorrect = checkIsCorrect(q, userAnswer);
@@ -672,21 +730,27 @@ const ResultsPage: React.FC<ResultsPageProps> = ({
                             <div key={idx} style={{ marginBottom: '20px', pageBreakInside: 'avoid', width: '100%' }}>
                                 <div style={{ display: 'flex', gap: '12px', marginBottom: '10px', alignItems: 'flex-start' }}>
                                     <div style={{ 
-                                        width: '28px', 
-                                        height: '28px', 
+                                        width: '26px', 
+                                        height: '26px', 
                                         borderRadius: '50%', 
                                         border: '1.5px solid black',
                                         display: 'flex',
                                         alignItems: 'center',
                                         justifyContent: 'center',
-                                        fontSize: '15px', 
+                                        fontSize: '14px', 
                                         fontWeight: 'bold',
                                         flexShrink: 0,
-                                        marginTop: '1px'
+                                        marginTop: '1px',
+                                        lineHeight: '1',
+                                        padding: '0',
+                                        boxSizing: 'border-box'
                                     }}>
                                         {idx + 1}
                                     </div>
-                                    <span style={{ fontWeight: 'bold', flex: 1, fontSize: '18px' }}>{renderTextWithUnderline(q.question)}</span>
+                                    <span style={{ fontWeight: 'bold', flex: 1, fontSize: '18px' }}>
+                                        {isEnglish && <span style={{ marginRight: '8px' }}>{idx + 1}.</span>}
+                                        {renderTextWithUnderline(q.question)}
+                                    </span>
                                     <span style={{ flexShrink: 0, fontSize: '18px', fontWeight: 'bold', marginRight: isEnglish ? '0' : '10px', marginLeft: isEnglish ? '10px' : '0' }}>{isCorrect ? '✓' : '✗'}</span>
                                 </div>
                                 
@@ -707,10 +771,11 @@ const ResultsPage: React.FC<ResultsPageProps> = ({
                                                 <span style={{ fontWeight: 'bold' }}>{letter})</span>
                                                 <span style={{ 
                                                     fontWeight: isCorrectChoice ? 'bold' : 'normal',
-                                                    color: isUserChoice && !isCorrect ? '#ef4444' : 'black',
+                                                    color: isCorrectChoice ? '#16a34a' : (isUserChoice && !isCorrect ? '#ef4444' : 'black'),
                                                     textDecoration: isCorrectChoice ? 'underline' : 'none',
+                                                    textDecorationColor: isCorrectChoice ? 'black' : 'inherit',
                                                     textUnderlineOffset: isCorrectChoice ? '6px' : '0',
-                                                    textDecorationThickness: isCorrectChoice ? '1px' : '0',
+                                                    textDecorationThickness: isCorrectChoice ? '1.5px' : '0',
                                                     display: 'inline-block'
                                                 }}>
                                                     {renderTextWithUnderline(choice)}
@@ -724,8 +789,9 @@ const ResultsPage: React.FC<ResultsPageProps> = ({
                     })}
                 </div>
 
-                <div style={{ textAlign: 'center', marginTop: '30px', borderTop: '1px solid black', paddingTop: '10px', fontSize: '14px', fontWeight: 'bold' }}>
+                <div style={{ textAlign: 'center', marginTop: '30px', borderTop: '1px solid black', paddingTop: '10px', fontSize: '14px', fontWeight: 'bold', position: 'relative', zIndex: 1 }}>
                     {isEnglish ? 'Questions Ended - Good Luck - JoSchool 11' : 'انتهت الأسئلة - مع تمنياتنا لكم بالتوفيق - JoSchool 11'}
+                    <div style={{ marginTop: '10px' }}>زوروا موقعنا: JoSchool11.netlify.app</div>
                 </div>
             </div>
         </div>

@@ -161,6 +161,17 @@ const SessionSubjectsPage: React.FC<SessionSubjectsPageProps> = ({
 
     return (
         <div className="container mx-auto p-2 max-w-2xl pt-2 relative" dir="rtl">
+            {/* Session Title Header */}
+            <div className="flex flex-col items-center mb-6">
+                <motion.div 
+                    initial={{ y: -20, opacity: 0 }}
+                    animate={{ y: 0, opacity: 1 }}
+                    className="px-6 py-1.5 bg-white border-2 border-slate-900 rounded-b-2xl shadow-[0_5px_0_rgb(15,23,42)] font-black text-slate-900 text-xl"
+                >
+                    {sessionTitle}
+                </motion.div>
+            </div>
+
             <div className="flex items-center gap-3 mb-6 px-2">
                 <div className="w-2 h-6 bg-yellow-400 rounded-full shrink-0"></div>
                 <h2 className="text-xl font-black text-slate-800 leading-tight flex-1">
