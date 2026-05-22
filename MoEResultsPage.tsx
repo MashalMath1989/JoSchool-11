@@ -69,37 +69,6 @@ const MoEResultsPage: React.FC<MoEResultsPageProps> = ({
     const [isExporting, setIsExporting] = React.useState(false);
     const reportRef = React.useRef<HTMLDivElement>(null);
 
-    const handlePrint = () => {
-        const element = reportRef.current;
-        if (!element) return;
-        
-        setIsPrinting(true);
-        setIsExporting(true);
-        
-        // Brief delay to allow React to update the DOM with printing styles
-        setTimeout(() => {
-            const opt = {
-                margin: [5, 10, 5, 10],
-                filename: `JoSchool11_Result_${userName || 'Student'}.pdf`,
-                image: { type: 'jpeg', quality: 0.98 },
-                html2canvas: { 
-                    scale: 3, 
-                    useCORS: true,
-                    letterRendering: true,
-                    scrollY: 0,
-                    windowWidth: 1200 // Force a wider capture context for PDF
-                },
-                jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' },
-                pagebreak: { mode: ['avoid-all', 'css', 'legacy'] }
-            };
-            
-            html2pdf().set(opt).from(element).save().then(() => {
-                setIsPrinting(false);
-                setIsExporting(false);
-            });
-        }, 150);
-    };
-
     // Generate current day and time
     const [currentTime, setCurrentTime] = React.useState('');
     React.useEffect(() => {
@@ -111,11 +80,46 @@ const MoEResultsPage: React.FC<MoEResultsPageProps> = ({
         setCurrentTime(`${dayName}، ${dateStr} - الساعة ${timeStr}`);
     }, []);
 
-    // Generate a consistent seat number for the session
-    const [seatNumber, setSeatNumber] = React.useState(0);
+    // Generate a consistent seat number fallback for the session
+    const [randomSeat, setRandomSeat] = React.useState(0);
     React.useEffect(() => {
-        setSeatNumber(Math.floor(100000 + Math.random() * 900000));
+        setRandomSeat(Math.floor(100000 + Math.random() * 900000));
     }, []);
+
+    // Load custom profile details or use fallbacks
+    const profileName = userProgress.studentProfile?.name || userName || 'زائر';
+    const profileSeat = userProgress.studentProfile?.seatNumber || (randomSeat ? String(randomSeat) : '');
+
+    const handlePrint = () => {
+        const element = reportRef.current;
+        if (!element) return;
+        
+        setIsPrinting(true);
+        setIsExporting(true);
+        
+        // Brief delay to allow React to update the DOM with printing styles
+        setTimeout(() => {
+            const opt = {
+                margin: [5, 10, 5, 10],
+                filename: `JoSchool11_Result_${profileName}.pdf`,
+                image: { type: 'jpeg', quality: 0.98 },
+                html2canvas: { 
+                    scale: 3, 
+                    useCORS: true,
+                    letterRendering: true,
+                    scrollY: 0,
+                    windowWidth: 1200 // Force a wider capture context for PDF
+                },
+                jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' },
+                pagebreak: { mode: ['css', 'legacy'] }
+            };
+            
+            html2pdf().set(opt).from(element).save().then(() => {
+                setIsPrinting(false);
+                setIsExporting(false);
+            });
+        }, 150);
+    };
 
     return (
         <motion.div 
@@ -165,11 +169,11 @@ const MoEResultsPage: React.FC<MoEResultsPageProps> = ({
                 <div className={`w-full flex flex-col gap-3 text-black z-10 ${isPrinting ? 'text-xl mb-6' : 'text-lg mb-10'}`}>
                     <div className="flex gap-2 border-b border-gray-100 pb-1">
                         <span className="font-bold">رقم الجلوس :</span>
-                        <span>{seatNumber}</span>
+                        <span>{profileSeat || '................................'}</span>
                     </div>
                     <div className="flex gap-2 border-b border-gray-100 pb-1">
                         <span className="font-bold">اسم الطالب :</span>
-                        <span>{userName || 'زائر'}</span>
+                        <span>{profileName || '................................'}</span>
                     </div>
                     <div className={`flex items-center gap-4 mt-2 border-b border-gray-100 ${isPrinting ? 'pb-4' : 'pb-2'}`}>
                         <div className="flex gap-2 whitespace-nowrap">

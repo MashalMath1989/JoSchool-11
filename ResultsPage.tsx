@@ -1,6 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { motion } from 'framer-motion';
 import html2pdf from 'html2pdf.js';
+import { auth } from './firebase';
 import { StarIcon, XIcon, CheckIcon, BookmarkIcon, BookmarkOutlineIcon, ShareIcon, FlagIcon, DownloadIcon, ChevronLeftIcon, ChevronRightIcon } from './data/Icons';
 import { Question, Subject, SubjectName, UserProgress, QuizResult } from './types';
 import { renderTextWithUnderline } from './textRenderer';
@@ -21,6 +22,7 @@ interface ResultsPageProps {
     isQuestionFavorite: (questionText: string) => boolean;
     toggleFavoriteQuestion: (question: Question, subjectId: string, lessonTitle: string) => void;
     isFavoriteDisabled?: boolean;
+    userProgress?: UserProgress;
 }
 
 const ResultsPage: React.FC<ResultsPageProps> = ({
@@ -38,9 +40,18 @@ const ResultsPage: React.FC<ResultsPageProps> = ({
     onBackToIndexLabel,
     isQuestionFavorite,
     toggleFavoriteQuestion,
-    isFavoriteDisabled
+    isFavoriteDisabled,
+    userProgress
 }) => {
     const isEnglish = selectedSubject?.id === SubjectName.English;
+    const studentName = userProgress?.studentProfile?.name || auth.currentUser?.displayName || auth.currentUser?.email?.split('@')[0] || '';
+    const seatNumber = userProgress?.studentProfile?.seatNumber || '';
+    const isSessionExam = currentLessonTitle.includes('دورة') || 
+                          currentLessonTitle.includes('الدورة') || 
+                          currentLessonTitle.toLowerCase().includes('session') || 
+                          currentLessonTitle.includes('تجريبي') ||
+                          currentLessonTitle.includes('Comprehensive') ||
+                          currentLessonTitle.includes('شامل');
     const checkIsCorrect = (q: Question, userAnswer: string | undefined) => {
         if (!userAnswer || !q.correct_answer) return false;
         
@@ -104,10 +115,11 @@ const ResultsPage: React.FC<ResultsPageProps> = ({
                 useCORS: true, 
                 letterRendering: true,
                 scrollX: 0,
-                scrollY: 0
+                scrollY: 0,
+                windowWidth: 1200
             },
             jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' },
-            pagebreak: { mode: ['avoid-all', 'css', 'legacy'] }
+            pagebreak: { mode: ['css', 'legacy'] }
         };
 
         // Temporarily show the element for capture
@@ -144,7 +156,8 @@ const ResultsPage: React.FC<ResultsPageProps> = ({
     }, [selectedSubject, currentLessonTitle, examNumber, finalMark, totalQuestions, setUserProgress, userAnswers]);
 
     return (
-        <div className="container mx-auto p-4 max-w-2xl text-center pt-10" dir={isEnglish ? 'ltr' : 'rtl'}>
+        <>
+            <div className="container mx-auto p-4 max-w-2xl text-center pt-10" dir={isEnglish ? 'ltr' : 'rtl'}>
             {/* Back button moved inside card */}
 
             {/* زر التصدير في الزاوية العلوية - REMOVED per user request to move inside card */}
@@ -333,9 +346,9 @@ const ResultsPage: React.FC<ResultsPageProps> = ({
                                 </div>
                             </div>
 
-                            <h4 className={`font-black text-text-main text-base leading-relaxed mb-8 flex items-start gap-4 ${isEnglish ? 'text-left' : 'text-right'}`}>
-                                <span className={`w-8 h-8 rounded-full shrink-0 flex items-center justify-center font-black text-xs mt-1 shadow-inner ${isCorrect ? 'bg-emerald-500/10 text-emerald-600' : 'bg-red-500/10 text-red-500'}`}>
-                                    {idx + 1}
+                            <h4 className={`font-black text-text-main text-base leading-relaxed mb-8 flex items-start gap-2 ${isEnglish ? 'text-left' : 'text-right'}`}>
+                                <span className={`shrink-0 font-black text-sm mt-1 ${isCorrect ? 'text-emerald-600' : 'text-red-500'}`}>
+                                    {idx + 1}.
                                 </span>
                                 <span className="flex-1 pt-1">{renderTextWithUnderline(q.question)}</span>
                             </h4>
@@ -389,6 +402,7 @@ const ResultsPage: React.FC<ResultsPageProps> = ({
                     );
                 })}
             </div>
+            </div>
 
             {/* Hidden PDF Content */}
             <div 
@@ -397,7 +411,7 @@ const ResultsPage: React.FC<ResultsPageProps> = ({
                 dir={isEnglish ? 'ltr' : 'rtl'} 
                 style={{ 
                     display: 'none', 
-                    padding: '15px 30px', 
+                    padding: isEnglish ? '15px 65px' : '15px 30px', 
                     backgroundColor: 'white',
                     width: '740px',
                     fontFamily: 'system-ui, -apple-system, sans-serif',
@@ -413,7 +427,7 @@ const ResultsPage: React.FC<ResultsPageProps> = ({
                     <div style={{
                         position: 'absolute',
                         top: '12px',
-                        [isEnglish ? 'left' : 'right']: '15px',
+                        [isEnglish ? 'left' : 'right']: isEnglish ? '65px' : '15px',
                         display: 'flex',
                         flexDirection: 'column',
                         alignItems: 'center',
@@ -474,20 +488,35 @@ const ResultsPage: React.FC<ResultsPageProps> = ({
                     <div style={{ fontSize: '18px', fontWeight: 'bold', color: '#3b82f6', marginTop: '8px' }}>{selectedSubject?.id}</div>
                     {(selectedSubject?.id === SubjectName.JordanHistory || selectedSubject?.id === SubjectName.IslamicEducation) && (
                         <>
-                            {currentUnitTitle && <div style={{ fontSize: '16px', fontWeight: 'bold', color: '#475569', marginTop: '4px' }}>{currentUnitTitle}</div>}
-                            {examNumber && <div style={{ fontSize: '15px', fontWeight: 'bold', color: '#64748b', marginTop: '2px' }}>رقم الامتحان: {examNumber}</div>}
+                            {currentUnitTitle && !isSessionExam && <div style={{ fontSize: '16px', fontWeight: 'bold', color: '#475569', marginTop: '4px' }}>{currentUnitTitle}</div>}
+                            {examNumber && !isSessionExam && <div style={{ fontSize: '15px', fontWeight: 'bold', color: '#64748b', marginTop: '2px' }}>رقم الامتحان: {examNumber}</div>}
                         </>
                     )}
-                    <div style={{ fontSize: '16px', color: '#64748b', marginTop: '4px' }}>{currentLessonTitle}</div>
+                    <div style={{ 
+                        fontSize: '16px', 
+                        color: '#64748b', 
+                        marginTop: '4px' 
+                    }}>{currentLessonTitle}</div>
                     <div style={{ 
                         marginTop: '10px',
                         fontSize: '14px',
                         fontWeight: 'bold',
                         color: '#475569',
-                        textAlign: isEnglish ? 'left' : 'right',
-                        padding: '0 10px'
+                        display: 'flex',
+                        justifyContent: 'space-between',
+                        alignItems: 'center',
+                        width: '100%',
+                        padding: isEnglish ? '0 25px' : '0 35px',
+                        direction: isEnglish ? 'ltr' : 'rtl'
                     }}>
-                        {isEnglish ? 'Student Name:' : 'اسم الطالب:'} ......................................................
+                        <span>
+                            {isEnglish ? `Student Name: ${studentName || '.................'}` : `اسم الطالب: ${studentName || '.................'}`}
+                        </span>
+                        <span style={{
+                            [isEnglish ? 'marginRight' : 'marginLeft']: '30px'
+                        }}>
+                            {isEnglish ? `Seat Number: ${seatNumber || '.................'}` : `رقم الجلوس: ${seatNumber || '.................'}`}
+                        </span>
                     </div>
                 </div>
 
@@ -498,26 +527,21 @@ const ResultsPage: React.FC<ResultsPageProps> = ({
                         
                         return (
                             <div key={idx} style={{ marginBottom: '5px', padding: '12px', border: '1px solid #e2e8f0', borderRadius: '15px', pageBreakInside: 'avoid' }}>
-                                <div style={{ display: 'flex', alignItems: 'flex-start', gap: '10px', marginBottom: '10px' }}>
-                                    <div style={{ 
-                                        width: '26px', 
-                                        height: '26px', 
-                                        borderRadius: '50%', 
-                                        backgroundColor: isCorrect ? '#ecfdf5' : '#fef2f2', 
-                                        color: isCorrect ? '#059669' : '#dc2626',
-                                        fontSize: '12px',
-                                        fontWeight: '900',
-                                        display: 'flex',
-                                        alignItems: 'center',
-                                        justifyContent: 'center',
-                                        border: `1px solid ${isCorrect ? '#10b981' : '#ef4444'}`,
-                                        flexShrink: 0,
-                                        marginTop: '2px'
-                                    }}>
-                                        {idx + 1}
-                                    </div>
+                                <div style={{ 
+                                    display: 'flex', 
+                                    alignItems: 'flex-start', 
+                                    gap: isEnglish ? '12px' : '6px', 
+                                    marginBottom: '10px',
+                                    paddingLeft: isEnglish ? '20px' : '0'
+                                }}>
                                     <div style={{ fontSize: '15px', fontWeight: 'bold', color: '#334155', lineHeight: '1.4', flex: 1 }}>
-                                        {isEnglish && <span style={{ marginRight: '5px' }}>{idx + 1}.</span>}
+                                        <span style={{ 
+                                            marginRight: isEnglish ? '5px' : '0', 
+                                            marginLeft: isEnglish ? '0' : '5px',
+                                            color: isCorrect ? '#059669' : '#dc2626'
+                                        }}>
+                                            {idx + 1}.
+                                        </span>
                                         {renderTextWithUnderline(q.question)}
                                     </div>
                                     <div style={{ fontSize: '18px', color: isCorrect ? '#10b981' : '#ef4444', fontWeight: '900', flexShrink: 0 }}>
@@ -624,7 +648,7 @@ const ResultsPage: React.FC<ResultsPageProps> = ({
                 dir={isEnglish ? 'ltr' : 'rtl'} 
                 style={{ 
                     display: 'none', 
-                    padding: '30px 40px', 
+                    padding: isEnglish ? '30px 75px' : '30px 40px', 
                     backgroundColor: 'white',
                     width: '790px',
                     fontFamily: 'serif',
@@ -641,7 +665,7 @@ const ResultsPage: React.FC<ResultsPageProps> = ({
                     <div style={{
                         position: 'absolute',
                         top: '-5px',
-                        [isEnglish ? 'left' : 'right']: '50px',
+                        [isEnglish ? 'left' : 'right']: isEnglish ? '75px' : '50px',
                         display: 'flex',
                         flexDirection: 'column',
                         alignItems: 'center',
@@ -702,8 +726,8 @@ const ResultsPage: React.FC<ResultsPageProps> = ({
                     <div style={{ fontSize: '26px', fontWeight: 'bold', marginTop: '15px' }}>امتحان مادة: {selectedSubject?.id}</div>
                     {(selectedSubject?.id === SubjectName.JordanHistory || selectedSubject?.id === SubjectName.IslamicEducation) && (
                         <>
-                            {currentUnitTitle && <div style={{ fontSize: '22px', fontWeight: 'bold', marginTop: '10px' }}>{currentUnitTitle}</div>}
-                            {examNumber && <div style={{ fontSize: '20px', fontWeight: 'bold', marginTop: '5px' }}>رقم الامتحان: {examNumber}</div>}
+                            {currentUnitTitle && !isSessionExam && <div style={{ fontSize: '22px', fontWeight: 'bold', marginTop: '10px' }}>{currentUnitTitle}</div>}
+                            {examNumber && !isSessionExam && <div style={{ fontSize: '20px', fontWeight: 'bold', marginTop: '5px' }}>رقم الامتحان: {examNumber}</div>}
                         </>
                     )}
                     <div style={{ fontSize: '20px', marginTop: '8px' }}>{currentLessonTitle}</div>
@@ -715,9 +739,18 @@ const ResultsPage: React.FC<ResultsPageProps> = ({
                         fontSize: '18px', 
                         fontWeight: 'bold',
                         width: '100%',
-                        padding: '0 10px'
+                        padding: isEnglish ? '0 25px' : '0 35px',
+                        direction: isEnglish ? 'ltr' : 'rtl'
                     }}>
-                        <span style={{ flex: 1, textAlign: isEnglish ? 'left' : 'right', paddingLeft: isEnglish ? '30px' : '0' }}>{isEnglish ? 'Student Name:' : 'اسم الطالب:'} ......................................................</span>
+                        <span style={{ textAlign: isEnglish ? 'left' : 'right' }}>
+                            {isEnglish ? `Student Name: ${studentName || '.................'}` : `اسم الطالب: ${studentName || '.................'}`}
+                        </span>
+                        <span style={{ 
+                            textAlign: isEnglish ? 'right' : 'left',
+                            [isEnglish ? 'marginRight' : 'marginLeft']: '30px'
+                        }}>
+                            {isEnglish ? `Seat Number: ${seatNumber || '.................'}` : `رقم الجلوس: ${seatNumber || '.................'}`}
+                        </span>
                     </div>
                 </div>
 
@@ -728,27 +761,21 @@ const ResultsPage: React.FC<ResultsPageProps> = ({
                         
                         return (
                             <div key={idx} style={{ marginBottom: '20px', pageBreakInside: 'avoid', width: '100%' }}>
-                                <div style={{ display: 'flex', gap: '12px', marginBottom: '10px', alignItems: 'flex-start' }}>
-                                    <div style={{ 
-                                        width: '26px', 
-                                        height: '26px', 
-                                        borderRadius: '50%', 
-                                        border: '1.5px solid black',
-                                        display: 'flex',
-                                        alignItems: 'center',
-                                        justifyContent: 'center',
-                                        fontSize: '14px', 
-                                        fontWeight: 'bold',
-                                        flexShrink: 0,
-                                        marginTop: '1px',
-                                        lineHeight: '1',
-                                        padding: '0',
-                                        boxSizing: 'border-box'
-                                    }}>
-                                        {idx + 1}
-                                    </div>
+                                <div style={{ 
+                                    display: 'flex', 
+                                    gap: isEnglish ? '14px' : '8px', 
+                                    marginBottom: '10px', 
+                                    alignItems: 'flex-start',
+                                    paddingLeft: isEnglish ? '25px' : '0'
+                                }}>
                                     <span style={{ fontWeight: 'bold', flex: 1, fontSize: '18px' }}>
-                                        {isEnglish && <span style={{ marginRight: '8px' }}>{idx + 1}.</span>}
+                                        <span style={{ 
+                                            marginRight: isEnglish ? '8px' : '0', 
+                                            marginLeft: isEnglish ? '0' : '8px',
+                                            color: isCorrect ? '#16a34a' : '#ef4444'
+                                        }}>
+                                            {idx + 1}.
+                                        </span>
                                         {renderTextWithUnderline(q.question)}
                                     </span>
                                     <span style={{ flexShrink: 0, fontSize: '18px', fontWeight: 'bold', marginRight: isEnglish ? '0' : '10px', marginLeft: isEnglish ? '10px' : '0' }}>{isCorrect ? '✓' : '✗'}</span>
@@ -794,7 +821,7 @@ const ResultsPage: React.FC<ResultsPageProps> = ({
                     <div style={{ marginTop: '10px' }}>زوروا موقعنا: JoSchool11.netlify.app</div>
                 </div>
             </div>
-        </div>
+        </>
     );
 };
 

@@ -310,6 +310,12 @@ const LandingPage: React.FC<LandingPageProps> = React.memo(({
             action: () => navigateTo(View.Progress) 
         },
         { 
+            id: 'announcements', 
+            label: 'الإعلانات', 
+            icon: <span className="text-xl leading-none select-none">📰</span>, 
+            action: () => navigateTo(View.Announcements) 
+        },
+        { 
             id: 'schedule', 
             label: 'جدول امتحانات الوزارة', 
             icon: <CalendarIcon className="w-5 h-5" />, 

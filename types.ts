@@ -13,6 +13,7 @@ export enum View {
   Progress,
   Favorites,
   MoEResults,
+  Announcements,
 }
 
 export enum Grade {
@@ -97,4 +98,12 @@ export interface UserProgress {
   examProgresses: Record<string, ExamProgress>;
   totalTimeSpent: number; // in seconds
   lastActive: string;
+  studentProfile?: {
+    name?: string;
+    seatNumber?: string;
+    email?: string;
+    age?: string;
+    gender?: 'ذكر' | 'أنثى' | string;
+    phoneNumber?: string;
+  };
 }

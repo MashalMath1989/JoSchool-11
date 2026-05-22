@@ -20,6 +20,7 @@ import ProgressDashboard from './ProgressDashboard';
 import FavoriteQuestionsPage from './FavoriteQuestionsPage';
 import SessionSubjectsPage from './SessionSubjectsPage';
 import MoEResultsPage from './MoEResultsPage';
+import AnnouncementsPage from './AnnouncementsPage';
 import AuthPage from './AuthPage';
 
 // روابط امتحانات مادة تاريخ الأردن - الفصل الأول
@@ -428,7 +429,15 @@ const App: React.FC = () => {
         favoriteQuestions: [],
         examProgresses: {},
         totalTimeSpent: 0,
-        lastActive: new Date().toISOString()
+        lastActive: new Date().toISOString(),
+        studentProfile: {
+            name: '',
+            seatNumber: '',
+            email: '',
+            age: '',
+            gender: '',
+            phoneNumber: ''
+        }
     }), []);
 
     const [userProgress, setUserProgress] = useState<UserProgress>(getDefaultProgress());
@@ -1322,6 +1331,7 @@ const App: React.FC = () => {
     const startSessionExam = (title: string, questions: Question[], progress?: ExamProgress) => {
         setCurrentLessonTitle(title);
         setCurrentQuiz(questions);
+        setCurrentUnitTitle(''); // Clear unit title for course exams
         if (progress && progress.currentQuestionIndex > 0) {
             setCurrentQuestionIndex(progress.currentQuestionIndex);
             setUserAnswers(progress.userAnswers);
@@ -1597,6 +1607,7 @@ const App: React.FC = () => {
             setCurrentQuiz(qs);
             setUserAnswers(result.userAnswers!);
             setExamNumber(result.examNumber || null);
+            setCurrentUnitTitle(''); // Clear unit title for course exams
             setShowResults(true);
             navigateTo(View.Quiz);
         };
@@ -1843,6 +1854,7 @@ const App: React.FC = () => {
                             examNumber={examNumber}
                             setUserProgress={setUserProgress} 
                             setViewHistory={setViewHistory} 
+                            userProgress={userProgress}
                             goBack={goBack}
                             goToHome={goToHome} 
                             onBackToIndex={() => {
@@ -1899,6 +1911,13 @@ const App: React.FC = () => {
                     return (
                         <ProgressDashboard 
                             userProgress={userProgress} 
+                            setUserProgress={setUserProgress}
+                            goBack={goBack}
+                        />
+                    );
+                case View.Announcements:
+                    return (
+                        <AnnouncementsPage 
                             goBack={goBack}
                         />
                     );
@@ -2013,10 +2032,10 @@ const App: React.FC = () => {
                 <button 
                     onClick={goBack}
                     className={`fixed top-4 z-[9999] p-3 bg-white border border-slate-900 rounded-full shadow-lg text-slate-600 hover:text-primary transition-all active:scale-95 
-                        ${((isEnglish || currentView === View.SessionSubjects || currentView === View.Favorites || currentView === View.Progress || currentView === View.PdfViewer) && currentView !== View.MoEResults) ? 'left-4' : 'right-4'}`}
+                        ${((isEnglish || currentView === View.SessionSubjects || currentView === View.Favorites || currentView === View.Progress || currentView === View.PdfViewer || currentView === View.Announcements) && currentView !== View.MoEResults) ? 'left-4' : 'right-4'}`}
                     title={(isEnglish && currentView !== View.MoEResults) ? "Back" : "رجوع"}
                 >
-                    {((isEnglish || currentView === View.SessionSubjects || currentView === View.Favorites || currentView === View.Progress || currentView === View.PdfViewer) && currentView !== View.MoEResults) ? <ChevronLeftIcon className="w-6 h-6" strokeWidth={3} /> : <ChevronRightIcon className="w-6 h-6" strokeWidth={3} />}
+                    {((isEnglish || currentView === View.SessionSubjects || currentView === View.Favorites || currentView === View.Progress || currentView === View.PdfViewer || currentView === View.Announcements) && currentView !== View.MoEResults) ? <ChevronLeftIcon className="w-6 h-6" strokeWidth={3} /> : <ChevronRightIcon className="w-6 h-6" strokeWidth={3} />}
                 </button>
             )}
 

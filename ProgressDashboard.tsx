@@ -1,14 +1,30 @@
-import React from 'react';
-import { ClockIcon, TrophyIcon, CheckCircleIcon, CheckIcon, StarIcon, BookmarkIcon } from './data/Icons';
+import React, { useState } from 'react';
+import { ClockIcon, TrophyIcon, CheckCircleIcon, CheckIcon, StarIcon, BookmarkIcon, UserIcon } from './data/Icons';
 import { UserProgress } from './types';
 
 interface ProgressDashboardProps {
     userProgress: UserProgress;
+    setUserProgress: React.Dispatch<React.SetStateAction<UserProgress>>;
+    goBack?: () => void;
 }
 
 const ProgressDashboard: React.FC<ProgressDashboardProps> = ({
-    userProgress
+    userProgress,
+    setUserProgress
 }) => {
+    const [activeTab, setActiveTab] = useState<'profile' | 'achievements'>('profile');
+
+    // Retrieve initial student profile fields, defaulting to empty strings
+    const profile = userProgress.studentProfile || {};
+    const [name, setName] = useState(profile.name || '');
+    const [seatNumber, setSeatNumber] = useState(profile.seatNumber || '');
+    const [email, setEmail] = useState(profile.email || '');
+    const [age, setAge] = useState(profile.age || '');
+    const [gender, setGender] = useState(profile.gender || '');
+    const [phoneNumber, setPhoneNumber] = useState(profile.phoneNumber || '');
+    const [isSaving, setIsSaving] = useState(false);
+    const [saveMessage, setSaveMessage] = useState('');
+
     const totalLessons = userProgress.completedLessons.length;
     const allQuizResults = userProgress.quizResults;
     const totalQuizzes = allQuizResults.length;
@@ -17,7 +33,6 @@ const ProgressDashboard: React.FC<ProgressDashboardProps> = ({
     const averagePercentage = totalQuizzes > 0 
         ? Math.round(allQuizResults.reduce((acc, r) => {
             const ratio = r.totalQuestions > 0 ? (r.score / r.totalQuestions) : 0;
-            // If ratio > 1, the score was already scaled
             return acc + (ratio > 1 ? 100 : ratio * 100);
         }, 0) / totalQuizzes)
         : 0;
@@ -28,116 +43,314 @@ const ProgressDashboard: React.FC<ProgressDashboardProps> = ({
         return `${h} ساعة و ${m} دقيقة`;
     };
 
+    const handleSave = (e: React.FormEvent) => {
+        e.preventDefault();
+        setIsSaving(true);
+        setSaveMessage('');
+        
+        setTimeout(() => {
+            setUserProgress(prev => ({
+                ...prev,
+                studentProfile: {
+                    name,
+                    seatNumber,
+                    email,
+                    age,
+                    gender,
+                    phoneNumber
+                }
+            }));
+            setIsSaving(false);
+            setSaveMessage('تم حفظ البيانات بنجاح! ✨');
+            
+            // Clear message after 3 seconds
+            setTimeout(() => {
+                setSaveMessage('');
+            }, 3000);
+        }, 800);
+    };
+
     return (
-        <div className="container mx-auto p-4 max-w-2xl pt-2 text-right" dir="rtl">
-            <div className="text-right mb-8 px-2">
-                <h3 className="text-lg font-black text-text-main flex items-center gap-3">
-                    <div className="w-2 h-10 bg-primary rounded-full"></div>
+        <div className="container mx-auto p-4 max-w-2xl pt-2 text-right animate-fade-in" dir="rtl">
+            {/* Title Block */}
+            <div className="text-right mb-6 px-2 flex items-center justify-between">
+                <div>
+                    <h3 className="text-lg font-black text-text-main flex items-center gap-3">
+                        <div className="w-2 h-10 bg-primary rounded-full"></div>
+                        لوحة الطالب الدراسية
+                    </h3>
+                    <p className="text-text-sub font-bold text-[9px] mt-1">إدخال البيانات ومتابعة الإنجاز والتقدم</p>
+                </div>
+            </div>
+
+            {/* Custom Tab Switcher */}
+            <div className="flex bg-[#ededee] p-1.5 rounded-xl mb-6 border border-slate-900 shadow-inner">
+                <button
+                    id="tab-profile-btn"
+                    onClick={() => setActiveTab('profile')}
+                    className={`flex-1 py-3 text-center text-xs font-black rounded-lg transition-all flex items-center justify-center gap-2 ${
+                        activeTab === 'profile'
+                            ? 'bg-primary text-white shadow-md border border-slate-900 scale-[1.02]'
+                            : 'text-slate-600 hover:text-slate-800'
+                    }`}
+                >
+                    <UserIcon className="w-4 h-4" />
+                    الملف الشخصي
+                </button>
+                <button
+                    id="tab-achievements-btn"
+                    onClick={() => setActiveTab('achievements')}
+                    className={`flex-1 py-3 text-center text-xs font-black rounded-lg transition-all flex items-center justify-center gap-2 ${
+                        activeTab === 'achievements'
+                            ? 'bg-primary text-white shadow-md border border-slate-900 scale-[1.02]'
+                            : 'text-slate-600 hover:text-slate-800'
+                    }`}
+                >
+                    <TrophyIcon className="w-4 h-4" />
                     لوحة الإنجازات
-                </h3>
-                <p className="text-text-sub font-bold text-[9px] mt-1">تابع تقدمك الدراسي وتفوقك</p>
+                </button>
             </div>
 
-            <div className="grid grid-cols-2 gap-4 mb-8">
-                <div className="bg-white p-6 rounded-xl shadow-md border-b-4 border-primary text-center border border-slate-900">
-                    <div className="w-12 h-12 bg-primary/10 text-primary rounded-lg flex items-center justify-center mx-auto mb-4">
-                        <ClockIcon className="w-6 h-6" />
-                    </div>
-                    <div className="text-sm font-black text-text-main leading-tight">{formatTime(userProgress.totalTimeSpent)}</div>
-                    <div className="text-[9px] font-bold text-text-sub mt-1">وقت التعلم الكلي</div>
-                </div>
-                <div className="bg-white p-6 rounded-xl shadow-md border-b-4 border-accent text-center border border-slate-900">
-                    <div className="w-12 h-12 bg-accent/10 text-accent rounded-lg flex items-center justify-center mx-auto mb-4">
-                        <TrophyIcon className="w-6 h-6" />
-                    </div>
-                    <div className="text-sm font-black text-text-main leading-tight">{averagePercentage}%</div>
-                    <div className="text-[9px] font-bold text-text-sub mt-1">معدل الإنجاز</div>
-                </div>
-            </div>
-
-            <div className="space-y-6">
+            {activeTab === 'profile' ? (
+                /* Profile Tab */
                 <div className="bg-white p-6 rounded-xl shadow-md border border-slate-900">
-                    <h3 className="text-xs font-black text-text-main mb-4 flex items-center gap-2">
-                        <CheckCircleIcon className="w-5 h-5 text-emerald-500" />
-                        الدروس المكتملة ({totalLessons})
+                    <h3 className="text-base font-black text-text-main mb-6 flex items-center gap-2">
+                        <UserIcon className="w-5 h-5 text-primary" />
+                        البيانات الشخصية للطالب
                     </h3>
-                    <div className="space-y-2 max-h-48 overflow-y-auto pr-2 custom-scrollbar">
-                        {userProgress.completedLessons.length > 0 ? (
-                            [...userProgress.completedLessons].reverse().map((l, i) => (
-                                <div key={i} className="bg-app-bg/50 p-3 rounded-xl text-sm font-bold text-text-main border-r-4 border-emerald-500 flex items-center justify-between border border-slate-900">
-                                    <span>{l}</span>
-                                    <CheckIcon className="w-4 h-4 text-emerald-500" />
+
+                    {saveMessage && (
+                        <div className="bg-emerald-50 text-emerald-700 p-3 rounded-lg text-xs font-bold mb-5 border border-emerald-200 text-center animate-pulse">
+                            {saveMessage}
+                        </div>
+                    )}
+
+                    <form onSubmit={handleSave} className="space-y-4 text-right">
+                        {/* الاسم كامل */}
+                        <div>
+                            <label className="block text-xs font-black text-text-sub mb-1">الاسم كامل</label>
+                            <input
+                                id="profile-name-input"
+                                type="text"
+                                value={name}
+                                onChange={(e) => setName(e.target.value)}
+                                placeholder="أدخل اسمك الكامل هنا"
+                                className="w-full px-4 py-2.5 bg-app-bg/50 border border-slate-900 rounded-lg text-sm text-text-main font-bold focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary text-right"
+                            />
+                        </div>
+
+                        {/* رقم الجلوس والبريد الإلكتروني */}
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <div>
+                                <label className="block text-xs font-black text-text-sub mb-1">رقم الجلوس</label>
+                                <input
+                                    id="profile-seat-input"
+                                    type="text"
+                                    value={seatNumber}
+                                    onChange={(e) => setSeatNumber(e.target.value)}
+                                    placeholder="أدخل رقم الجلوس"
+                                    className="w-full px-4 py-2.5 bg-app-bg/50 border border-slate-900 rounded-lg text-sm text-text-main font-bold focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary text-right"
+                                />
+                            </div>
+                            <div>
+                                <label className="block text-xs font-black text-text-sub mb-1 text-right">البريد الإلكتروني (الايميل)</label>
+                                <input
+                                    id="profile-email-input"
+                                    type="email"
+                                    value={email}
+                                    onChange={(e) => setEmail(e.target.value)}
+                                    placeholder="example@email.com"
+                                    className="w-full px-4 py-2.5 bg-app-bg/50 border border-slate-900 rounded-lg text-sm text-text-main font-bold focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary text-left ltr"
+                                    dir="ltr"
+                                />
+                            </div>
+                        </div>
+
+                        {/* العمر والجنس */}
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <div>
+                                <label className="block text-xs font-black text-text-sub mb-1">العمر</label>
+                                <input
+                                    id="profile-age-input"
+                                    type="text"
+                                    value={age}
+                                    onChange={(e) => setAge(e.target.value)}
+                                    placeholder="العمر بالسنوات"
+                                    className="w-full px-4 py-2.5 bg-app-bg/50 border border-slate-900 rounded-lg text-sm text-text-main font-bold focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary text-right"
+                                />
+                            </div>
+                            <div>
+                                <label className="block text-xs font-black text-text-sub mb-1">الجنس</label>
+                                <div className="flex bg-[#f3f4f6] p-1 rounded-lg border border-slate-900 shadow-inner h-[46px] items-center">
+                                    <button
+                                        id="gender-male-btn"
+                                        type="button"
+                                        onClick={() => setGender('ذكر')}
+                                        className={`flex-1 h-full text-xs font-black rounded-md transition-all ${
+                                            gender === 'ذكر'
+                                                ? 'bg-primary text-white border border-slate-900 shadow-sm'
+                                                : 'text-slate-500 hover:text-slate-800'
+                                        }`}
+                                    >
+                                        ذكر
+                                    </button>
+                                    <button
+                                        id="gender-female-btn"
+                                        type="button"
+                                        onClick={() => setGender('أنثى')}
+                                        className={`flex-1 h-full text-xs font-black rounded-md transition-all ${
+                                            gender === 'أنثى'
+                                                ? 'bg-primary text-white border border-slate-900 shadow-sm'
+                                                : 'text-slate-500 hover:text-slate-800'
+                                        }`}
+                                    >
+                                        أنثى
+                                    </button>
                                 </div>
-                            ))
-                        ) : (
-                            <p className="text-sm text-text-sub italic text-center py-4">لم تكتمل أي دروس بعد</p>
-                        )}
-                    </div>
+                            </div>
+                        </div>
+
+                        {/* رقم الهاتف */}
+                        <div>
+                            <label className="block text-xs font-black text-text-sub mb-1">رقم الهاتف</label>
+                            <input
+                                id="profile-phone-input"
+                                type="text"
+                                value={phoneNumber}
+                                onChange={(e) => setPhoneNumber(e.target.value)}
+                                placeholder="07xxxxxxxx"
+                                className="w-full px-4 py-2.5 bg-app-bg/50 border border-slate-900 rounded-lg text-sm text-text-main font-bold focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary text-left ltr"
+                                dir="ltr"
+                            />
+                        </div>
+
+                        {/* زر الحفظ */}
+                        <div className="pt-4">
+                            <button
+                                id="profile-save-btn"
+                                type="submit"
+                                disabled={isSaving}
+                                className="w-full py-3 bg-primary text-white font-black text-sm rounded-lg shadow-md border border-slate-900 hover:bg-slate-800 active:scale-[0.98] transition-all flex items-center justify-center gap-2 disabled:opacity-75 disabled:cursor-not-allowed"
+                            >
+                                {isSaving ? (
+                                    <>
+                                        <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                                        جاري حفظ البيانات...
+                                    </>
+                                ) : (
+                                    <>
+                                        <span>حفظ البيانات</span>
+                                    </>
+                                )}
+                            </button>
+                        </div>
+                    </form>
                 </div>
+            ) : (
+                /* Achievements Tab (Original Progress Dashboard) */
+                <>
+                    <div className="grid grid-cols-2 gap-4 mb-8">
+                        <div className="bg-white p-6 rounded-xl shadow-md border-b-4 border-primary text-center border border-slate-900">
+                            <div className="w-12 h-12 bg-primary/10 text-primary rounded-lg flex items-center justify-center mx-auto mb-4">
+                                <ClockIcon className="w-6 h-6" />
+                            </div>
+                            <div className="text-sm font-black text-text-main leading-tight">{formatTime(userProgress.totalTimeSpent)}</div>
+                            <div className="text-[9px] font-bold text-text-sub mt-1">وقت التعلم الكلي</div>
+                        </div>
+                        <div className="bg-white p-6 rounded-xl shadow-md border-b-4 border-accent text-center border border-slate-900">
+                            <div className="w-12 h-12 bg-accent/10 text-accent rounded-lg flex items-center justify-center mx-auto mb-4">
+                                <TrophyIcon className="w-6 h-6" />
+                            </div>
+                            <div className="text-sm font-black text-text-main leading-tight">{averagePercentage}%</div>
+                            <div className="text-[9px] font-bold text-text-sub mt-1">معدل الإنجاز</div>
+                        </div>
+                    </div>
 
-                <div className="bg-white p-6 rounded-xl shadow-md border border-slate-900">
-                    <h3 className="text-base font-black text-text-main mb-4 flex items-center gap-2">
-                        <StarIcon className="w-5 h-5 text-amber-500" />
-                        سجل الامتحانات ({totalQuizzes})
-                    </h3>
-                    <div className="space-y-3 max-h-64 overflow-y-auto pr-2 custom-scrollbar">
-                        {totalQuizzes > 0 ? (
-                            [...allQuizResults].reverse().map((r, i) => {
-                                const ratio = r.totalQuestions > 0 ? (r.score / r.totalQuestions) : 0;
-                                const isAlreadyScaled = ratio > 1;
-                                const displayPercentage = isAlreadyScaled ? Math.min(r.score, 100) : Math.round(ratio * 100);
-                                const isPassed = displayPercentage >= 50;
+                    <div className="space-y-6">
+                        <div className="bg-white p-6 rounded-xl shadow-md border border-slate-900">
+                            <h3 className="text-xs font-black text-text-main mb-4 flex items-center gap-2">
+                                <CheckCircleIcon className="w-5 h-5 text-emerald-500" />
+                                الدروس المكتملة ({totalLessons})
+                            </h3>
+                            <div className="space-y-2 max-h-48 overflow-y-auto pr-2 custom-scrollbar">
+                                {userProgress.completedLessons.length > 0 ? (
+                                    [...userProgress.completedLessons].reverse().map((l, i) => (
+                                        <div key={i} className="bg-app-bg/50 p-3 rounded-xl text-sm font-bold text-text-main border-r-4 border-emerald-500 flex items-center justify-between border border-slate-900">
+                                            <span>{l}</span>
+                                            <CheckIcon className="w-4 h-4 text-emerald-500" />
+                                        </div>
+                                    ))
+                                ) : (
+                                    <p className="text-sm text-text-sub italic text-center py-4">لم تكتمل أي دروس بعد</p>
+                                )}
+                            </div>
+                        </div>
 
-                                return (
-                                    <div key={i} className="bg-app-bg/50 p-4 rounded-lg flex items-center justify-between border-r-4 border-primary shadow-sm border border-slate-900">
-                                        <div className="text-right">
-                                            <div className="font-black text-text-main text-sm leading-tight mb-1">{r.lessonTitle}</div>
-                                            <div className="flex items-center gap-2">
-                                                <span className="text-[8px] font-bold text-text-sub bg-white px-2 py-0.5 rounded-full border border-primary/10">{r.subjectId}</span>
-                                                <span className="text-[8px] font-bold text-text-sub opacity-60">{new Date(r.date).toLocaleDateString('ar-EG')}</span>
+                        <div className="bg-white p-6 rounded-xl shadow-md border border-slate-900">
+                            <h3 className="text-base font-black text-text-main mb-4 flex items-center gap-2">
+                                <StarIcon className="w-5 h-5 text-amber-500" />
+                                سجل الامتحانات ({totalQuizzes})
+                            </h3>
+                            <div className="space-y-3 max-h-64 overflow-y-auto pr-2 custom-scrollbar">
+                                {totalQuizzes > 0 ? (
+                                    [...allQuizResults].reverse().map((r, i) => {
+                                        const ratio = r.totalQuestions > 0 ? (r.score / r.totalQuestions) : 0;
+                                        const isAlreadyScaled = ratio > 1;
+                                        const displayPercentage = isAlreadyScaled ? Math.min(r.score, 100) : Math.round(ratio * 100);
+                                        const isPassed = displayPercentage >= 50;
+
+                                        return (
+                                            <div key={i} className="bg-app-bg/50 p-4 rounded-lg flex items-center justify-between border-r-4 border-primary shadow-sm border border-slate-900">
+                                                <div className="text-right">
+                                                    <div className="font-black text-text-main text-sm leading-tight mb-1">{r.lessonTitle}</div>
+                                                    <div className="flex items-center gap-2">
+                                                        <span className="text-[8px] font-bold text-text-sub bg-white px-2 py-0.5 rounded-full border border-primary/10">{r.subjectId}</span>
+                                                        <span className="text-[8px] font-bold text-text-sub opacity-60">{new Date(r.date).toLocaleDateString('ar-EG')}</span>
+                                                    </div>
+                                                </div>
+                                                <div className="flex flex-col items-end">
+                                                    <div className={`text-sm font-black ${isPassed ? 'text-emerald-600' : 'text-red-600'}`}>
+                                                        {displayPercentage}%
+                                                    </div>
+                                                    <div className="w-16 h-1 bg-app-bg rounded-full overflow-hidden mt-1">
+                                                        <div className={`h-full ${isPassed ? 'bg-emerald-500' : 'bg-red-500'}`} style={{ width: `${displayPercentage}%` }}></div>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        );
+                                    })
+                                ) : (
+                                    <p className="text-sm text-text-sub italic text-center py-4">لا توجد نتائج امتحانات بعد</p>
+                                )}
+                            </div>
+                        </div>
+
+                        <div className="bg-white p-6 rounded-xl shadow-md border border-slate-900">
+                            <h3 className="text-base font-black text-text-main mb-4 flex items-center gap-2">
+                                <BookmarkIcon className="w-5 h-5 text-amber-500" />
+                                الأسئلة المفضلة ({userProgress.favoriteQuestions.length})
+                            </h3>
+                            <div className="space-y-3 max-h-64 overflow-y-auto pr-2 custom-scrollbar">
+                                {userProgress.favoriteQuestions.length > 0 ? (
+                                    [...userProgress.favoriteQuestions].reverse().map((q, i) => (
+                                        <div key={i} className="bg-app-bg/50 p-4 rounded-lg border-r-4 border-amber-500 shadow-sm border border-slate-900">
+                                            <div className="text-right">
+                                                <div className="font-black text-text-main text-xs leading-relaxed mb-2">{q.question}</div>
+                                                <div className="flex items-center gap-2">
+                                                    <span className="text-[8px] font-bold text-text-sub bg-white px-2 py-0.5 rounded-full border border-amber-500/20">{q.subjectId}</span>
+                                                    <span className="text-[8px] font-bold text-text-sub opacity-60">{q.lessonTitle} {q.semester ? `(${q.semester})` : ''}</span>
+                                                </div>
                                             </div>
                                         </div>
-                                        <div className="flex flex-col items-end">
-                                            <div className={`text-sm font-black ${isPassed ? 'text-emerald-600' : 'text-red-600'}`}>
-                                                {displayPercentage}%
-                                            </div>
-                                            <div className="w-16 h-1 bg-app-bg rounded-full overflow-hidden mt-1">
-                                                <div className={`h-full ${isPassed ? 'bg-emerald-500' : 'bg-red-500'}`} style={{ width: `${displayPercentage}%` }}></div>
-                                            </div>
-                                        </div>
-                                    </div>
-                                );
-                            })
-                        ) : (
-                            <p className="text-sm text-text-sub italic text-center py-4">لا توجد نتائج امتحانات بعد</p>
-                        )}
+                                    ))
+                                ) : (
+                                    <p className="text-sm text-text-sub italic text-center py-4">لا توجد أسئلة مفضلة بعد</p>
+                                )}
+                            </div>
+                        </div>
                     </div>
-                </div>
-
-                <div className="bg-white p-6 rounded-xl shadow-md border border-slate-900">
-                    <h3 className="text-base font-black text-text-main mb-4 flex items-center gap-2">
-                        <BookmarkIcon className="w-5 h-5 text-amber-500" />
-                        الأسئلة المفضلة ({userProgress.favoriteQuestions.length})
-                    </h3>
-                    <div className="space-y-3 max-h-64 overflow-y-auto pr-2 custom-scrollbar">
-                        {userProgress.favoriteQuestions.length > 0 ? (
-                            [...userProgress.favoriteQuestions].reverse().map((q, i) => (
-                                <div key={i} className="bg-app-bg/50 p-4 rounded-lg border-r-4 border-amber-500 shadow-sm border border-slate-900">
-                                    <div className="text-right">
-                                        <div className="font-black text-text-main text-xs leading-relaxed mb-2">{q.question}</div>
-                                        <div className="flex items-center gap-2">
-                                            <span className="text-[8px] font-bold text-text-sub bg-white px-2 py-0.5 rounded-full border border-amber-500/20">{q.subjectId}</span>
-                                            <span className="text-[8px] font-bold text-text-sub opacity-60">{q.lessonTitle} {q.semester ? `(${q.semester})` : ''}</span>
-                                        </div>
-                                    </div>
-                                </div>
-                            ))
-                        ) : (
-                            <p className="text-sm text-text-sub italic text-center py-4">لا توجد أسئلة مفضلة بعد</p>
-                        )}
-                    </div>
-                </div>
-            </div>
+                </>
+            )}
         </div>
     );
 };
