@@ -1,8 +1,11 @@
 import React from 'react';
-import { BookmarkIcon, ShareIcon, FlagIcon, ChevronLeftIcon, ChevronRightIcon, TrashIcon, CheckCircleIcon, XIcon, CheckIcon } from './data/Icons';
+import { BookmarkIcon, ShareIcon, FlagIcon, ChevronLeftIcon, ChevronRightIcon, TrashIcon, CheckCircleIcon, XIcon, CheckIcon, ChevronDownIcon, BookOpenIcon, DownloadIcon } from './data/Icons';
 import { FavoriteQuestion, Subject, UserProgress, SubjectName, Question } from './types';
-import { renderTextWithUnderline } from './textRenderer';
+import { MathRenderer, renderTextWithUnderline } from './textRenderer';
 import { motion, AnimatePresence } from 'framer-motion';
+import TrigGraph from './TrigGraph';
+import { shareQuestionDirectly, isMathSubject } from './shareUtils';
+import { subjectsData } from './data';
 
 interface FavoriteQuestionsPageProps {
     favoriteQuestions: FavoriteQuestion[];
@@ -21,6 +24,15 @@ const FavoriteQuestionsPage: React.FC<FavoriteQuestionsPageProps> = ({
 }) => {
     const [isBulkMode, setIsBulkMode] = React.useState(false);
     const [selectedIndices, setSelectedIndices] = React.useState<Set<number>>(new Set());
+    const [expandedExplanations, setExpandedExplanations] = React.useState<Record<number, boolean>>({});
+    const [shareQuestion, setShareQuestion] = React.useState<FavoriteQuestion | null>(null);
+
+    const toggleExplanation = (idx: number) => {
+        setExpandedExplanations(prev => ({
+            ...prev,
+            [idx]: !prev[idx]
+        }));
+    };
 
     // Filter questions for the current subject and semester
     const filteredQuestions = favoriteQuestions.filter(q => {
@@ -28,7 +40,9 @@ const FavoriteQuestionsPage: React.FC<FavoriteQuestionsPageProps> = ({
         return q.subjectId === selectedSubject.id && q.semester === selectedSubject.semester;
     });
 
-    const isEnglish = selectedSubject?.id === SubjectName.English;
+    const isEnglish = false;
+    const isMath = selectedSubject?.id === SubjectName.Math;
+    const isLtr = isEnglish || isMath;
 
     const toggleSelect = (idx: number) => {
         const newSet = new Set(selectedIndices);
@@ -160,16 +174,18 @@ const FavoriteQuestionsPage: React.FC<FavoriteQuestionsPageProps> = ({
                             <span className="text-xs font-black">{filteredQuestions.length}</span>
                         </div>
                     </div>
-                    {filteredQuestions.map((q, idx) => (
-                        <motion.div 
-                            key={idx}
-                            initial={{ opacity: 0, y: 20 }}
-                            animate={{ opacity: 1, y: 0 }}
-                            transition={{ delay: idx * 0.05 }}
-                            onClick={() => isBulkMode && toggleSelect(idx)}
-                            className={`bg-white rounded-lg px-3 py-5 shadow-md ${isEnglish ? 'border-l-8 border-l-amber-500 text-left' : 'border-r-8 border-r-amber-500 text-right'} relative group border border-slate-900 ${isBulkMode ? 'cursor-pointer hover:border-primary/50' : ''}`}
-                            dir={isEnglish ? 'ltr' : 'rtl'}
-                        >
+                    {filteredQuestions.map((q, idx) => {
+                        const explanationText = q.explanation || (q as any).Explanation;
+                        return (
+                            <motion.div 
+                                key={idx}
+                                initial={{ opacity: 0, y: 20 }}
+                                animate={{ opacity: 1, y: 0 }}
+                                transition={{ delay: idx * 0.05 }}
+                                onClick={() => isBulkMode && toggleSelect(idx)}
+                                className={`bg-white rounded-lg px-3 py-5 shadow-md ${isEnglish ? 'border-l-8 border-l-amber-500 text-left' : 'border-r-8 border-r-amber-500 text-right'} relative group border border-slate-900 ${isBulkMode ? 'cursor-pointer hover:border-primary/50' : ''}`}
+                                dir={isEnglish ? 'ltr' : 'rtl'}
+                            >
                             {isBulkMode && (
                                 <div className={`absolute top-4 ${isEnglish ? 'right-4' : 'left-4'} z-10`}>
                                     <div className={`w-6 h-6 rounded-md border-2 border-slate-900 flex items-center justify-center transition-colors ${selectedIndices.has(idx) ? 'bg-primary border-primary' : 'bg-white'}`}>
@@ -182,7 +198,7 @@ const FavoriteQuestionsPage: React.FC<FavoriteQuestionsPageProps> = ({
                                     <div className="w-8 h-8 rounded-full bg-amber-500/10 text-amber-600 flex items-center justify-center font-black text-xs shrink-0 mt-1 shadow-inner">
                                         {idx + 1}
                                     </div>
-                                    <h4 className={`font-black text-text-main text-sm leading-relaxed flex-1 pt-1.5 ${isEnglish ? 'font-sans' : 'font-naskh'}`}>{renderTextWithUnderline(q.question)}</h4>
+                                    <h4 className={`font-black text-text-main text-sm leading-relaxed flex-1 pt-1.5 ${isEnglish ? 'font-sans' : 'font-naskh'}`}><MathRenderer text={q.question} /></h4>
                                 </div>
                                 <div className={`flex items-center gap-1 shrink-0 ${isBulkMode ? 'opacity-0' : 'opacity-100'}`}>
                                     <button 
@@ -197,50 +213,111 @@ const FavoriteQuestionsPage: React.FC<FavoriteQuestionsPageProps> = ({
                                         onClick={(e) => {
                                             e.stopPropagation();
                                             if (isBulkMode) return;
-                                            if (navigator.share) {
-                                                const choiceLabels = isEnglish ? ['a', 'b', 'c', 'd'] : ['أ', 'ب', 'ج', 'د'];
-                                                navigator.share({
-                                                    title: 'سؤال مهم',
-                                                    text: `${q.question}\n\n${q.choices.map((c, i) => `${choiceLabels[i]}: ${c}`).join('\n')}`,
-                                                }).catch(() => {});
-                                            }
+                                            shareQuestionDirectly({
+                                                question: q,
+                                                subjectName: q.subjectId,
+                                                lessonTitle: q.lessonTitle,
+                                                isEnglish: q.subjectId === SubjectName.English,
+                                            });
                                         }}
                                         className="p-2 rounded-lg bg-slate-100 text-slate-400 hover:bg-slate-200 transition-colors border border-slate-900"
-                                        title="مشاركة"
+                                        title={isMathSubject(q.subjectId, q) ? "تصدير بطاقة السؤال كملف PDF" : "مشاركة السؤال كنص"}
                                         disabled={isBulkMode}
                                     >
-                                        <ShareIcon className="w-4 h-4" />
+                                        {isMathSubject(q.subjectId, q) ? <DownloadIcon className="w-4 h-4 text-emerald-600" /> : <ShareIcon className="w-4 h-4" />}
                                     </button>
                                 </div>
                             </div>
                             
-                            <div className="grid grid-cols-1 gap-2 mb-4">
+                            {/* Question Graph if available */}
+                            {((q as any).questionGraph || (q as any).graph) && (
+                                <div className="mb-4 relative z-10 w-full max-w-[340px] h-[220px] mx-auto bg-slate-50 p-3 rounded-xl border border-slate-200 flex justify-center items-center shadow-sm">
+                                    <TrigGraph graphData={(q as any).questionGraph || (q as any).graph} />
+                                </div>
+                            )}
+
+                            <div className={`grid gap-2 mb-4 ${(q as any).options && (q as any).options.some((opt: any) => opt.graph) ? 'grid-cols-1 sm:grid-cols-2' : 'grid-cols-1'}`}>
                                 {q.choices.map((choice, cIdx) => {
                                     const trimmedChoice = choice.trim();
                                     const trimmedCorrect = String(q.correct_answer).trim();
-                                    const choiceLabels = isEnglish ? ['a', 'b', 'c', 'd'] : ['أ', 'ب', 'ج', 'د'];
+                                    const isArSub = q.subjectId === SubjectName.JordanHistory || q.subjectId === SubjectName.IslamicEducation || q.subjectId === SubjectName.Arabic || (q.subjectId !== SubjectName.Math && !isEnglish);
+                                    const choiceLabels = isArSub ? ['أ', 'ب', 'ج', 'د'] : ['A', 'B', 'C', 'D'];
                                     
                                     // Robust check for correct answer
                                     const isCorrect = 
                                         trimmedChoice === trimmedCorrect || 
-                                        choiceLabels[cIdx] === trimmedCorrect.toLowerCase() ||
-                                        choiceLabels[cIdx] === trimmedCorrect ||
-                                        ['A', 'B', 'C', 'D'][cIdx] === trimmedCorrect.toUpperCase() ||
+                                        trimmedCorrect.toUpperCase() === 'A' && cIdx === 0 ||
+                                        trimmedCorrect.toUpperCase() === 'B' && cIdx === 1 ||
+                                        trimmedCorrect.toUpperCase() === 'C' && cIdx === 2 ||
+                                        trimmedCorrect.toUpperCase() === 'D' && cIdx === 3 ||
+                                        trimmedCorrect === 'أ' && cIdx === 0 ||
+                                        trimmedCorrect === 'ب' && cIdx === 1 ||
+                                        trimmedCorrect === 'ج' && cIdx === 2 ||
+                                        trimmedCorrect === 'د' && cIdx === 3 ||
                                         String(cIdx) === trimmedCorrect;
+
+                                    const option = (q as any).options && (q as any).options[cIdx];
+                                    const optionGraph = option && option.graph;
 
                                     return (
                                         <div 
                                             key={cIdx}
+                                            dir={isLtr ? 'ltr' : 'rtl'}
                                             className={`p-3 rounded-lg text-sm font-bold border flex items-center gap-3 border-slate-900 ${isCorrect ? 'bg-emerald-50 text-emerald-700' : 'bg-slate-50 text-slate-600'} flex-row`}
                                         >
                                             <div className={`w-7 h-7 rounded-md border flex items-center justify-center shrink-0 font-black text-[10px] ${isCorrect ? 'bg-emerald-500 text-white border-emerald-400' : 'bg-white text-slate-400 border-slate-200'}`}>
                                                 {choiceLabels[cIdx]}
                                             </div>
-                                            <span className={`flex-1 ${isEnglish ? 'text-left font-sans' : 'text-right font-naskh'}`}>{renderTextWithUnderline(choice)}</span>
+                                            {optionGraph ? (
+                                                <div className="flex-1 flex justify-center items-center h-[105px] max-w-[160px] mx-auto py-1">
+                                                    <TrigGraph graphData={optionGraph} isOption={true} />
+                                                </div>
+                                            ) : (
+                                                <div className={`flex-1 min-w-0 w-full ${isLtr ? 'text-left font-sans' : 'text-right font-naskh'}`}><MathRenderer text={choice} /></div>
+                                            )}
                                         </div>
                                     );
                                 })}
                             </div>
+
+                            {explanationText && (
+                                <div className="mt-6 mb-4 flex flex-col items-center justify-center">
+                                    <button
+                                        onClick={(e) => {
+                                            e.stopPropagation();
+                                            if (isBulkMode) return;
+                                            toggleExplanation(idx);
+                                        }}
+                                        className={`w-16 h-16 rounded-full shrink-0 flex flex-col items-center justify-center transition-all duration-300 border-2 ${
+                                            isBulkMode
+                                                ? 'bg-slate-100 text-slate-400 border-slate-200 cursor-not-allowed opacity-60'
+                                                : 'bg-emerald-50 hover:bg-emerald-100 border-emerald-500 text-emerald-800 cursor-pointer shadow-md active:scale-95'
+                                        }`}
+                                        disabled={isBulkMode}
+                                    >
+                                        <span className="text-[12px] font-black leading-none mb-1">الشرح</span>
+                                        <ChevronDownIcon 
+                                            className={`w-4 h-4 transition-transform duration-300 ${
+                                                expandedExplanations[idx] ? 'rotate-180 text-emerald-600' : 'text-slate-400'
+                                            }`} 
+                                        />
+                                    </button>
+
+                                    {expandedExplanations[idx] && (
+                                        <motion.div
+                                            initial={{ opacity: 0, height: 0 }}
+                                            animate={{ opacity: 1, height: "auto" }}
+                                            className="overflow-hidden mt-3 w-full"
+                                        >
+                                            <div className="bg-emerald-50/40 rounded-lg p-4 border border-emerald-200/60 text-right w-full" dir="rtl">
+                                                <div className="text-sm text-emerald-950 font-medium leading-relaxed font-naskh">
+                                                    <MathRenderer text={explanationText} />
+                                                </div>
+                                            </div>
+                                        </motion.div>
+                                    )}
+                                </div>
+                            )}
 
                             <div className="flex items-center justify-between pt-3 border-t border-slate-50">
                                 <div className={`flex flex-col text-[10px] font-bold text-slate-400 ${isEnglish ? 'text-left' : 'text-right'}`}>
@@ -256,7 +333,8 @@ const FavoriteQuestionsPage: React.FC<FavoriteQuestionsPageProps> = ({
                                 </button>
                             )}
                         </motion.div>
-                    ))}
+                    );
+                })}
                 </div>
             )}
 

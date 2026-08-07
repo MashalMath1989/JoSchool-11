@@ -3,8 +3,8 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { Loader2, ExternalLink, AlertCircle, LogOut } from 'lucide-react';
 import { View, Subject, SubjectName, Question, Semester, UserProgress, QuizResult } from './types';
 import { subjectsData, subjectIndexData } from './data';
-import { getQuizzesForLesson, getLessonChunksCount, getQuizzesForUnit } from './services/quizService';
-import { updateDatabase, examsDatabase, loadFromCache, saveToCache } from './data/examsDatabase';
+import { getQuizzesForLesson, getLessonChunksCount, getQuizzesForUnit, isLessonLoaded } from './services/quizService';
+import { updateDatabase, examsDatabase, loadFromCache, saveToCache, hasValidCache } from './data/examsDatabase';
 import { ArrowLeftIcon, ChevronDownIcon, StarIcon, XIcon, CheckIcon, BookOpenIcon, BookmarkIcon, BookmarkOutlineIcon, RefreshIcon, ChevronLeftIcon, ChevronRightIcon, ClockIcon, TrophyIcon, CheckCircleIcon, UserIcon } from './data/Icons';
 import { auth } from './firebase';
 import { SESSION_2008_EXAMS, SESSION_2008_SUP_EXAMS } from './data/exams';
@@ -22,28 +22,32 @@ import SessionSubjectsPage from './SessionSubjectsPage';
 import MoEResultsPage from './MoEResultsPage';
 import AnnouncementsPage from './AnnouncementsPage';
 import AuthPage from './AuthPage';
+import SessionsListPage from './SessionsListPage';
+import { LOGO_DATA_URI } from './logoDataUri';
+import LibraryPage from './LibraryPage';
+import WelcomePage from './WelcomePage';
 
 // روابط امتحانات مادة تاريخ الأردن - الفصل الأول
 const HISTORY_U1_EXAMS = [
-    { title: "الدرس الأول: الأردن في العصور الحجرية – صفحة 8", url: "https://raw.githubusercontent.com/MashalMath/joschool-11-arabic-exams/Arabic-S1/history_s1_unit1_exam1.json" },
-    { title: "الدرس الثاني: الأردن في العصر الحديدي – صفحة 16", url: "https://raw.githubusercontent.com/MashalMath/joschool-11-arabic-exams/Arabic-S1/history_s1_unit1_exam2.json" },
-    { title: "الدرس الثالث: مملكة الأنباط – صفحة 22", url: "https://raw.githubusercontent.com/MashalMath/joschool-11-arabic-exams/Arabic-S1/history_s1_unit1_exam3.json" },
-    { title: "الدرس الرابع: مظاهر الحضارتين اليونانية والرومانية–البيزنطية في الأردن – صفحة 31", url: "https://raw.githubusercontent.com/MashalMath/joschool-11-arabic-exams/Arabic-S1/history_s1_unit1_exam4.json" }
+    { title: "الدرس الأول: الأردن في العصور الحجرية – صفحة 8", url: "https://raw.githubusercontent.com/MashalMath/joschool-11-arabic-exams/JoSchool112010/History11_s1_unit1_L1.json" },
+    { title: "الدرس الثاني: الأردن في العصر الحديدي – صفحة 16", url: "https://raw.githubusercontent.com/MashalMath/joschool-11-arabic-exams/JoSchool112010/History11_s1_unit1_L2.json" },
+    { title: "الدرس الثالث: مملكة الأنباط – صفحة 21", url: "https://raw.githubusercontent.com/MashalMath/joschool-11-arabic-exams/JoSchool112010/History11_s1_unit1_L3.json" },
+    { title: "الدرس الرابع: مظاهر الحضارتين اليونانية والرومانية–البيزنطية في الأردن – صفحة 29", url: "https://raw.githubusercontent.com/MashalMath/joschool-11-arabic-exams/JoSchool112010/History11_s1_unit1_L4.json" }
 ];
 
 const HISTORY_U2_EXAMS = [
-    { title: "الدرس الأول: الأردن في صدر الإسلام – صفحة 46", url: "https://raw.githubusercontent.com/MashalMath/joschool-11-arabic-exams/Arabic-S1/history_s1_unit2_exam1.json" },
-    { title: "الدرس الثاني: الأردن في العصرين الأموي والعباسي – صفحة 56", url: "https://raw.githubusercontent.com/MashalMath/joschool-11-arabic-exams/Arabic-S1/history_s1_unit2_exam2.json" },
-    { title: "الدرس الثالث: الأردن خلال حملات الفرنجة – صفحة 66", url: "https://raw.githubusercontent.com/MashalMath/joschool-11-arabic-exams/Arabic-S1/history_s1_unit2_exam3.json" },
-    { title: "الدرس الرابع: الأردن في العصر الأيوبي – صفحة 72", url: "https://raw.githubusercontent.com/MashalMath/joschool-11-arabic-exams/Arabic-S1/history_s1_unit2_exam4.json" },
-    { title: "الدرس الخامس: الأردن في العصر المملوكي – صفحة 77", url: "https://raw.githubusercontent.com/MashalMath/joschool-11-arabic-exams/Arabic-S1/history_s1_unit2_exam5.json" }
+    { title: "الدرس الأول: الأردن في صدر الإسلام – صفحة 44", url: "https://raw.githubusercontent.com/MashalMath/joschool-11-arabic-exams/JoSchool112010/History11_s1_unit2_L1.json" },
+    { title: "الدرس الثاني: الأردن في العصرين الأموي والعباسي – صفحة 53", url: "https://raw.githubusercontent.com/MashalMath/joschool-11-arabic-exams/JoSchool112010/History11_s1_unit2_L2.json" },
+    { title: "الدرس الثالث: الأردن خلال حملات الفرنجة – صفحة 62", url: "https://raw.githubusercontent.com/MashalMath/joschool-11-arabic-exams/JoSchool112010/History11_s1_unit2_L3.json" },
+    { title: "الدرس الرابع: الأردن في العصر الأيوبي – صفحة 68", url: "https://raw.githubusercontent.com/MashalMath/joschool-11-arabic-exams/JoSchool112010/History11_s1_unit2_L4.json" },
+    { title: "الدرس الخامس: الأردن في العصر المملوكي – صفحة 73", url: "https://raw.githubusercontent.com/MashalMath/joschool-11-arabic-exams/JoSchool112010/History11_s1_unit2_L5.json" }
 ];
 
 const HISTORY_U3_EXAMS = [
-    { title: "الدرس الأول: الأوضاع السياسية والإدارية في الأردن في العهد العثماني – صفحة 88", url: "https://raw.githubusercontent.com/MashalMath/joschool-11-arabic-exams/Arabic-S1/history_s1_unit3_exam1.json" },
-    { title: "الدرس الثاني: الأوضاع الاجتماعية والاقتصادية في الأردن في العهد العثماني – صفحة 94", url: "https://raw.githubusercontent.com/MashalMath/joschool-11-arabic-exams/Arabic-S1/history_s1_unit3_exam2.json" },
-    { title: "الدرس الثالث: الثورة العربية الكبرى (النهضة العربية) – صفحة 105", url: "https://raw.githubusercontent.com/MashalMath/joschool-11-arabic-exams/Arabic-S1/history_s1_unit3_exam3.json" },
-    { title: "الدرس الرابع: الأردن في عهد المملكة العربية السورية والحكومات المحلية – صفحة 118", url: "https://raw.githubusercontent.com/MashalMath/joschool-11-arabic-exams/Arabic-S1/history_s1_unit3_exam4.json" }
+    { title: "الدرس الأول: الأوضاع السياسية والإدارية في الأردن في العهد العثماني – صفحة 82", url: "https://raw.githubusercontent.com/MashalMath/joschool-11-arabic-exams/JoSchool112010/History11_s1_unit3_L1.json" },
+    { title: "الدرس الثاني: الأوضاع الاجتماعية والاقتصادية في الأردن في العهد العثماني – صفحة 88", url: "https://raw.githubusercontent.com/MashalMath/joschool-11-arabic-exams/JoSchool112010/History11_s1_unit3_L2.json" },
+    { title: "الدرس الثالث: الثورة العربية الكبرى (النهضة العربية) – صفحة 98", url: "https://raw.githubusercontent.com/MashalMath/joschool-11-arabic-exams/JoSchool112010/History11_s1_unit3_L3.json" },
+    { title: "الدرس الرابع: الأردن في عهد المملكة العربية السورية والحكومات المحلية – صفحة 111", url: "https://raw.githubusercontent.com/MashalMath/joschool-11-arabic-exams/JoSchool112010/History11_s1_unit3_L4.json" }
 ];
 
 const HISTORY_S2_U4_EXAMS = [
@@ -81,37 +85,37 @@ const HISTORY_S2_U8_EXAMS = [
 
 // روابط امتحانات التربية الإسلامية
 const ISLAMIC_U1_EXAMS = [
-    { title: "الدرس الأول: سورة آل عمران الآيات الكريمة (١٠٢–١٠٥) – صفحة 6", url: "https://raw.githubusercontent.com/MashalMath/joschool-11-arabic-exams/Arabic-S1/Islamic_s1_unit1_exam1.json" },
-    { title: "الدرس الثاني: الحديث الشريف: اتقاء الشبهات – صفحة 12", url: "https://raw.githubusercontent.com/MashalMath/joschool-11-arabic-exams/Arabic-S1/Islamic_s1_unit1_exam2.json" },
-    { title: "الدرس الثالث: من صور الضلال – صفحة 20", url: "https://raw.githubusercontent.com/MashalMath/joschool-11-arabic-exams/Arabic-S1/Islamic_s1_unit1_exam3.json" },
-    { title: "الدرس الرابع: كرامة الإنسان في الشريعة الإسلامية – صفحة 26", url: "https://raw.githubusercontent.com/MashalMath/joschool-11-arabic-exams/Arabic-S1/Islamic_s1_unit1_exam4.json" },
-    { title: "الدرس الخامس: الزواج: مشروعيته ومقدماته – صفحة 31", url: "https://raw.githubusercontent.com/MashalMath/joschool-11-arabic-exams/Arabic-S1/Islamic_s1_unit1_exam5.json" },
-    { title: "الدرس السادس: الجهاد في الإسلام – صفحة 37", url: "https://raw.githubusercontent.com/MashalMath/joschool-11-arabic-exams/Arabic-S1/Islamic_s1_unit1_exam6.json" }
+    { title: "الدرس الأول: سورة آل عمران، الآيات الكريمة (١٠٢–١٠٥) – صفحة 6", url: "https://raw.githubusercontent.com/MashalMath/joschool-11-arabic-exams/JoSchool112010/Islamic11_s1_unit1_L1.json" },
+    { title: "الدرس الثاني: الحديث الشريف: اتقاء الشُّبُهات – صفحة 12", url: "https://raw.githubusercontent.com/MashalMath/joschool-11-arabic-exams/JoSchool112010/Islamic11_s1_unit1_L2.json" },
+    { title: "الدرس الثالث: من صور الضلال – صفحة 20", url: "https://raw.githubusercontent.com/MashalMath/joschool-11-arabic-exams/JoSchool112010/Islamic11_s1_unit1_L3.json" },
+    { title: "الدرس الرابع: كرامة الإنسان في الشريعة الإسلامية – صفحة 26", url: "https://raw.githubusercontent.com/MashalMath/joschool-11-arabic-exams/JoSchool112010/Islamic11_s1_unit1_L4.json" },
+    { title: "الدرس الخامس: الزواج: مشروعيته، ومُقَدِّماته – صفحة 31", url: "https://raw.githubusercontent.com/MashalMath/joschool-11-arabic-exams/JoSchool112010/Islamic11_s1_unit1_L5.json" },
+    { title: "الدرس السادس: الجهاد في الإسلام – صفحة 37", url: "https://raw.githubusercontent.com/MashalMath/joschool-11-arabic-exams/JoSchool112010/Islamic11_s1_unit1_L6.json" }
 ];
 const ISLAMIC_U2_EXAMS = [
-    { title: "الدرس الأول: جهود علماء المسلمين في خدمة القرآن الكريم – صفحة 44", url: "https://raw.githubusercontent.com/MashalMath/joschool-11-arabic-exams/Arabic-S1/Islamic_s1_unit2_exam1.json" },
-    { title: "الدرس الثاني: العزيمة والرخصة – صفحة 50", url: "https://raw.githubusercontent.com/MashalMath/joschool-11-arabic-exams/Arabic-S1/Islamic_s1_unit2_exam2.json" },
-    { title: "الدرس الثالث: معركة مؤتة (8 هـ) – صفحة 56", url: "https://raw.githubusercontent.com/MashalMath/joschool-11-arabic-exams/Arabic-S1/Islamic_s1_unit2_exam3.json" },
-    { title: "الدرس الرابع: المحرّمات من النساء – صفحة 61", url: "https://raw.githubusercontent.com/MashalMath/joschool-11-arabic-exams/Arabic-S1/Islamic_s1_unit2_exam4.json" },
-    { title: "الدرس الخامس: التعايش الإنساني – صفحة 67", url: "https://raw.githubusercontent.com/MashalMath/joschool-11-arabic-exams/Arabic-S1/Islamic_s1_unit2_exam5.json" },
-    { title: "الدرس السادس: الحقوق الاجتماعية للمرأة في الإسلام – صفحة 73", url: "https://raw.githubusercontent.com/MashalMath/joschool-11-arabic-exams/Arabic-S1/Islamic_s1_unit2_exam6.json" }
+    { title: "الدرس الأول: جهود علماء المسلمين في خدمة القرآن الكريم – صفحة 44", url: "https://raw.githubusercontent.com/MashalMath/joschool-11-arabic-exams/JoSchool112010/Islamic11_s1_unit2_L1.json" },
+    { title: "الدرس الثاني: العزيمة والرخصة – صفحة 50", url: "https://raw.githubusercontent.com/MashalMath/joschool-11-arabic-exams/JoSchool112010/Islamic11_s1_unit2_L2.json" },
+    { title: "الدرس الثالث: معركة مؤتة (8 هـ) – صفحة 55", url: "https://raw.githubusercontent.com/MashalMath/joschool-11-arabic-exams/JoSchool112010/Islamic11_s1_unit2_L3.json" },
+    { title: "الدرس الرابع: المحرّمات من النساء – صفحة 60", url: "https://raw.githubusercontent.com/MashalMath/joschool-11-arabic-exams/JoSchool112010/Islamic11_s1_unit2_L4.json" },
+    { title: "الدرس الخامس: التعايش الإنساني – صفحة 66", url: "https://raw.githubusercontent.com/MashalMath/joschool-11-arabic-exams/JoSchool112010/Islamic11_s1_unit2_L5.json" },
+    { title: "الدرس السادس: الحقوق المالية للمرأة في الإسلام – صفحة 72", url: "https://raw.githubusercontent.com/MashalMath/joschool-11-arabic-exams/JoSchool112010/Islamic11_s1_unit2_L6.json" }
 ];
 const ISLAMIC_U3_EXAMS = [
-    { title: "الدرس الأول: سورة آل عمران الآيات الكريمة (169–174) – صفحة 81", url: "https://raw.githubusercontent.com/MashalMath/joschool-11-arabic-exams/Arabic-S1/Islamic_s1_unit3_exam1.json" },
-    { title: "الدرس الثاني: الحديث الشريف: رضا الله تعالى – صفحة 87", url: "https://raw.githubusercontent.com/MashalMath/joschool-11-arabic-exams/Arabic-S1/Islamic_s1_unit3_exam2.json" },
-    { title: "الدرس الثالث: فتح مكة (8 هـ) – صفحة 93", page: 93, url: "https://raw.githubusercontent.com/MashalMath/joschool-11-arabic-exams/Arabic-S1/Islamic_s1_unit3_exam3.json" },
-    { title: "الدرس الرابع: من خصائص الشريعة الإسلامية: الإيجابية – صفحة 99", url: "https://raw.githubusercontent.com/MashalMath/joschool-11-arabic-exams/Arabic-S1/Islamic_s1_unit3_exam4.json" },
-    { title: "الدرس الخامس: شروط صحة عقد الزواج – صفحة 105", url: "https://raw.githubusercontent.com/MashalMath/joschool-11-arabic-exams/Arabic-S1/Islamic_s1_unit3_exam5.json" },
-    { title: "الدرس السادس: الحقوق المالية للمرأة في الإسلام – صفحة 110", url: "https://raw.githubusercontent.com/MashalMath/joschool-11-arabic-exams/Arabic-S1/Islamic_s1_unit3_exam6.json" }
+    { title: "الدرس الأول: سورة آل عمران، الآيات الكريمة (١٦٩–١٧٤) – صفحة 77", url: "https://raw.githubusercontent.com/MashalMath/joschool-11-arabic-exams/JoSchool112010/Islamic11_s1_unit3_L1.json" },
+    { title: "الدرس الثاني: الحديث الشريف: رضا الله تعالى – صفحة 83", url: "https://raw.githubusercontent.com/MashalMath/joschool-11-arabic-exams/JoSchool112010/Islamic11_s1_unit3_L2.json" },
+    { title: "الدرس الثالث: فتح مكة (8 هـ) – صفحة 89", url: "https://raw.githubusercontent.com/MashalMath/joschool-11-arabic-exams/JoSchool112010/Islamic11_s1_unit3_L3.json" },
+    { title: "الدرس الرابع: من خصائص الشريعة الإسلامية: الإيجابية – صفحة 95", url: "https://raw.githubusercontent.com/MashalMath/joschool-11-arabic-exams/JoSchool112010/Islamic11_s1_unit3_L4.json" },
+    { title: "الدرس الخامس: شروط صِحَّة عَقْدِ الزواج – صفحة 100", url: "https://raw.githubusercontent.com/MashalMath/joschool-11-arabic-exams/JoSchool112010/Islamic11_s1_unit3_L5.json" },
+    { title: "الدرس السادس: الحقوق الاجتماعية للمرأة في الإسلام – صفحة 105", url: "https://raw.githubusercontent.com/MashalMath/joschool-11-arabic-exams/JoSchool112010/Islamic11_s1_unit3_L6.json" }
 ];
 const ISLAMIC_U4_EXAMS = [
-    { title: "الدرس الأول: سورة الروم الآيات الكريمة (21–24) – صفحة 115", url: "https://raw.githubusercontent.com/MashalMath/joschool-11-arabic-exams/Arabic-S1/Islamic_s1_unit4_exam1.json" },
-    { title: "الدرس الثاني: مكانة السنة النبوية الشريفة في التشريع الإسلامي – صفحة 120", url: "https://raw.githubusercontent.com/MashalMath/joschool-11-arabic-exams/Arabic-S1/Islamic_s1_unit4_exam2.json" },
-    { title: "الدرس الثالث: مراعاة الأعراف في الشريعة الإسلامية – صفحة 128", url: "https://raw.githubusercontent.com/MashalMath/joschool-11-arabic-exams/Arabic-S1/Islamic_s1_unit4_exam3.json" },
-    { title: "الدرس الرابع: حقوق الزوجين في الإسلام – صفحة 134", url: "https://raw.githubusercontent.com/MashalMath/joschool-11-arabic-exams/Arabic-S1/Islamic_s1_unit4_exam4.json" },
-    { title: "الدرس الخامس: تنظيم النسل وتحديده – صفحة 141", url: "https://raw.githubusercontent.com/MashalMath/joschool-11-arabic-exams/Arabic-S1/Islamic_s1_unit4_exam5.json" },
-    { title: "الدرس السادس: الأمن الغذائي في الإسلام – صفحة 146", url: "https://raw.githubusercontent.com/MashalMath/joschool-11-arabic-exams/Arabic-S1/Islamic_s1_unit4_exam6.json" },
-    { title: "الدرس السابع: الإسلام والوحدة الوطنية – صفحة 152", url: "https://raw.githubusercontent.com/MashalMath/joschool-11-arabic-exams/Arabic-S1/Islamic_s1_unit4_exam7.json" }
+    { title: "الدرس الأول: سورة الروم، الآيات الكريمة (٢١–٢٤) – صفحة 112", url: "https://raw.githubusercontent.com/MashalMath/joschool-11-arabic-exams/JoSchool112010/Islamic11_s1_unit4_L1.json" },
+    { title: "الدرس الثاني: مكانة السنة النبوية الشريفة في التشريع الإسلامي – صفحة 117", url: "https://raw.githubusercontent.com/MashalMath/joschool-11-arabic-exams/JoSchool112010/Islamic11_s1_unit4_L2.json" },
+    { title: "الدرس الثالث: مراعاة الأعراف في الشريعة الإسلامية – صفحة 124", url: "https://raw.githubusercontent.com/MashalMath/joschool-11-arabic-exams/JoSchool112010/Islamic11_s1_unit4_L3.json" },
+    { title: "الدرس الرابع: حقوق الزوجين في الإسلام – صفحة 130", url: "https://raw.githubusercontent.com/MashalMath/joschool-11-arabic-exams/JoSchool112010/Islamic11_s1_unit4_L4.json" },
+    { title: "الدرس الخامس: تنظيم النسل وتحديده – صفحة 137", url: "https://raw.githubusercontent.com/MashalMath/joschool-11-arabic-exams/JoSchool112010/Islamic11_s1_unit4_L5.json" },
+    { title: "الدرس السادس: الأمن الغذائي في الإسلام – صفحة 141", url: "https://raw.githubusercontent.com/MashalMath/joschool-11-arabic-exams/JoSchool112010/Islamic11_s1_unit4_L6.json" },
+    { title: "الدرس السابع: الإسلام والوحدة الوطنية – صفحة 146", url: "https://raw.githubusercontent.com/MashalMath/joschool-11-arabic-exams/JoSchool112010/Islamic11_s1_unit4_L7.json" }
 ];
 
 const ISLAMIC_S2_U1_EXAMS = [
@@ -152,161 +156,328 @@ const ISLAMIC_S2_U4_EXAMS = [
     { title: "الدرس السادس: حقوق الإنسان بين الإسلام والإعلان العالمي لحقوق الإنسان — صفحة 171", url: "https://raw.githubusercontent.com/MashalMath/joschool-11-arabic-exams/Arabic-S1/Islamic_s2_unit4_exam6.json" }
 ];
 
-// توليد روابط امتحانات اللغة العربية بتنسيق العناوين الجديد
+// روابط امتحانات اللغة العربية (الفصل الأول - الوحدات الأولى والثانية والثالثة والرابعة والخامسة)
 const generateArabicExams = () => {
-    const config = [
-        { unit: 1, count: 12, unitLabel: "الوحدة الأولى" },
-        { unit: 2, count: 12, unitLabel: "الوحدة الثانية" },
-        { unit: 3, count: 13, unitLabel: "الوحدة الثالثة" },
-        { unit: 4, count: 13, unitLabel: "الوحدة الرابعة" },
-        { unit: 5, count: 14, unitLabel: "الوحدة الخامسة" },
-    ];
-    
-    const allExams: { title: string, url: string }[] = [];
-    config.forEach(c => {
-        for(let i = 1; i <= c.count; i++) {
-            let branch = "Arabic-S1";
-            if (c.unit === 1 && i === 1) {
-                branch = "main";
-            }
-            allExams.push({
-                title: `${c.unitLabel} - امتحان ${i}`,
-                url: `https://raw.githubusercontent.com/MashalMath/joschool-11-arabic-exams/${branch}/arabic_s1_unit${c.unit}_exam${i}.json`
-            });
-        }
-    });
-    return allExams;
+    const unit1Exams: { title: string, url: string }[] = [];
+    for (let i = 1; i <= 10; i++) {
+        unit1Exams.push({
+            title: `الوحدة الأولى - امتحان ${i}`,
+            url: `https://raw.githubusercontent.com/MashalMath/joschool-11-arabic-exams/JoSchool112010/Arabic11_s1_unit1_exam${i}.json`
+        });
+    }
+    const unit2Exams: { title: string, url: string }[] = [];
+    for (let i = 1; i <= 10; i++) {
+        unit2Exams.push({
+            title: `الوحدة الثانية - امتحان ${i}`,
+            url: `https://raw.githubusercontent.com/MashalMath/joschool-11-arabic-exams/JoSchool112010/Arabic11_s1_unit2_exam${i}.json`
+        });
+    }
+    const unit3Exams: { title: string, url: string }[] = [];
+    for (let i = 1; i <= 10; i++) {
+        unit3Exams.push({
+            title: `الوحدة الثالثة - امتحان ${i}`,
+            url: `https://raw.githubusercontent.com/MashalMath/joschool-11-arabic-exams/JoSchool112010/Arabic11_s1_unit3_exam${i}.json`
+        });
+    }
+    const unit4Exams: { title: string, url: string }[] = [];
+    for (let i = 1; i <= 10; i++) {
+        unit4Exams.push({
+            title: `الوحدة الرابعة - امتحان ${i}`,
+            url: `https://raw.githubusercontent.com/MashalMath/joschool-11-arabic-exams/JoSchool112010/Arabic11_s1_unit4_exam${i}.json`
+        });
+    }
+    const unit5Exams: { title: string, url: string }[] = [];
+    for (let i = 1; i <= 10; i++) {
+        unit5Exams.push({
+            title: `الوحدة الخامسة - امتحان ${i}`,
+            url: `https://raw.githubusercontent.com/MashalMath/joschool-11-arabic-exams/JoSchool112010/Arabic11_s1_unit5_exam${i}.json`
+        });
+    }
+    return [...unit1Exams, ...unit2Exams, ...unit3Exams, ...unit4Exams, ...unit5Exams];
 };
 
 const ARABIC_EXAMS = generateArabicExams();
 const ARABIC_UNIT_LABELS = ["الوحدة الأولى", "الوحدة الثانية", "الوحدة الثالثة", "الوحدة الرابعة", "الوحدة الخامسة"];
 const ARABIC_UNIT_COUNTS = [12, 12, 13, 13, 14];
 
-// روابط امتحانات اللغة الإنجليزية - الفصل الأول
-const ENGLISH_U1_EXAMS = [
-    { title: "Unit 01 - Exam 1", url: "https://raw.githubusercontent.com/MashalMath/joschool-11-arabic-exams/Arabic-S1/English_s1_unit1_exam1.json" },
-    { title: "Unit 01 - Exam 2", url: "https://raw.githubusercontent.com/MashalMath/joschool-11-arabic-exams/Arabic-S1/English_s1_unit1_exam2.json" },
-    { title: "Unit 01 - Exam 3", url: "https://raw.githubusercontent.com/MashalMath/joschool-11-arabic-exams/Arabic-S1/English_s1_unit1_exam3.json" },
-    { title: "Unit 01 - Exam 4", url: "https://raw.githubusercontent.com/MashalMath/joschool-11-arabic-exams/Arabic-S1/English_s1_unit1_exam4.json" },
-    { title: "Unit 01 - Exam 5", url: "https://raw.githubusercontent.com/MashalMath/joschool-11-arabic-exams/Arabic-S1/English_s1_unit1_exam5.json" },
-    { title: "Unit 01 - Exam 6", url: "https://raw.githubusercontent.com/MashalMath/joschool-11-arabic-exams/Arabic-S1/English_s1_unit1_exam6.json" },
-    { title: "Unit 01 - Exam 7", url: "https://raw.githubusercontent.com/MashalMath/joschool-11-arabic-exams/Arabic-S1/English_s1_unit1_exam7.json" },
-    { title: "Unit 01 - Exam 8", url: "https://raw.githubusercontent.com/MashalMath/joschool-11-arabic-exams/Arabic-S1/English_s1_unit1_exam8.json" },
-    { title: "Unit 01 - Exam 9", url: "https://raw.githubusercontent.com/MashalMath/joschool-11-arabic-exams/Arabic-S1/English_s1_unit1_exam9.json" },
-    { title: "Unit 01 - Exam 10", url: "https://raw.githubusercontent.com/MashalMath/joschool-11-arabic-exams/Arabic-S1/English_s1_unit1_exam10.json" }
-];
-const ENGLISH_U2_EXAMS = [
-    { title: "Unit 02 - Exam 1", url: "https://raw.githubusercontent.com/MashalMath/joschool-11-arabic-exams/Arabic-S1/English_s1_unit2_exam1.json" },
-    { title: "Unit 02 - Exam 2", url: "https://raw.githubusercontent.com/MashalMath/joschool-11-arabic-exams/Arabic-S1/English_s1_unit2_exam2.json" },
-    { title: "Unit 02 - Exam 3", url: "https://raw.githubusercontent.com/MashalMath/joschool-11-arabic-exams/Arabic-S1/English_s1_unit2_exam3.json" },
-    { title: "Unit 02 - Exam 4", url: "https://raw.githubusercontent.com/MashalMath/joschool-11-arabic-exams/Arabic-S1/English_s1_unit2_exam4.json" },
-    { title: "Unit 02 - Exam 5", url: "https://raw.githubusercontent.com/MashalMath/joschool-11-arabic-exams/Arabic-S1/English_s1_unit2_exam5.json" },
-    { title: "Unit 02 - Exam 6", url: "https://raw.githubusercontent.com/MashalMath/joschool-11-arabic-exams/Arabic-S1/English_s1_unit2_exam6.json" },
-    { title: "Unit 02 - Exam 7", url: "https://raw.githubusercontent.com/MashalMath/joschool-11-arabic-exams/Arabic-S1/English_s1_unit2_exam7.json" },
-    { title: "Unit 02 - Exam 8", url: "https://raw.githubusercontent.com/MashalMath/joschool-11-arabic-exams/Arabic-S1/English_s1_unit2_exam8.json" },
-    { title: "Unit 02 - Exam 9", url: "https://raw.githubusercontent.com/MashalMath/joschool-11-arabic-exams/Arabic-S1/English_s1_unit2_exam9.json" },
-    { title: "Unit 02 - Exam 10", url: "https://raw.githubusercontent.com/MashalMath/joschool-11-arabic-exams/Arabic-S1/English_s1_unit2_exam10.json" }
-];
-const ENGLISH_U3_EXAMS = [
-    { title: "Unit 03 - Exam 1", url: "https://raw.githubusercontent.com/MashalMath/joschool-11-arabic-exams/Arabic-S1/English_s1_unit3_exam1.json" },
-    { title: "Unit 03 - Exam 2", url: "https://raw.githubusercontent.com/MashalMath/joschool-11-arabic-exams/Arabic-S1/English_s1_unit3_exam2.json" },
-    { title: "Unit 03 - Exam 3", url: "https://raw.githubusercontent.com/MashalMath/joschool-11-arabic-exams/Arabic-S1/English_s1_unit3_exam3.json" },
-    { title: "Unit 03 - Exam 4", url: "https://raw.githubusercontent.com/MashalMath/joschool-11-arabic-exams/Arabic-S1/English_s1_unit3_exam4.json" },
-    { title: "Unit 03 - Exam 5", url: "https://raw.githubusercontent.com/MashalMath/joschool-11-arabic-exams/Arabic-S1/English_s1_unit3_exam5.json" },
-    { title: "Unit 03 - Exam 6", url: "https://raw.githubusercontent.com/MashalMath/joschool-11-arabic-exams/Arabic-S1/English_s1_unit3_exam6.json" },
-    { title: "Unit 03 - Exam 7", url: "https://raw.githubusercontent.com/MashalMath/joschool-11-arabic-exams/Arabic-S1/English_s1_unit3_exam7.json" },
-    { title: "Unit 03 - Exam 8", url: "https://raw.githubusercontent.com/MashalMath/joschool-11-arabic-exams/Arabic-S1/English_s1_unit3_exam8.json" },
-    { title: "Unit 03 - Exam 9", url: "https://raw.githubusercontent.com/MashalMath/joschool-11-arabic-exams/Arabic-S1/English_s1_unit3_exam9.json" },
-    { title: "Unit 03 - Exam 10", url: "https://raw.githubusercontent.com/MashalMath/joschool-11-arabic-exams/Arabic-S1/English_s1_unit3_exam10.json" }
-];
-const ENGLISH_U4_EXAMS = [
-    { title: "Unit 04 - Exam 1", url: "https://raw.githubusercontent.com/MashalMath/joschool-11-arabic-exams/Arabic-S1/English_s1_unit4_exam1.json" },
-    { title: "Unit 04 - Exam 2", url: "https://raw.githubusercontent.com/MashalMath/joschool-11-arabic-exams/Arabic-S1/English_s1_unit4_exam2.json" },
-    { title: "Unit 04 - Exam 3", url: "https://raw.githubusercontent.com/MashalMath/joschool-11-arabic-exams/Arabic-S1/English_s1_unit4_exam3.json" },
-    { title: "Unit 04 - Exam 4", url: "https://raw.githubusercontent.com/MashalMath/joschool-11-arabic-exams/Arabic-S1/English_s1_unit4_exam4.json" },
-    { title: "Unit 04 - Exam 5", url: "https://raw.githubusercontent.com/MashalMath/joschool-11-arabic-exams/Arabic-S1/English_s1_unit4_exam5.json" },
-    { title: "Unit 04 - Exam 6", url: "https://raw.githubusercontent.com/MashalMath/joschool-11-arabic-exams/Arabic-S1/English_s1_unit4_exam6.json" },
-    { title: "Unit 04 - Exam 7", url: "https://raw.githubusercontent.com/MashalMath/joschool-11-arabic-exams/Arabic-S1/English_s1_unit4_exam7.json" },
-    { title: "Unit 04 - Exam 8", url: "https://raw.githubusercontent.com/MashalMath/joschool-11-arabic-exams/Arabic-S1/English_s1_unit4_exam8.json" },
-    { title: "Unit 04 - Exam 9", url: "https://raw.githubusercontent.com/MashalMath/joschool-11-arabic-exams/Arabic-S1/English_s1_unit4_exam9.json" },
-    { title: "Unit 04 - Exam 10", url: "https://raw.githubusercontent.com/MashalMath/joschool-11-arabic-exams/Arabic-S1/English_s1_unit4_exam10.json" }
-];
-const ENGLISH_U5_EXAMS = [
-    { title: "Unit 05 - Exam 1", url: "https://raw.githubusercontent.com/MashalMath/joschool-11-arabic-exams/Arabic-S1/English_s1_unit5_exam1.json" },
-    { title: "Unit 05 - Exam 2", url: "https://raw.githubusercontent.com/MashalMath/joschool-11-arabic-exams/Arabic-S1/English_s1_unit5_exam2.json" },
-    { title: "Unit 05 - Exam 3", url: "https://raw.githubusercontent.com/MashalMath/joschool-11-arabic-exams/Arabic-S1/English_s1_unit5_exam3.json" },
-    { title: "Unit 05 - Exam 4", url: "https://raw.githubusercontent.com/MashalMath/joschool-11-arabic-exams/Arabic-S1/English_s1_unit5_exam4.json" },
-    { title: "Unit 05 - Exam 5", url: "https://raw.githubusercontent.com/MashalMath/joschool-11-arabic-exams/Arabic-S1/English_s1_unit5_exam5.json" },
-    { title: "Unit 05 - Exam 6", url: "https://raw.githubusercontent.com/MashalMath/joschool-11-arabic-exams/Arabic-S1/English_s1_unit5_exam6.json" },
-    { title: "Unit 05 - Exam 7", url: "https://raw.githubusercontent.com/MashalMath/joschool-11-arabic-exams/Arabic-S1/English_s1_unit5_exam7.json" },
-    { title: "Unit 05 - Exam 8", url: "https://raw.githubusercontent.com/MashalMath/joschool-11-arabic-exams/Arabic-S1/English_s1_unit5_exam8.json" },
-    { title: "Unit 05 - Exam 9", url: "https://raw.githubusercontent.com/MashalMath/joschool-11-arabic-exams/Arabic-S1/English_s1_unit5_exam9.json" },
-    { title: "Unit 05 - Exam 10", url: "https://raw.githubusercontent.com/MashalMath/joschool-11-arabic-exams/Arabic-S1/English_s1_unit5_exam10.json" }
-];
-const ENGLISH_U6_EXAMS = [
-    { title: "Unit 06 - Exam 1", url: "https://raw.githubusercontent.com/MashalMath/joschool-11-arabic-exams/Arabic-S1/English_s2_unit6_exam1.json" },
-    { title: "Unit 06 - Exam 2", url: "https://raw.githubusercontent.com/MashalMath/joschool-11-arabic-exams/Arabic-S1/English_s2_unit6_exam2.json" },
-    { title: "Unit 06 - Exam 3", url: "https://raw.githubusercontent.com/MashalMath/joschool-11-arabic-exams/Arabic-S1/English_s2_unit6_exam3.json" },
-    { title: "Unit 06 - Exam 4", url: "https://raw.githubusercontent.com/MashalMath/joschool-11-arabic-exams/Arabic-S1/English_s2_unit6_exam4.json" },
-    { title: "Unit 06 - Exam 5", url: "https://raw.githubusercontent.com/MashalMath/joschool-11-arabic-exams/Arabic-S1/English_s2_unit6_exam5.json" },
-    { title: "Unit 06 - Exam 6", url: "https://raw.githubusercontent.com/MashalMath/joschool-11-arabic-exams/Arabic-S1/English_s2_unit6_exam6.json" },
-    { title: "Unit 06 - Exam 7", url: "https://raw.githubusercontent.com/MashalMath/joschool-11-arabic-exams/Arabic-S1/English_s2_unit6_exam7.json" },
-    { title: "Unit 06 - Exam 8", url: "https://raw.githubusercontent.com/MashalMath/joschool-11-arabic-exams/Arabic-S1/English_s2_unit6_exam8.json" },
-    { title: "Unit 06 - Exam 9", url: "https://raw.githubusercontent.com/MashalMath/joschool-11-arabic-exams/Arabic-S1/English_s2_unit6_exam9.json" },
-    { title: "Unit 06 - Exam 10", url: "https://raw.githubusercontent.com/MashalMath/joschool-11-arabic-exams/Arabic-S1/English_s2_unit6_exam10.json" }
-];
-const ENGLISH_U7_EXAMS = [
-    { title: "Unit 07 - Exam 1", url: "https://raw.githubusercontent.com/MashalMath/joschool-11-arabic-exams/Arabic-S1/English_s2_unit7_exam1.json" },
-    { title: "Unit 07 - Exam 2", url: "https://raw.githubusercontent.com/MashalMath/joschool-11-arabic-exams/Arabic-S1/English_s2_unit7_exam2.json" },
-    { title: "Unit 07 - Exam 3", url: "https://raw.githubusercontent.com/MashalMath/joschool-11-arabic-exams/Arabic-S1/English_s2_unit7_exam3.json" },
-    { title: "Unit 07 - Exam 4", url: "https://raw.githubusercontent.com/MashalMath/joschool-11-arabic-exams/Arabic-S1/English_s2_unit7_exam4.json" },
-    { title: "Unit 07 - Exam 5", url: "https://raw.githubusercontent.com/MashalMath/joschool-11-arabic-exams/Arabic-S1/English_s2_unit7_exam5.json" },
-    { title: "Unit 07 - Exam 6", url: "https://raw.githubusercontent.com/MashalMath/joschool-11-arabic-exams/Arabic-S1/English_s2_unit7_exam6.json" },
-    { title: "Unit 07 - Exam 7", url: "https://raw.githubusercontent.com/MashalMath/joschool-11-arabic-exams/Arabic-S1/English_s2_unit7_exam7.json" },
-    { title: "Unit 07 - Exam 8", url: "https://raw.githubusercontent.com/MashalMath/joschool-11-arabic-exams/Arabic-S1/English_s2_unit7_exam8.json" },
-    { title: "Unit 07 - Exam 9", url: "https://raw.githubusercontent.com/MashalMath/joschool-11-arabic-exams/Arabic-S1/English_s2_unit7_exam9.json" },
-    { title: "Unit 07 - Exam 10", url: "https://raw.githubusercontent.com/MashalMath/joschool-11-arabic-exams/Arabic-S1/English_s2_unit7_exam10.json" }
-];
-const ENGLISH_U8_EXAMS = [
-    { title: "Unit 08 - Exam 1", url: "https://raw.githubusercontent.com/MashalMath/joschool-11-arabic-exams/Arabic-S1/English_s2_unit8_exam1.json" },
-    { title: "Unit 08 - Exam 2", url: "https://raw.githubusercontent.com/MashalMath/joschool-11-arabic-exams/Arabic-S1/English_s2_unit8_exam2.json" },
-    { title: "Unit 08 - Exam 3", url: "https://raw.githubusercontent.com/MashalMath/joschool-11-arabic-exams/Arabic-S1/English_s2_unit8_exam3.json" },
-    { title: "Unit 08 - Exam 4", url: "https://raw.githubusercontent.com/MashalMath/joschool-11-arabic-exams/Arabic-S1/English_s2_unit8_exam4.json" },
-    { title: "Unit 08 - Exam 5", url: "https://raw.githubusercontent.com/MashalMath/joschool-11-arabic-exams/Arabic-S1/English_s2_unit8_exam5.json" },
-    { title: "Unit 08 - Exam 6", url: "https://raw.githubusercontent.com/MashalMath/joschool-11-arabic-exams/Arabic-S1/English_s2_unit8_exam6.json" },
-    { title: "Unit 08 - Exam 7", url: "https://raw.githubusercontent.com/MashalMath/joschool-11-arabic-exams/Arabic-S1/English_s2_unit8_exam7.json" },
-    { title: "Unit 08 - Exam 8", url: "https://raw.githubusercontent.com/MashalMath/joschool-11-arabic-exams/Arabic-S1/English_s2_unit8_exam8.json" },
-    { title: "Unit 08 - Exam 9", url: "https://raw.githubusercontent.com/MashalMath/joschool-11-arabic-exams/Arabic-S1/English_s2_unit8_exam9.json" },
-    { title: "Unit 08 - Exam 10", url: "https://raw.githubusercontent.com/MashalMath/joschool-11-arabic-exams/Arabic-S1/English_s2_unit8_exam10.json" }
-];
-const ENGLISH_U9_EXAMS = [
-    { title: "Unit 09 - Exam 1", url: "https://raw.githubusercontent.com/MashalMath/joschool-11-arabic-exams/Arabic-S1/English_s2_unit9_exam1.json" },
-    { title: "Unit 09 - Exam 2", url: "https://raw.githubusercontent.com/MashalMath/joschool-11-arabic-exams/Arabic-S1/English_s2_unit9_exam2.json" },
-    { title: "Unit 09 - Exam 3", url: "https://raw.githubusercontent.com/MashalMath/joschool-11-arabic-exams/Arabic-S1/English_s2_unit9_exam3.json" },
-    { title: "Unit 09 - Exam 4", url: "https://raw.githubusercontent.com/MashalMath/joschool-11-arabic-exams/Arabic-S1/English_s2_unit9_exam4.json" },
-    { title: "Unit 09 - Exam 5", url: "https://raw.githubusercontent.com/MashalMath/joschool-11-arabic-exams/Arabic-S1/English_s2_unit9_exam5.json" },
-    { title: "Unit 09 - Exam 6", url: "https://raw.githubusercontent.com/MashalMath/joschool-11-arabic-exams/Arabic-S1/English_s2_unit9_exam6.json" },
-    { title: "Unit 09 - Exam 7", url: "https://raw.githubusercontent.com/MashalMath/joschool-11-arabic-exams/Arabic-S1/English_s2_unit9_exam7.json" },
-    { title: "Unit 09 - Exam 8", url: "https://raw.githubusercontent.com/MashalMath/joschool-11-arabic-exams/Arabic-S1/English_s2_unit9_exam8.json" },
-    { title: "Unit 09 - Exam 9", url: "https://raw.githubusercontent.com/MashalMath/joschool-11-arabic-exams/Arabic-S1/English_s2_unit9_exam9.json" },
-    { title: "Unit 09 - Exam 10", url: "https://raw.githubusercontent.com/MashalMath/joschool-11-arabic-exams/Arabic-S1/English_s2_unit9_exam10.json" }
-];
-const ENGLISH_U10_EXAMS = [
-    { title: "Unit 10 - Exam 1", url: "https://raw.githubusercontent.com/MashalMath/joschool-11-arabic-exams/Arabic-S1/English_s2_unit10_exam1.json" },
-    { title: "Unit 10 - Exam 2", url: "https://raw.githubusercontent.com/MashalMath/joschool-11-arabic-exams/Arabic-S1/English_s2_unit10_exam2.json" },
-    { title: "Unit 10 - Exam 3", url: "https://raw.githubusercontent.com/MashalMath/joschool-11-arabic-exams/Arabic-S1/English_s2_unit10_exam3.json" },
-    { title: "Unit 10 - Exam 4", url: "https://raw.githubusercontent.com/MashalMath/joschool-11-arabic-exams/Arabic-S1/English_s2_unit10_exam4.json" },
-    { title: "Unit 10 - Exam 5", url: "https://raw.githubusercontent.com/MashalMath/joschool-11-arabic-exams/Arabic-S1/English_s2_unit10_exam5.json" },
-    { title: "Unit 10 - Exam 6", url: "https://raw.githubusercontent.com/MashalMath/joschool-11-arabic-exams/Arabic-S1/English_s2_unit10_exam6.json" },
-    { title: "Unit 10 - Exam 7", url: "https://raw.githubusercontent.com/MashalMath/joschool-11-arabic-exams/Arabic-S1/English_s2_unit10_exam7.json" },
-    { title: "Unit 10 - Exam 8", url: "https://raw.githubusercontent.com/MashalMath/joschool-11-arabic-exams/Arabic-S1/English_s2_unit10_exam8.json" },
-    { title: "Unit 10 - Exam 9", url: "https://raw.githubusercontent.com/MashalMath/joschool-11-arabic-exams/Arabic-S1/English_s2_unit10_exam9.json" },
-    { title: "Unit 10 - Exam 10", url: "https://raw.githubusercontent.com/MashalMath/joschool-11-arabic-exams/Arabic-S1/English_s2_unit10_exam10.json" }
-];
+const getMathLessonTitle = (semester: Semester, unitNum: number, lessonNum: number): string | undefined => {
+    if (typeof subjectIndexData === 'undefined' || !subjectIndexData) return undefined;
+    const semesterKey = `${SubjectName.Math}-${semester}`;
+    const units = subjectIndexData[semesterKey] || subjectIndexData[SubjectName.Math] || [];
+    const uIdx = semester === Semester.First ? (unitNum - 1) : (unitNum - 5);
+    const unit = units[uIdx];
+    if (unit && unit.lessons) {
+        const lesson = unit.lessons[lessonNum - 1];
+        if (lesson) {
+            return lesson.title;
+        }
+    }
+    return undefined;
+};
+
+// توليد روابط امتحانات مادة الرياضيات - الفصل الأول
+const generateMathS1Exams = () => {
+    const allExams: { title: string, url: string, chunkIndex: number }[] = [];
+    
+    // الدرس الأول
+    const lesson1Title = getMathLessonTitle(Semester.First, 1, 1);
+    if (lesson1Title) {
+        for (let i = 1; i <= 10; i++) {
+            allExams.push({
+                title: lesson1Title,
+                url: `https://raw.githubusercontent.com/MashalMath/joschool-11-arabic-exams/JoSchool112010/Math11_s1_unit1_L1_E${i}.json`,
+                chunkIndex: i - 1
+            });
+        }
+    }
+
+    // الدرس الثاني
+    const lesson2Title = getMathLessonTitle(Semester.First, 1, 2);
+    if (lesson2Title) {
+        for (let i = 1; i <= 10; i++) {
+            allExams.push({
+                title: lesson2Title,
+                url: `https://raw.githubusercontent.com/MashalMath/joschool-11-arabic-exams/JoSchool112010/Math11_s1_unit1_L2_E${i}.json`,
+                chunkIndex: i - 1
+            });
+        }
+    }
+
+    // الدرس الثالث
+    const lesson3Title = getMathLessonTitle(Semester.First, 1, 3);
+    if (lesson3Title) {
+        for (let i = 1; i <= 10; i++) {
+            allExams.push({
+                title: lesson3Title,
+                url: `https://raw.githubusercontent.com/MashalMath/joschool-11-arabic-exams/JoSchool112010/Math11_s1_unit1_L3_E${i}.json`,
+                chunkIndex: i - 1
+            });
+        }
+    }
+
+    // الدرس الرابع
+    const lesson4Title = getMathLessonTitle(Semester.First, 1, 4);
+    if (lesson4Title) {
+        for (let i = 1; i <= 10; i++) {
+            allExams.push({
+                title: lesson4Title,
+                url: `https://raw.githubusercontent.com/MashalMath/joschool-11-arabic-exams/JoSchool112010/Math11_s1_unit1_L4_E${i}.json`,
+                chunkIndex: i - 1
+            });
+        }
+    }
+
+    // الوحدة الثانية - الدرس الأول
+    const u2Lesson1Title = getMathLessonTitle(Semester.First, 2, 1);
+    if (u2Lesson1Title) {
+        for (let i = 1; i <= 10; i++) {
+            allExams.push({
+                title: u2Lesson1Title,
+                url: `https://raw.githubusercontent.com/MashalMath/joschool-11-arabic-exams/JoSchool112010/Math11_s1_unit2_L1_E${i}.json`,
+                chunkIndex: i - 1
+            });
+        }
+    }
+
+    // الوحدة الثانية - الدرس الثاني
+    const u2Lesson2Title = getMathLessonTitle(Semester.First, 2, 2);
+    if (u2Lesson2Title) {
+        for (let i = 1; i <= 10; i++) {
+            allExams.push({
+                title: u2Lesson2Title,
+                url: `https://raw.githubusercontent.com/MashalMath/joschool-11-arabic-exams/JoSchool112010/Math11_s1_unit2_L2_E${i}.json`,
+                chunkIndex: i - 1
+            });
+        }
+    }
+
+    // الوحدة الثانية - الدرس الثالث
+    const u2Lesson3Title = getMathLessonTitle(Semester.First, 2, 3);
+    if (u2Lesson3Title) {
+        for (let i = 1; i <= 10; i++) {
+            allExams.push({
+                title: u2Lesson3Title,
+                url: `https://raw.githubusercontent.com/MashalMath/joschool-11-arabic-exams/JoSchool112010/Math11_s1_unit2_L3_E${i}.json`,
+                chunkIndex: i - 1
+            });
+        }
+    }
+
+    // الوحدة الثالثة - الدرس الأول
+    const u3Lesson1Title = getMathLessonTitle(Semester.First, 3, 1);
+    if (u3Lesson1Title) {
+        for (let i = 1; i <= 10; i++) {
+            allExams.push({
+                title: u3Lesson1Title,
+                url: `https://raw.githubusercontent.com/MashalMath/joschool-11-arabic-exams/JoSchool112010/Math11_s1_unit3_L1_E${i}.json`,
+                chunkIndex: i - 1
+            });
+        }
+    }
+
+    // الوحدة الثالثة - الدرس الثاني
+    const u3Lesson2Title = getMathLessonTitle(Semester.First, 3, 2);
+    if (u3Lesson2Title) {
+        for (let i = 1; i <= 10; i++) {
+            allExams.push({
+                title: u3Lesson2Title,
+                url: `https://raw.githubusercontent.com/MashalMath/joschool-11-arabic-exams/JoSchool112010/Math11_s1_unit3_L2_E${i}.json`,
+                chunkIndex: i - 1
+            });
+        }
+    }
+
+    // الوحدة الثالثة - الدرس الثالث
+    const u3Lesson3Title = getMathLessonTitle(Semester.First, 3, 3);
+    if (u3Lesson3Title) {
+        for (let i = 1; i <= 10; i++) {
+            allExams.push({
+                title: u3Lesson3Title,
+                url: `https://raw.githubusercontent.com/MashalMath/joschool-11-arabic-exams/JoSchool112010/Math11_s1_unit3_L3_E${i}.json`,
+                chunkIndex: i - 1
+            });
+        }
+    }
+
+    // الوحدة الثالثة - الدرس الرابع
+    const u3Lesson4Title = getMathLessonTitle(Semester.First, 3, 4);
+    if (u3Lesson4Title) {
+        for (let i = 1; i <= 10; i++) {
+            allExams.push({
+                title: u3Lesson4Title,
+                url: `https://raw.githubusercontent.com/MashalMath/joschool-11-arabic-exams/JoSchool112010/Math11_s1_unit3_L4_E${i}.json`,
+                chunkIndex: i - 1
+            });
+        }
+    }
+
+    // الوحدة الثالثة - الدرس الخامس
+    const u3Lesson5Title = getMathLessonTitle(Semester.First, 3, 5);
+    if (u3Lesson5Title) {
+        for (let i = 1; i <= 10; i++) {
+            allExams.push({
+                title: u3Lesson5Title,
+                url: `https://raw.githubusercontent.com/MashalMath/joschool-11-arabic-exams/JoSchool112010/Math11_s1_unit3_L5_E${i}.json`,
+                chunkIndex: i - 1
+            });
+        }
+    }
+
+    // الوحدة الثالثة - الدرس السادس
+    const u3Lesson6Title = getMathLessonTitle(Semester.First, 3, 6);
+    if (u3Lesson6Title) {
+        for (let i = 1; i <= 10; i++) {
+            allExams.push({
+                title: u3Lesson6Title,
+                url: `https://raw.githubusercontent.com/MashalMath/joschool-11-arabic-exams/JoSchool112010/Math11_s1_unit3_L6_E${i}.json`,
+                chunkIndex: i - 1
+            });
+        }
+    }
+    
+    return allExams;
+};
+
+// توليد روابط امتحانات مادة الرياضيات - الفصل الثاني
+const generateMathS2Exams = () => {
+    const config = [
+        { unit: 5, lessons: [ { index: 1, exams: 7 }, { index: 2, exams: 7 }, { index: 3, exams: 7 }, { index: 4, exams: 7 }, { index: 5, exams: 7 }, { index: 6, exams: 7 } ] },
+        { unit: 6, lessons: [ { index: 1, exams: 7 }, { index: 2, exams: 7 }, { index: 3, exams: 7 } ] },
+        { unit: 7, lessons: [ { index: 1, exams: 7 }, { index: 2, exams: 7 } ] },
+    ];
+    const allExams: { title: string, url: string, chunkIndex: number }[] = [];
+    config.forEach(u => {
+        u.lessons.forEach(l => {
+            const lessonTitle = getMathLessonTitle(Semester.Second, u.unit, l.index);
+            if (lessonTitle) {
+                for (let i = 1; i <= l.exams; i++) {
+                    allExams.push({
+                        title: lessonTitle,
+                        url: `https://raw.githubusercontent.com/MashalMath/joschool-11-arabic-exams/Arabic-S1/Math_s2_unit${u.unit}_L${l.index}_exam${i}.json`,
+                        chunkIndex: i - 1
+                    });
+                }
+            }
+        });
+    });
+    return allExams;
+};
+
+const MATH_S1_EXAMS = generateMathS1Exams();
+const MATH_S2_EXAMS = generateMathS2Exams();
+
+// Helper function to safely escape invalid backslashes inside JSON strings (e.g. \implies, \sqrt, \cdot)
+const fixUnescapedBackslashesInJson = (jsonString: string): string => {
+    let result = '';
+    let inString = false;
+    let i = 0;
+    while (i < jsonString.length) {
+        const char = jsonString[i];
+        if (!inString) {
+            if (char === '"') {
+                inString = true;
+            }
+            result += char;
+            i++;
+        } else {
+            if (char === '"') {
+                inString = false;
+                result += char;
+                i++;
+            } else if (char === '\\') {
+                const nextChar = jsonString[i + 1];
+                if (nextChar === '"' || nextChar === '\\' || nextChar === '/' ||
+                    nextChar === 'b' || nextChar === 'f' || nextChar === 'n' ||
+                    nextChar === 'r' || nextChar === 't') {
+                    // Valid 2-char escape sequence
+                    result += '\\' + nextChar;
+                    i += 2;
+                } else if (nextChar === 'u' && /^[0-9a-fA-F]{4}$/.test(jsonString.substring(i + 2, i + 6))) {
+                    // Valid \uXXXX unicode escape sequence
+                    result += jsonString.substring(i, i + 6);
+                    i += 6;
+                } else {
+                    // Invalid escape sequence like \i (\implies), \s (\sqrt), \c (\cdot), \d (\delta), \l (\left), \a (\alpha), \p (\pi), etc.
+                    // Replace single \ with \\
+                    result += '\\\\';
+                    i++;
+                }
+            } else {
+                result += char;
+                i++;
+            }
+        }
+    }
+    return result;
+};
 
 // Helper function to clean and parse JSON that might contain BOM or non-breaking spaces
 const cleanAndParseJson = (text: string) => {
     let cleanedText = text.replace(/^\uFEFF/, '').trim();
+    
+    // Fix illegal trailing dots outside double quotes (e.g., ". instead of .")
+    cleanedText = cleanedText.replace(/"\s*\./g, '"');
+
+    // Fix missing commas between properties in objects (e.g. source_text and correct_answer)
+    cleanedText = cleanedText.replace(/("source_text"\s*:\s*"[^"]+")\s*\n\s*("correct_answer")/g, '$1,\n$2');
+
+    // Fix malformed Arabic punctuation in choices lists (specifically in Unit 2 Lesson 6)
+    cleanedText = cleanedText.replace(/"مباحاً إذا كان الزوج فقيراً"[^\n]*/g, '"مباحاً إذا كان الزوج فقيراً",');
+
+    // Fix unescaped LaTeX backslashes inside JSON string literals
+    cleanedText = fixUnescapedBackslashesInJson(cleanedText);
+
+    // Clean bad unescaped control characters inside string literals (ASCII 0-31)
+    cleanedText = cleanedText.replace(/"(\\.|[^"\\])*"/g, (match) => {
+        // eslint-disable-next-line no-control-regex
+        return match.replace(new RegExp("[\\x00-\\x1F]", "g"), (char) => {
+            if (char === '\n') return '\\n';
+            if (char === '\r') return '\\r';
+            if (char === '\t') return '\\t';
+            return '';
+        });
+    });
+
     const firstBrace = cleanedText.indexOf('{');
     const firstBracket = cleanedText.indexOf('[');
     let start = -1;
@@ -327,18 +498,58 @@ const cleanAndParseJson = (text: string) => {
 
     try {
         const data = JSON.parse(cleanedText);
-        if (Array.isArray(data)) return data;
-        if (data.questions && Array.isArray(data.questions)) return data.questions;
-        if (data.exam && Array.isArray(data.exam)) return data.exam;
-        // Search for any array property if neither 'questions' nor 'exam' exists
-        const arrayKey = Object.keys(data).find(key => Array.isArray(data[key]));
-        if (arrayKey) return data[arrayKey];
+        let questions: any[] | null = null;
+        if (Array.isArray(data)) {
+            questions = data;
+        } else if (data.questions && Array.isArray(data.questions)) {
+            questions = data.questions;
+        } else if (data.exam && Array.isArray(data.exam)) {
+            questions = data.exam;
+        } else {
+            const arrayKey = Object.keys(data).find(key => Array.isArray(data[key]));
+            if (arrayKey) {
+                questions = data[arrayKey];
+            }
+        }
+        
+        if (questions && Array.isArray(questions)) {
+            questions.forEach((q: any) => {
+                if (q && q.options && !q.choices) {
+                    q.choices = q.options.map((opt: any) => opt.label);
+                }
+            });
+            return questions;
+        }
         return null;
     } catch (e) {
         if (!cleanedText.includes('404')) {
             throw e;
         }
         return null;
+    }
+};
+
+// Helper to safely write to localStorage with self-healing on QuotaExceededError
+const safeLocalStorageSetItem = (key: string, value: string) => {
+    try {
+        localStorage.setItem(key, value);
+    } catch (e: any) {
+        console.warn(`[JoSchool] LocalStorage setItem failed for key "${key}":`, e);
+        if (e.name === 'QuotaExceededError' || e.code === 22 || e.name === 'NS_ERROR_DOM_QUOTA_REACHED') {
+            console.warn("[JoSchool] Storage quota exceeded! Initiating self-healing cache cleanup...");
+            try {
+                // Remove non-critical cached exam questions to free up valuable space
+                localStorage.removeItem('joschool_exams_cache');
+                localStorage.removeItem('joschool_exams_urls_cache');
+                console.log("[JoSchool] Cleared large exam caches from localStorage.");
+                
+                // Retry saving the critical user data
+                localStorage.setItem(key, value);
+                console.log("[JoSchool] Successfully saved critical state after self-healing.");
+            } catch (retryError) {
+                console.error("[JoSchool] Failed to save critical state even after clearing cache:", retryError);
+            }
+        }
     }
 };
 
@@ -378,9 +589,31 @@ const App: React.FC = () => {
         }
     }, [getStorageKey]);
 
-    const [viewHistory, setViewHistory] = useState<View[]>([View.Landing]);
+    const [viewHistory, setViewHistory] = useState<View[]>(() => {
+        try {
+            const hasSeen = localStorage.getItem('joschool_has_seen_welcome') === 'true';
+            return hasSeen ? [View.Landing] : [View.Welcome];
+        } catch {
+            return [View.Welcome];
+        }
+    });
     const [selectedSubject, setSelectedSubject] = useState<Subject | null>(null);
     const [sessionTitle, setSessionTitle] = useState<string>('');
+    const [noticeModal, setNoticeModal] = useState<{
+        show: boolean;
+        title?: string;
+        message: string;
+        imageUrl?: string;
+    } | null>(null);
+
+    const showNotice = useCallback((message: string, title: string = 'تنبيه', imageUrl?: string) => {
+        setNoticeModal({
+            show: true,
+            title,
+            message,
+            imageUrl: imageUrl || 'https://i.postimg.cc/XvYQrc5C/FB-IMG-1780984890803.jpg'
+        });
+    }, []);
     
     // View state
     const currentView = viewHistory[viewHistory.length - 1] || View.Landing;
@@ -430,6 +663,7 @@ const App: React.FC = () => {
         examProgresses: {},
         totalTimeSpent: 0,
         lastActive: new Date().toISOString(),
+        lastActiveDate: new Date().toLocaleDateString('en-CA'),
         studentProfile: {
             name: '',
             seatNumber: '',
@@ -491,8 +725,14 @@ const App: React.FC = () => {
                         if (state.viewHistory) setViewHistory(state.viewHistory);
                         if (state.selectedSubject) setSelectedSubject(state.selectedSubject);
                         if (state.sessionTitle) setSessionTitle(state.sessionTitle);
-                        if (state.currentQuiz) setCurrentQuiz(state.currentQuiz);
-                        if (state.currentQuestionIndex !== undefined) setCurrentQuestionIndex(state.currentQuestionIndex);
+                        const loadedQuiz = state.currentQuiz || [];
+                        if (state.currentQuiz) setCurrentQuiz(loadedQuiz);
+                        if (state.currentQuestionIndex !== undefined) {
+                            const validIdx = (loadedQuiz.length > 0 && typeof state.currentQuestionIndex === 'number' && state.currentQuestionIndex >= 0 && state.currentQuestionIndex < loadedQuiz.length)
+                                ? state.currentQuestionIndex
+                                : 0;
+                            setCurrentQuestionIndex(validIdx);
+                        }
                         if (state.userAnswers) setUserAnswers(state.userAnswers);
                         if (state.showResults !== undefined) setShowResults(state.showResults);
                         if (state.timer !== undefined) setTimer(state.timer);
@@ -505,7 +745,8 @@ const App: React.FC = () => {
                         if (state.expandedLessonKeys) setExpandedLessonKeys(state.expandedLessonKeys);
                     } else {
                         // Start fresh for new account or guest
-                        setViewHistory([View.Landing]);
+                        const hasSeen = localStorage.getItem(getStorageKey('has_seen_welcome', newUid)) === 'true';
+                        setViewHistory(hasSeen ? [View.Landing] : [View.Welcome]);
                         setSelectedSubject(null);
                         setSessionTitle('');
                         setCurrentQuiz([]);
@@ -530,7 +771,7 @@ const App: React.FC = () => {
 
     useEffect(() => {
         const key = getStorageKey('user_progress', user?.uid);
-        localStorage.setItem(key, JSON.stringify(userProgress));
+        safeLocalStorageSetItem(key, JSON.stringify(userProgress));
         
         if (user) {
             // Only push to cloud if meaningful data changed (excluding just time/lastActive unless significantly different)
@@ -594,7 +835,22 @@ const App: React.FC = () => {
         return () => clearInterval(interval);
     }, []);
 
+    const lastActiveDate = userProgress?.lastActiveDate;
+
+    // Track active date
+    useEffect(() => {
+        const todayStr = new Date().toLocaleDateString('en-CA'); // YYYY-MM-DD local format
+        if (lastActiveDate !== todayStr) {
+            setUserProgress(prev => ({
+                ...prev,
+                lastActiveDate: todayStr,
+                lastActive: new Date().toISOString()
+            }));
+        }
+    }, [lastActiveDate, setUserProgress]);
+
     const [isDbLoaded, setIsDbLoaded] = useState(true);
+    const [examsUpdatedTrigger, setExamsUpdatedTrigger] = useState(0);
     const [isBackgroundFetching, setIsBackgroundFetching] = useState(false);
     const [isLoadingExam, setIsLoadingExam] = useState(false);
     const [showBackConfirmation, setShowBackConfirmation] = useState(false);
@@ -638,7 +894,7 @@ const App: React.FC = () => {
                 pdfTitle
             };
             const key = getStorageKey('app_state', user?.uid);
-            localStorage.setItem(key, JSON.stringify(appState));
+            safeLocalStorageSetItem(key, JSON.stringify(appState));
         };
 
         const timeout = setTimeout(saveState, timer > 0 ? 2000 : 500); // Save less frequently during active exams
@@ -685,14 +941,14 @@ const App: React.FC = () => {
             { subject: SubjectName.JordanHistory, exams: [...HISTORY_U1_EXAMS, ...HISTORY_U2_EXAMS, ...HISTORY_U3_EXAMS] },
             { subject: SubjectName.IslamicEducation, exams: [...ISLAMIC_U1_EXAMS, ...ISLAMIC_U2_EXAMS, ...ISLAMIC_U3_EXAMS, ...ISLAMIC_U4_EXAMS] },
             { subject: SubjectName.Arabic, exams: ARABIC_EXAMS.slice(0, 30) }, // First 30 Arabic exams first
-            { subject: SubjectName.English, exams: [...ENGLISH_U1_EXAMS, ...ENGLISH_U2_EXAMS, ...ENGLISH_U3_EXAMS, ...ENGLISH_U4_EXAMS, ...ENGLISH_U5_EXAMS] },
+            { subject: SubjectName.Math, exams: MATH_S1_EXAMS },
             { subject: "SESSION_2008", exams: SESSION_2008_EXAMS },
             { subject: "SESSION_2008_SUP", exams: SESSION_2008_SUP_EXAMS },
             // Remaining exams
             { subject: SubjectName.JordanHistory, exams: [...HISTORY_S2_U4_EXAMS, ...HISTORY_S2_U5_EXAMS, ...HISTORY_S2_U6_EXAMS, ...HISTORY_S2_U7_EXAMS, ...HISTORY_S2_U8_EXAMS] },
             { subject: SubjectName.IslamicEducation, exams: [...ISLAMIC_S2_U1_EXAMS, ...ISLAMIC_S2_U2_EXAMS, ...ISLAMIC_S2_U3_EXAMS, ...ISLAMIC_S2_U4_EXAMS] },
             { subject: SubjectName.Arabic, exams: ARABIC_EXAMS.slice(30) },
-            { subject: SubjectName.English, exams: [...ENGLISH_U6_EXAMS, ...ENGLISH_U7_EXAMS, ...ENGLISH_U8_EXAMS, ...ENGLISH_U9_EXAMS, ...ENGLISH_U10_EXAMS] }
+            { subject: SubjectName.Math, exams: MATH_S2_EXAMS }
         ];
 
         for (const set of examSets) {
@@ -708,8 +964,10 @@ const App: React.FC = () => {
                         ? (item as any).subject 
                         : set.subject;
                     
+                    const chunkIdx = (item as any).chunkIndex;
+                    
                     // Skip if already in database or if we are already fetching it
-                    if (examsDatabase[subjectKey]?.[item.title]) return;
+                    if (hasValidCache(subjectKey as SubjectName, item.title, item.url, chunkIdx)) return;
                     
                     try {
                         const res = await fetch(`${item.url}${item.url.includes('?') ? '&' : '?'}bv=1`, {
@@ -723,7 +981,8 @@ const App: React.FC = () => {
                         try {
                             const questions = cleanAndParseJson(text);
                             if (questions && questions.length > 0) {
-                                updateDatabase(subjectKey, item.title, questions);
+                                updateDatabase(subjectKey as SubjectName, item.title, questions, item.url, chunkIdx);
+                                setExamsUpdatedTrigger(prev => prev + 1);
                             }
                         } catch (parseError) {
                             // Silently ignore
@@ -764,15 +1023,15 @@ const App: React.FC = () => {
         return () => clearTimeout(timeout);
     }, [fetchExams]);
 
-    const getExamsForSubject = (subject: SubjectName) => {
+    const getExamsForSubject = useCallback((subject: SubjectName) => {
         switch (subject) {
             case SubjectName.JordanHistory: return [...HISTORY_U1_EXAMS, ...HISTORY_U2_EXAMS, ...HISTORY_U3_EXAMS, ...HISTORY_S2_U4_EXAMS, ...HISTORY_S2_U5_EXAMS, ...HISTORY_S2_U6_EXAMS, ...HISTORY_S2_U7_EXAMS, ...HISTORY_S2_U8_EXAMS];
             case SubjectName.IslamicEducation: return [...ISLAMIC_U1_EXAMS, ...ISLAMIC_U2_EXAMS, ...ISLAMIC_U3_EXAMS, ...ISLAMIC_U4_EXAMS, ...ISLAMIC_S2_U1_EXAMS, ...ISLAMIC_S2_U2_EXAMS, ...ISLAMIC_S2_U3_EXAMS, ...ISLAMIC_S2_U4_EXAMS];
             case SubjectName.Arabic: return ARABIC_EXAMS;
-            case SubjectName.English: return [...ENGLISH_U1_EXAMS, ...ENGLISH_U2_EXAMS, ...ENGLISH_U3_EXAMS, ...ENGLISH_U4_EXAMS, ...ENGLISH_U5_EXAMS, ...ENGLISH_U6_EXAMS, ...ENGLISH_U7_EXAMS, ...ENGLISH_U8_EXAMS, ...ENGLISH_U9_EXAMS, ...ENGLISH_U10_EXAMS];
+            case SubjectName.Math: return [...MATH_S1_EXAMS, ...MATH_S2_EXAMS];
             default: return [];
         }
-    };
+    }, []);
 
     // مراقبة تغيير المادة المختارة لتسريع تحميل اختباراتها إذا لم تكن محملة
     useEffect(() => {
@@ -784,7 +1043,7 @@ const App: React.FC = () => {
             const fetchSelectedSubjectExams = async () => {
                 // Determine which ones are missing
                 const missing = subjectExams.filter(item => 
-                    !examsDatabase[selectedSubject.id as SubjectName]?.[item.title] && item.url
+                    !hasValidCache(selectedSubject.id as SubjectName, item.title, item.url, (item as any).chunkIndex) && item.url
                 );
 
                 if (missing.length === 0) return;
@@ -809,7 +1068,8 @@ const App: React.FC = () => {
                             
                             const questions = cleanAndParseJson(text);
                             if (questions && questions.length > 0) {
-                                updateDatabase(selectedSubject.id as SubjectName, item.title, questions);
+                                updateDatabase(selectedSubject.id as SubjectName, item.title, questions, item.url, (item as any).chunkIndex);
+                                setExamsUpdatedTrigger(prev => prev + 1);
                             }
                         } catch (err: any) {
                             // Ignore errors in background
@@ -829,7 +1089,7 @@ const App: React.FC = () => {
         return () => {
             isCancelled = true;
         };
-    }, [selectedSubject]);
+    }, [selectedSubject, getExamsForSubject]);
 
     useEffect(() => {
         const handlePopState = (event: PopStateEvent) => {
@@ -863,6 +1123,8 @@ const App: React.FC = () => {
             // Normal navigation or confirmed back
             if (isNavigatingBackRef.current) {
                 isNavigatingBackRef.current = false;
+                // If we already navigated back synchronously, do nothing here to keep it instant
+                return;
             }
             
             if (state && typeof state.historyIndex === 'number') {
@@ -889,9 +1151,17 @@ const App: React.FC = () => {
         } else {
             // Set flag to bypass confirmation in popstate
             isNavigatingBackRef.current = true;
-            window.history.back();
+            
+            // Instantly transition view history for ultimate snappiness
+            setViewHistory(prev => prev.length > 1 ? prev.slice(0, -1) : [View.Landing]);
+            
+            try {
+                window.history.back();
+            } catch (e) {
+                console.warn("History back failed", e);
+            }
         }
-    }, [currentView, showResults, setShowBackConfirmation, setShowExitConfirmation]);
+    }, [currentView, showResults, setViewHistory, setShowBackConfirmation, setShowExitConfirmation]);
 
     const confirmLeaveQuiz = () => {
         // Save progress before leaving
@@ -920,9 +1190,16 @@ const App: React.FC = () => {
         setShowBackConfirmation(false);
         isNavigatingBackRef.current = true;
         
+        // Instantly transition view history for ultimate snappiness
+        setViewHistory(prev => prev.length > 1 ? prev.slice(0, -1) : [View.Landing]);
+        
         // Use browser back to trigger the clean history movement
         // This will be caught by popstate which will perform the view transition
-        window.history.back();
+        try {
+            window.history.back();
+        } catch (e) {
+            console.warn("History back failed", e);
+        }
     };
 
     const confirmExitApp = () => {
@@ -972,14 +1249,116 @@ const App: React.FC = () => {
         );
     };
 
-    const toggleLesson = (key: string) => {
+    const toggleLesson = async (key: string) => {
+        const isExpanding = !expandedLessonKeys.includes(key);
         setExpandedLessonKeys(prev => 
             prev.includes(key) ? prev.filter(k => k !== key) : [...prev, key]
         );
+        
+        if (isExpanding && selectedSubject) {
+            // Extract lesson title from the key (format: `${uIdx}_${lesson.title}`)
+            const underscoreIdx = key.indexOf('_');
+            if (underscoreIdx !== -1) {
+                const lessonTitle = key.substring(underscoreIdx + 1);
+                const subjectId = selectedSubject.id as SubjectName;
+                
+                if (subjectId === SubjectName.Math) {
+                    const uIdx = parseInt(key.substring(0, underscoreIdx));
+                    const semesterKey = `${selectedSubject.id}-${selectedSubject.semester}`;
+                    const units = subjectIndexData[semesterKey] || subjectIndexData[selectedSubject.id] || [];
+                    const unit = units[uIdx];
+                    if (unit) {
+                        const lIdx = unit.lessons.findIndex(l => l.title === lessonTitle);
+                        if (lIdx !== -1) {
+                            const unitNum = selectedSubject.semester === Semester.First ? (uIdx + 1) : (uIdx + 5);
+                            const lessonNum = lIdx + 1;
+                            const semPrefix = selectedSubject.semester === Semester.First ? 's1' : 's2';
+                            
+                            const examsCount = (selectedSubject.semester === Semester.First && ((unitNum === 1 && (lessonNum === 1 || lessonNum === 2 || lessonNum === 3 || lessonNum === 4)) || (unitNum === 2 && (lessonNum === 1 || lessonNum === 2 || lessonNum === 3)) || (unitNum === 3 && (lessonNum === 1 || lessonNum === 2 || lessonNum === 3 || lessonNum === 4 || lessonNum === 5 || lessonNum === 6)))) ? 10 : 7;
+                            const examsToFetch = Array.from({ length: examsCount }, (_, i) => i + 1);
+                            await Promise.all(examsToFetch.map(async (examNum) => {
+                                const url = (selectedSubject.semester === Semester.First && unitNum === 1 && lessonNum === 1)
+                                    ? `https://raw.githubusercontent.com/MashalMath/joschool-11-arabic-exams/JoSchool112010/Math11_s1_unit1_L1_E${examNum}.json`
+                                    : (selectedSubject.semester === Semester.First && unitNum === 1 && lessonNum === 2)
+                                        ? `https://raw.githubusercontent.com/MashalMath/joschool-11-arabic-exams/JoSchool112010/Math11_s1_unit1_L2_E${examNum}.json`
+                                        : (selectedSubject.semester === Semester.First && unitNum === 1 && lessonNum === 3)
+                                            ? `https://raw.githubusercontent.com/MashalMath/joschool-11-arabic-exams/JoSchool112010/Math11_s1_unit1_L3_E${examNum}.json`
+                                            : (selectedSubject.semester === Semester.First && unitNum === 1 && lessonNum === 4)
+                                                ? `https://raw.githubusercontent.com/MashalMath/joschool-11-arabic-exams/JoSchool112010/Math11_s1_unit1_L4_E${examNum}.json`
+                                                : (selectedSubject.semester === Semester.First && unitNum === 2 && lessonNum === 1)
+                                                    ? `https://raw.githubusercontent.com/MashalMath/joschool-11-arabic-exams/JoSchool112010/Math11_s1_unit2_L1_E${examNum}.json`
+                                                    : (selectedSubject.semester === Semester.First && unitNum === 2 && lessonNum === 2)
+                                                        ? `https://raw.githubusercontent.com/MashalMath/joschool-11-arabic-exams/JoSchool112010/Math11_s1_unit2_L2_E${examNum}.json`
+                                                        : (selectedSubject.semester === Semester.First && unitNum === 2 && lessonNum === 3)
+                                                            ? `https://raw.githubusercontent.com/MashalMath/joschool-11-arabic-exams/JoSchool112010/Math11_s1_unit2_L3_E${examNum}.json`
+                                                            : (selectedSubject.semester === Semester.First && unitNum === 3 && lessonNum === 1)
+                                                                ? `https://raw.githubusercontent.com/MashalMath/joschool-11-arabic-exams/JoSchool112010/Math11_s1_unit3_L1_E${examNum}.json`
+                                                                : (selectedSubject.semester === Semester.First && unitNum === 3 && lessonNum === 2)
+                                                                    ? `https://raw.githubusercontent.com/MashalMath/joschool-11-arabic-exams/JoSchool112010/Math11_s1_unit3_L2_E${examNum}.json`
+                                                                    : (selectedSubject.semester === Semester.First && unitNum === 3 && lessonNum === 3)
+                                                                        ? `https://raw.githubusercontent.com/MashalMath/joschool-11-arabic-exams/JoSchool112010/Math11_s1_unit3_L3_E${examNum}.json`
+                                                                        : (selectedSubject.semester === Semester.First && unitNum === 3 && lessonNum === 4)
+                                                                            ? `https://raw.githubusercontent.com/MashalMath/joschool-11-arabic-exams/JoSchool112010/Math11_s1_unit3_L4_E${examNum}.json`
+                                                                            : (selectedSubject.semester === Semester.First && unitNum === 3 && lessonNum === 5)
+                                                                                ? `https://raw.githubusercontent.com/MashalMath/joschool-11-arabic-exams/JoSchool112010/Math11_s1_unit3_L5_E${examNum}.json`
+                                                                                : (selectedSubject.semester === Semester.First && unitNum === 3 && lessonNum === 6)
+                                                                                    ? `https://raw.githubusercontent.com/MashalMath/joschool-11-arabic-exams/JoSchool112010/Math11_s1_unit3_L6_E${examNum}.json`
+                                                                                    : `https://raw.githubusercontent.com/MashalMath/joschool-11-arabic-exams/Arabic-S1/Math_${semPrefix}_unit${unitNum}_L${lessonNum}_exam${examNum}.json`;
+                                if (hasValidCache(subjectId, lessonTitle, url, examNum - 1)) return;
+                                try {
+                                    const res = await fetch(`${url}?t=${Date.now()}`, { cache: 'no-store' });
+                                    if (res.ok) {
+                                        const text = await res.text();
+                                        const questions = cleanAndParseJson(text);
+                                        if (questions && questions.length > 0) {
+                                            updateDatabase(subjectId, lessonTitle, questions, url, examNum - 1);
+                                        }
+                                    }
+                                } catch (e) {
+                                    console.warn(`Failed to fetch Math exam ${examNum} for ${lessonTitle}`, e);
+                                }
+                            }));
+                            saveToCache();
+                            setExamsUpdatedTrigger(prev => prev + 1);
+                        }
+                    }
+                } else {
+                    const subjectExams = getExamsForSubject(subjectId);
+                    const examConfig = subjectExams.find(e => e.title === lessonTitle);
+                    
+                    if (examConfig && examConfig.url) {
+                        try {
+                            const res = await fetch(`${examConfig.url}${examConfig.url.includes('?') ? '&' : '?'}t=${Date.now()}`, {
+                                cache: 'no-store'
+                            });
+                            if (res.ok) {
+                                const text = await res.text();
+                                const fetchedQuestions = cleanAndParseJson(text);
+                                if (fetchedQuestions && fetchedQuestions.length > 0) {
+                                    updateDatabase(subjectId, lessonTitle, fetchedQuestions, examConfig.url);
+                                    saveToCache();
+                                    setExamsUpdatedTrigger(prev => prev + 1);
+                                }
+                            }
+                        } catch (err) {
+                            console.warn("Failed on-demand fetch for expanded lesson", err);
+                        }
+                    }
+                }
+            }
+        }
     };
 
     const openExternalBook = () => {
         if (!selectedSubject) return;
+        if (selectedSubject.semester === Semester.Second || (!selectedSubject.textbookUrl && !selectedSubject.multiBooks)) {
+            showNotice(
+                'عندما تقوم وزارة التربية والتعليم بإصدار نسخة الفصل الثاني لعام 2026/2027 سيتم عرض أحدث نسخة هنا',
+                'تنبيه',
+                'https://i.postimg.cc/XvYQrc5C/FB-IMG-1780984890803.jpg'
+            );
+            return;
+        }
         if (selectedSubject.multiBooks) {
             setShowMultiBooksModal(true);
         } else if (selectedSubject.textbookUrl) {
@@ -987,62 +1366,118 @@ const App: React.FC = () => {
         }
     };
 
-    const startQuiz = async (lesson: any, chunkIndex?: number, unitTitle?: string, resumeProgress?: ExamProgress) => {
-        let questions = getQuizzesForLesson(selectedSubject?.id as SubjectName, lesson.title, chunkIndex);
-        
-        // If questions are not loaded yet, try to fetch them immediately
-        if (!questions || questions.length === 0) {
-            setIsLoadingExam(true);
-            try {
-                // Find the exam config for this lesson
-                const subjectExams = getExamsForSubject(selectedSubject?.id as SubjectName);
-                const examConfig = subjectExams.find(e => e.title === lesson.title);
-                
-                if (examConfig && examConfig.url) {
-                    const res = await fetch(`${examConfig.url}${examConfig.url.includes('?') ? '&' : '?'}t=${Date.now()}`, {
-                        cache: 'no-store'
-                    });
-                    if (res.ok) {
-                        const text = await res.text();
-                        const fetchedQuestions = cleanAndParseJson(text);
-                        if (fetchedQuestions) {
-                            updateDatabase(selectedSubject?.id as SubjectName, lesson.title, fetchedQuestions);
-                            questions = getQuizzesForLesson(selectedSubject?.id as SubjectName, lesson.title, chunkIndex);
-                        }
-                    }
-                }
-            } catch (e) {
-                console.error("Failed to load exam on demand", e);
-            } finally {
-                setIsLoadingExam(false);
-            }
-        }
+    const getMathUrl = (lesson: any, chunkIndex: number, unitTitle?: string) => {
+        if (!selectedSubject) return null;
+        const semesterKey = `${selectedSubject.id}-${selectedSubject.semester}`;
+        const units = subjectIndexData[semesterKey] || subjectIndexData[selectedSubject.id] || [];
+        const uIdx = units.findIndex(u => u.title === unitTitle);
+        if (uIdx === -1) return null;
+        const unit = units[uIdx];
+        const lIdx = unit.lessons.findIndex((l: any) => l.title === lesson.title);
+        if (lIdx === -1) return null;
+        const unitNum = selectedSubject.semester === Semester.First ? (uIdx + 1) : (uIdx + 5);
+        const lessonNum = lIdx + 1;
+        const semPrefix = selectedSubject.semester === Semester.First ? 's1' : 's2';
+        const examNum = chunkIndex + 1;
+        return (selectedSubject.semester === Semester.First && unitNum === 1 && lessonNum === 1)
+            ? `https://raw.githubusercontent.com/MashalMath/joschool-11-arabic-exams/JoSchool112010/Math11_s1_unit1_L1_E${examNum}.json`
+            : (selectedSubject.semester === Semester.First && unitNum === 1 && lessonNum === 2)
+                ? `https://raw.githubusercontent.com/MashalMath/joschool-11-arabic-exams/JoSchool112010/Math11_s1_unit1_L2_E${examNum}.json`
+                : (selectedSubject.semester === Semester.First && unitNum === 1 && lessonNum === 3)
+                    ? `https://raw.githubusercontent.com/MashalMath/joschool-11-arabic-exams/JoSchool112010/Math11_s1_unit1_L3_E${examNum}.json`
+                    : (selectedSubject.semester === Semester.First && unitNum === 1 && lessonNum === 4)
+                        ? `https://raw.githubusercontent.com/MashalMath/joschool-11-arabic-exams/JoSchool112010/Math11_s1_unit1_L4_E${examNum}.json`
+                        : (selectedSubject.semester === Semester.First && unitNum === 2 && lessonNum === 1)
+                            ? `https://raw.githubusercontent.com/MashalMath/joschool-11-arabic-exams/JoSchool112010/Math11_s1_unit2_L1_E${examNum}.json`
+                            : (selectedSubject.semester === Semester.First && unitNum === 2 && lessonNum === 2)
+                                ? `https://raw.githubusercontent.com/MashalMath/joschool-11-arabic-exams/JoSchool112010/Math11_s1_unit2_L2_E${examNum}.json`
+                                : (selectedSubject.semester === Semester.First && unitNum === 2 && lessonNum === 3)
+                                    ? `https://raw.githubusercontent.com/MashalMath/joschool-11-arabic-exams/JoSchool112010/Math11_s1_unit2_L3_E${examNum}.json`
+                                    : (selectedSubject.semester === Semester.First && unitNum === 3 && lessonNum === 1)
+                                        ? `https://raw.githubusercontent.com/MashalMath/joschool-11-arabic-exams/JoSchool112010/Math11_s1_unit3_L1_E${examNum}.json`
+                                        : (selectedSubject.semester === Semester.First && unitNum === 3 && lessonNum === 2)
+                                            ? `https://raw.githubusercontent.com/MashalMath/joschool-11-arabic-exams/JoSchool112010/Math11_s1_unit3_L2_E${examNum}.json`
+                                            : (selectedSubject.semester === Semester.First && unitNum === 3 && lessonNum === 3)
+                                                ? `https://raw.githubusercontent.com/MashalMath/joschool-11-arabic-exams/JoSchool112010/Math11_s1_unit3_L3_E${examNum}.json`
+                                                : (selectedSubject.semester === Semester.First && unitNum === 3 && lessonNum === 4)
+                                                    ? `https://raw.githubusercontent.com/MashalMath/joschool-11-arabic-exams/JoSchool112010/Math11_s1_unit3_L4_E${examNum}.json`
+                                                    : (selectedSubject.semester === Semester.First && unitNum === 3 && lessonNum === 5)
+                                                        ? `https://raw.githubusercontent.com/MashalMath/joschool-11-arabic-exams/JoSchool112010/Math11_s1_unit3_L5_E${examNum}.json`
+                                                        : (selectedSubject.semester === Semester.First && unitNum === 3 && lessonNum === 6)
+                                                            ? `https://raw.githubusercontent.com/MashalMath/joschool-11-arabic-exams/JoSchool112010/Math11_s1_unit3_L6_E${examNum}.json`
+                                                            : `https://raw.githubusercontent.com/MashalMath/joschool-11-arabic-exams/Arabic-S1/Math_${semPrefix}_unit${unitNum}_L${lessonNum}_exam${examNum}.json`;
+    };
 
-        if (!questions || questions.length === 0) return;
-        
+    const startQuiz = async (lesson: any, chunkIndex?: number, unitTitle?: string, resumeProgress?: ExamProgress) => {
+        const subjectId = selectedSubject?.id as SubjectName;
         const isEnglish = selectedSubject?.id === SubjectName.English;
         const examNum = (chunkIndex || 0) + 1;
         const examLabel = isEnglish ? `Exam (${examNum})` : `امتحان (${examNum})`;
         const fullLessonTitle = `${lesson.title} - ${examLabel}`;
 
-        setCurrentLessonTitle(fullLessonTitle);
-        setCurrentUnitTitle(unitTitle || '');
-        setExamNumber(examNum);
-        setCurrentQuiz([...questions]);
-        
-        if (resumeProgress && resumeProgress.lessonTitle === fullLessonTitle) {
-            setCurrentQuestionIndex(resumeProgress.currentQuestionIndex);
-            setUserAnswers(resumeProgress.userAnswers);
-            // setTimer based on remaining questions roughly or use saved timer if we had it
-            setTimer((resumeProgress.totalQuestions - resumeProgress.currentQuestionIndex) * 60); 
-        } else {
-            setCurrentQuestionIndex(0);
-            setUserAnswers(new Array(questions.length).fill(null));
-            setTimer(questions.length * 60); // 1 minute per question
+        const launchQuizWithQuestions = (questions: Question[]) => {
+            setCurrentLessonTitle(fullLessonTitle);
+            setCurrentUnitTitle(unitTitle || '');
+            setExamNumber(examNum);
+            setCurrentQuiz([...questions]);
+            
+            const secondsPerQuestion = selectedSubject?.id === SubjectName.Math ? 240 : 60;
+            if (resumeProgress && resumeProgress.lessonTitle === fullLessonTitle) {
+                const validIdx = (typeof resumeProgress.currentQuestionIndex === 'number' && resumeProgress.currentQuestionIndex >= 0 && resumeProgress.currentQuestionIndex < questions.length)
+                    ? resumeProgress.currentQuestionIndex
+                    : 0;
+                setCurrentQuestionIndex(validIdx);
+                setUserAnswers(resumeProgress.userAnswers || new Array(questions.length).fill(null));
+                setTimer((resumeProgress.totalQuestions - validIdx) * secondsPerQuestion); 
+            } else {
+                setCurrentQuestionIndex(0);
+                setUserAnswers(new Array(questions.length).fill(null));
+                setTimer(questions.length * secondsPerQuestion);
+            }
+            
+            setShowResults(false);
+            navigateTo(View.Quiz);
+        };
+
+        // Always fetch the latest version of the exam from GitHub on start
+        setIsLoadingExam(true);
+        let freshQuestions: Question[] | null = null;
+        try {
+            let targetUrl = lesson.url;
+            if (subjectId === SubjectName.Math && chunkIndex !== undefined) {
+                targetUrl = getMathUrl(lesson, chunkIndex, unitTitle) || targetUrl;
+            } else if (!targetUrl) {
+                const subjectExams = getExamsForSubject(subjectId);
+                const examConfig = subjectExams.find(e => e.title === lesson.title);
+                targetUrl = examConfig?.url;
+            }
+
+            if (targetUrl) {
+                const res = await fetch(`${targetUrl}${targetUrl.includes('?') ? '&' : '?'}t=${Date.now()}`, { cache: 'no-store' });
+                if (res.ok) {
+                    const text = await res.text();
+                    const fetchedQuestions = cleanAndParseJson(text);
+                    if (fetchedQuestions && fetchedQuestions.length > 0) {
+                        updateDatabase(subjectId, lesson.title, fetchedQuestions, targetUrl, chunkIndex);
+                        saveToCache();
+                        setExamsUpdatedTrigger(prev => prev + 1);
+                        freshQuestions = fetchedQuestions;
+                    }
+                }
+            }
+        } catch (e) {
+            console.warn("[JoSchool DB] Failed to fetch fresh exam from GitHub, falling back to cached questions.", e);
+        } finally {
+            setIsLoadingExam(false);
         }
-        
-        setShowResults(false);
-        navigateTo(View.Quiz);
+
+        const questionsToUse = freshQuestions || getQuizzesForLesson(subjectId, lesson.title, chunkIndex);
+        if (!questionsToUse || questionsToUse.length === 0) {
+            alert('تعذر تحميل أسئلة الامتحان. يرجى التحقق من اتصالك بالإنترنت والمحاولة مجدداً.');
+            return;
+        }
+
+        launchQuizWithQuestions(questionsToUse);
     };
 
     const handleStartQuiz = (lesson: any, chunkIndex?: number, unitTitle?: string) => {
@@ -1064,61 +1499,129 @@ const App: React.FC = () => {
     const startUnitExam = async (unit: any, resumeProgress?: ExamProgress) => {
         if (!selectedSubject) return;
         
-        let questions = getQuizzesForUnit(selectedSubject.id as SubjectName, unit);
-        
-        // If not enough questions or not loaded, try to load all lessons in unit
-        if (questions.length === 0) {
-            setIsLoadingExam(true);
-            try {
-                const subjectExams = getExamsForSubject(selectedSubject.id as SubjectName);
-                const promises = unit.lessons.map(async (lesson: any) => {
-                    if (!examsDatabase[selectedSubject.id as SubjectName]?.[lesson.title]) {
-                        const examConfig = subjectExams.find(e => e.title === lesson.title);
-                        if (examConfig && examConfig.url) {
-                            const res = await fetch(examConfig.url);
-                            if (res.ok) {
-                                const text = await res.text();
-                                const fetchedQuestions = cleanAndParseJson(text);
-                                if (fetchedQuestions) {
-                                    updateDatabase(selectedSubject.id as SubjectName, lesson.title, fetchedQuestions);
-                                }
-                            }
-                        }
-                    }
-                });
-                await Promise.all(promises);
-                questions = getQuizzesForUnit(selectedSubject.id as SubjectName, unit);
-            } catch (e) {
-                console.error("Failed to load unit exam on demand", e);
-            } finally {
-                setIsLoadingExam(false);
-            }
-        }
-
-        if (questions.length === 0) return;
-
+        const subjectId = selectedSubject.id as SubjectName;
         const unitOrdinal = unit.title.split(':')[0];
         const isEnglish = selectedSubject?.id === SubjectName.English;
         const examLabel = isEnglish ? 'Exam (1)' : 'امتحان (1)';
         const fullLessonTitle = `${unitOrdinal} - ${examLabel}`;
 
-        setCurrentLessonTitle(fullLessonTitle);
-        setCurrentUnitTitle(unit.title);
-        setExamNumber(1);
-        setCurrentQuiz(questions);
-        
-        if (resumeProgress && resumeProgress.lessonTitle === fullLessonTitle) {
-            setCurrentQuestionIndex(resumeProgress.currentQuestionIndex);
-            setUserAnswers(resumeProgress.userAnswers);
-            setTimer((resumeProgress.totalQuestions - resumeProgress.currentQuestionIndex) * 60);
-        } else {
-            setCurrentQuestionIndex(0);
-            setUserAnswers(new Array(questions.length).fill(null));
-            setTimer(questions.length * 60); // 1 minute per question
+        const launchUnitExamWithQuestions = (questions: Question[]) => {
+            setCurrentLessonTitle(fullLessonTitle);
+            setCurrentUnitTitle(unit.title);
+            setExamNumber(1);
+            setCurrentQuiz(questions);
+            
+            const secondsPerQuestion = selectedSubject?.id === SubjectName.Math ? 240 : 60;
+            if (resumeProgress && resumeProgress.lessonTitle === fullLessonTitle) {
+                const validIdx = (typeof resumeProgress.currentQuestionIndex === 'number' && resumeProgress.currentQuestionIndex >= 0 && resumeProgress.currentQuestionIndex < questions.length)
+                    ? resumeProgress.currentQuestionIndex
+                    : 0;
+                setCurrentQuestionIndex(validIdx);
+                setUserAnswers(resumeProgress.userAnswers || new Array(questions.length).fill(null));
+                setTimer((resumeProgress.totalQuestions - validIdx) * secondsPerQuestion);
+            } else {
+                setCurrentQuestionIndex(0);
+                setUserAnswers(new Array(questions.length).fill(null));
+                setTimer(questions.length * secondsPerQuestion);
+            }
+
+            setShowResults(false);
+            navigateTo(View.Quiz);
+        };
+
+        // Always fetch the latest version of unit exam from GitHub on start
+        setIsLoadingExam(true);
+        try {
+            const semesterKey = `${selectedSubject.id}-${selectedSubject.semester}`;
+            const units = subjectIndexData[semesterKey] || subjectIndexData[selectedSubject.id] || [];
+            const uIdx = units.findIndex(u => u.title === unit.title);
+            
+            await Promise.all(unit.lessons.map(async (lesson: any, lIdx: number) => {
+                if (subjectId === SubjectName.Math) {
+                    if (uIdx !== -1) {
+                        const unitNum = selectedSubject.semester === Semester.First ? (uIdx + 1) : (uIdx + 5);
+                        const lessonNum = lIdx + 1;
+                        const semPrefix = selectedSubject.semester === Semester.First ? 's1' : 's2';
+                        const examsCount = (selectedSubject.semester === Semester.First && ((unitNum === 1 && (lessonNum === 1 || lessonNum === 2 || lessonNum === 3 || lessonNum === 4)) || (unitNum === 2 && (lessonNum === 1 || lessonNum === 2 || lessonNum === 3)) || (unitNum === 3 && (lessonNum === 1 || lessonNum === 2 || lessonNum === 3 || lessonNum === 4 || lessonNum === 5 || lessonNum === 6)))) ? 10 : 7;
+                        const examsToFetch = Array.from({ length: examsCount }, (_, i) => i + 1);
+                        await Promise.all(examsToFetch.map(async (examNum) => {
+                            const url = (selectedSubject.semester === Semester.First && unitNum === 1 && lessonNum === 1)
+                                ? `https://raw.githubusercontent.com/MashalMath/joschool-11-arabic-exams/JoSchool112010/Math11_s1_unit1_L1_E${examNum}.json`
+                                : (selectedSubject.semester === Semester.First && unitNum === 1 && lessonNum === 2)
+                                    ? `https://raw.githubusercontent.com/MashalMath/joschool-11-arabic-exams/JoSchool112010/Math11_s1_unit1_L2_E${examNum}.json`
+                                    : (selectedSubject.semester === Semester.First && unitNum === 1 && lessonNum === 3)
+                                        ? `https://raw.githubusercontent.com/MashalMath/joschool-11-arabic-exams/JoSchool112010/Math11_s1_unit1_L3_E${examNum}.json`
+                                        : (selectedSubject.semester === Semester.First && unitNum === 1 && lessonNum === 4)
+                                            ? `https://raw.githubusercontent.com/MashalMath/joschool-11-arabic-exams/JoSchool112010/Math11_s1_unit1_L4_E${examNum}.json`
+                                            : (selectedSubject.semester === Semester.First && unitNum === 2 && lessonNum === 1)
+                                                ? `https://raw.githubusercontent.com/MashalMath/joschool-11-arabic-exams/JoSchool112010/Math11_s1_unit2_L1_E${examNum}.json`
+                                                : (selectedSubject.semester === Semester.First && unitNum === 2 && lessonNum === 2)
+                                                    ? `https://raw.githubusercontent.com/MashalMath/joschool-11-arabic-exams/JoSchool112010/Math11_s1_unit2_L2_E${examNum}.json`
+                                                    : (selectedSubject.semester === Semester.First && unitNum === 2 && lessonNum === 3)
+                                                        ? `https://raw.githubusercontent.com/MashalMath/joschool-11-arabic-exams/JoSchool112010/Math11_s1_unit2_L3_E${examNum}.json`
+                                                        : (selectedSubject.semester === Semester.First && unitNum === 3 && lessonNum === 1)
+                                                            ? `https://raw.githubusercontent.com/MashalMath/joschool-11-arabic-exams/JoSchool112010/Math11_s1_unit3_L1_E${examNum}.json`
+                                                            : (selectedSubject.semester === Semester.First && unitNum === 3 && lessonNum === 2)
+                                                                ? `https://raw.githubusercontent.com/MashalMath/joschool-11-arabic-exams/JoSchool112010/Math11_s1_unit3_L2_E${examNum}.json`
+                                                                : (selectedSubject.semester === Semester.First && unitNum === 3 && lessonNum === 3)
+                                                                    ? `https://raw.githubusercontent.com/MashalMath/joschool-11-arabic-exams/JoSchool112010/Math11_s1_unit3_L3_E${examNum}.json`
+                                                                    : (selectedSubject.semester === Semester.First && unitNum === 3 && lessonNum === 4)
+                                                                        ? `https://raw.githubusercontent.com/MashalMath/joschool-11-arabic-exams/JoSchool112010/Math11_s1_unit3_L4_E${examNum}.json`
+                                                                        : (selectedSubject.semester === Semester.First && unitNum === 3 && lessonNum === 5)
+                                                                            ? `https://raw.githubusercontent.com/MashalMath/joschool-11-arabic-exams/JoSchool112010/Math11_s1_unit3_L5_E${examNum}.json`
+                                                                            : (selectedSubject.semester === Semester.First && unitNum === 3 && lessonNum === 6)
+                                                                                ? `https://raw.githubusercontent.com/MashalMath/joschool-11-arabic-exams/JoSchool112010/Math11_s1_unit3_L6_E${examNum}.json`
+                                                                                : `https://raw.githubusercontent.com/MashalMath/joschool-11-arabic-exams/Arabic-S1/Math_${semPrefix}_unit${unitNum}_L${lessonNum}_exam${examNum}.json`;
+                            try {
+                                const res = await fetch(`${url}?t=${Date.now()}`, { cache: 'no-store' });
+                                if (res.ok) {
+                                    const text = await res.text();
+                                    const fetchedQuestions = cleanAndParseJson(text);
+                                    if (fetchedQuestions && fetchedQuestions.length > 0) {
+                                        updateDatabase(subjectId, lesson.title, fetchedQuestions, url, examNum - 1);
+                                        setExamsUpdatedTrigger(prev => prev + 1);
+                                    }
+                                }
+                            } catch (err) {
+                                /* ignore error */
+                            }
+                        }));
+                    }
+                } else {
+                    const subjectExams = getExamsForSubject(subjectId);
+                    const examConfig = subjectExams.find(e => e.title === lesson.title);
+                    const targetUrl = lesson.url || examConfig?.url;
+                    if (targetUrl) {
+                        try {
+                            const res = await fetch(`${targetUrl}${targetUrl.includes('?') ? '&' : '?'}t=${Date.now()}`, { cache: 'no-store' });
+                            if (res.ok) {
+                                const text = await res.text();
+                                const fetchedQuestions = cleanAndParseJson(text);
+                                if (fetchedQuestions && fetchedQuestions.length > 0) {
+                                    updateDatabase(subjectId, lesson.title, fetchedQuestions, targetUrl);
+                                    setExamsUpdatedTrigger(prev => prev + 1);
+                                }
+                            }
+                        } catch (err) {
+                            /* ignore error */
+                        }
+                    }
+                }
+            }));
+            saveToCache();
+        } catch (e) {
+            console.error("Failed to load unit exam", e);
+        } finally {
+            setIsLoadingExam(false);
         }
 
-        setShowResults(false);
-        navigateTo(View.Quiz);
+        const questions = getQuizzesForUnit(subjectId, unit);
+        if (!questions || questions.length === 0) {
+            alert('تعذر تحميل أسئلة امتحان الوحدة. يرجى التحقق من اتصالك بالإنترنت والمحاولة مجدداً.');
+            return;
+        }
+
+        launchUnitExamWithQuestions(questions);
     };
 
     const handleStartUnitExam = (unit: any, uIdx: number) => {
@@ -1169,48 +1672,54 @@ const App: React.FC = () => {
 
     const handleStartComprehensiveExam = async () => {
         if (!selectedSubject) return;
-        let subjectData = examsDatabase[selectedSubject.id as SubjectName];
         
-        // If subject data is not loaded, try to load all exams for this subject
-        if (!subjectData || Object.keys(subjectData).length === 0) {
-            setIsLoadingExam(true);
-            try {
-                const subjectExams = getExamsForSubject(selectedSubject.id as SubjectName);
-                const promises = subjectExams.map(async (item) => {
-                    if (!item.url) return;
-                    if (!examsDatabase[selectedSubject.id as SubjectName]?.[item.title]) {
-                        const res = await fetch(item.url);
-                        if (res.ok) {
-                            const text = await res.text();
-                            const questions = cleanAndParseJson(text);
-                            if (questions) {
-                                updateDatabase(selectedSubject.id as SubjectName, item.title, questions);
-                            }
+        const subjectId = selectedSubject.id as SubjectName;
+
+        setIsLoadingExam(true);
+        const subjectExams = getExamsForSubject(subjectId);
+        try {
+            await Promise.all(subjectExams.map(async (item) => {
+                if (!item.url) return;
+                try {
+                    const res = await fetch(`${item.url}${item.url.includes('?') ? '&' : '?'}t=${Date.now()}`, { cache: 'no-store' });
+                    if (res.ok) {
+                        const text = await res.text();
+                        const questions = cleanAndParseJson(text);
+                        if (questions && questions.length > 0) {
+                            updateDatabase(subjectId, item.title, questions, item.url);
                         }
                     }
-                });
-                await Promise.all(promises);
-                subjectData = examsDatabase[selectedSubject.id as SubjectName];
-            } catch (e) {
-                console.error("Failed to load comprehensive exam on demand", e);
-            } finally {
-                setIsLoadingExam(false);
-            }
+                } catch (err) {
+                    /* ignore error */
+                }
+            }));
+            saveToCache();
+            setExamsUpdatedTrigger(prev => prev + 1);
+        } catch (e) {
+            console.error("Failed to load comprehensive exam", e);
+        } finally {
+            setIsLoadingExam(false);
         }
 
-        if (!subjectData) return;
+        const finalSubjectData = examsDatabase[subjectId];
+        if (!finalSubjectData) {
+            alert('تعذر تحميل أسئلة الامتحان الشامل. يرجى التحقق من اتصالك بالإنترنت والمحاولة مجدداً.');
+            return;
+        }
 
-        const allQuestions: Question[] = [];
-        Object.values(subjectData).forEach(lessonChunks => {
+        const finalAllQuestions: Question[] = [];
+        Object.values(finalSubjectData).forEach(lessonChunks => {
             lessonChunks.forEach(chunk => {
-                allQuestions.push(...chunk);
+                finalAllQuestions.push(...chunk);
             });
         });
 
-        if (allQuestions.length === 0) return;
+        if (finalAllQuestions.length === 0) {
+            alert('تعذر تحميل أسئلة الامتحان الشامل. يرجى التحقق من اتصالك بالإنترنت والمحاولة مجدداً.');
+            return;
+        }
 
-        // Shuffle and pick 40 questions
-        const shuffled = [...allQuestions].sort(() => 0.5 - Math.random());
+        const shuffled = [...finalAllQuestions].sort(() => 0.5 - Math.random());
         const selected = shuffled.slice(0, 40);
 
         const isEnglish = selectedSubject?.id === SubjectName.English;
@@ -1220,7 +1729,8 @@ const App: React.FC = () => {
         setCurrentQuestionIndex(0);
         setUserAnswers(new Array(selected.length).fill(null));
         setShowResults(false);
-        setTimer(40 * 60); // 40 minutes
+        const secondsPerQuestion = selectedSubject?.id === SubjectName.Math ? 240 : 60;
+        setTimer(selected.length * secondsPerQuestion);
         navigateTo(View.Quiz);
     };
 
@@ -1254,8 +1764,9 @@ const App: React.FC = () => {
         });
     }, [currentLessonTitle, setUserProgress, selectedSubject]);
 
+    const isTimerActive = timer > 0;
     useEffect(() => {
-        if (currentView === View.Quiz && !showResults && timer > 0) {
+        if (currentView === View.Quiz && !showResults && isTimerActive) {
             // Only start interval if not already running
             if (!timerRef.current) {
                 timerRef.current = setInterval(() => {
@@ -1280,7 +1791,7 @@ const App: React.FC = () => {
                 timerRef.current = null;
             }
         };
-    }, [currentView, showResults, handleFinish]); // Removed timer from deps
+    }, [currentView, showResults, handleFinish, isTimerActive]);
 
     const handleAnswer = (choice: string) => {
         const newAnswers = [...userAnswers];
@@ -1328,25 +1839,28 @@ const App: React.FC = () => {
         return `${m}:${s.toString().padStart(2, '0')}`;
     };
 
-    const startSessionExam = (title: string, questions: Question[], progress?: ExamProgress) => {
+    const startSessionExam = useCallback((title: string, questions: Question[], progress?: ExamProgress) => {
         setCurrentLessonTitle(title);
         setCurrentQuiz(questions);
         setCurrentUnitTitle(''); // Clear unit title for course exams
+        const secondsPerQuestion = (selectedSubject?.id === SubjectName.Math || title.includes("الرياضيات")) ? 240 : 60;
         if (progress && progress.currentQuestionIndex > 0) {
-            setCurrentQuestionIndex(progress.currentQuestionIndex);
-            setUserAnswers(progress.userAnswers);
-            setTimer((progress.totalQuestions - progress.currentQuestionIndex) * 60);
+            const validIdx = (typeof progress.currentQuestionIndex === 'number' && progress.currentQuestionIndex >= 0 && progress.currentQuestionIndex < questions.length)
+                ? progress.currentQuestionIndex
+                : 0;
+            setCurrentQuestionIndex(validIdx);
+            setUserAnswers(progress.userAnswers || new Array(questions.length).fill(null));
+            setTimer((progress.totalQuestions - validIdx) * secondsPerQuestion);
         } else {
             setCurrentQuestionIndex(0);
             setUserAnswers(new Array(questions.length).fill(null));
-            setTimer(questions.length * 60);
+            setTimer(questions.length * secondsPerQuestion);
         }
         setShowResults(false);
         navigateTo(View.Quiz);
-    };
+    }, [selectedSubject, navigateTo]);
 
     const handleStartMockExam = useCallback(async (subjectId: SubjectName) => {
-        // Find the subject object to set it as selected
         const subject = subjectsData.find(s => s.id === subjectId);
         if (subject) setSelectedSubject(subject);
 
@@ -1356,32 +1870,24 @@ const App: React.FC = () => {
             return;
         }
 
-        // Check if all exams are already loaded
-        const missingExams = allExams.filter(exam => {
-            const questions = getQuizzesForLesson(subjectId, exam.title);
-            return (!questions || questions.length === 0) || (exam as any).forceUpdate;
-        });
-
-        if (missingExams.length > 0) {
-            setIsLoadingExam(true);
-        }
+        setIsLoadingExam(true);
 
         try {
-            // Fetch all missing exams using Promise.all to load everything for the mock exam
             const fetchPromises = allExams.map(async (exam) => {
                 let questions = getQuizzesForLesson(subjectId, exam.title);
-                if (((!questions || questions.length === 0) || (exam as any).forceUpdate) && exam.url) {
+                if (exam.url) {
                     try {
-                        // If forceUpdate, clear it first
-                        if ((exam as any).forceUpdate && examsDatabase[subjectId]) {
-                            delete examsDatabase[subjectId]![exam.title];
-                        }
-                        const res = await fetch(exam.url);
-                        const text = await res.text();
-                        const qs = cleanAndParseJson(text);
-                        if (qs && qs.length > 0) {
-                            updateDatabase(subjectId, exam.title, qs);
-                            questions = qs;
+                        const res = await fetch(`${exam.url}${exam.url.includes('?') ? '&' : '?'}t=${Date.now()}`, {
+                            cache: 'no-store'
+                        });
+                        if (res.ok) {
+                            const text = await res.text();
+                            const qs = cleanAndParseJson(text);
+                            if (qs && qs.length > 0) {
+                                updateDatabase(subjectId, exam.title, qs, exam.url);
+                                setExamsUpdatedTrigger(prev => prev + 1);
+                                questions = qs;
+                            }
                         }
                     } catch (e) {
                         console.error(`Failed to fetch ${exam.title}`, e);
@@ -1391,44 +1897,34 @@ const App: React.FC = () => {
             });
 
             const results = await Promise.all(fetchPromises);
+            saveToCache();
             
-            // Sampling logic...
-            const guaranteedQuestions: Question[] = [];
-            const allRemainingQuestions: Question[] = [];
-            
-            // Filter out empty results
             const validResults = results.filter(r => r.questions.length > 0);
-
             if (validResults.length === 0) {
                 alert('عذراً، لم تتوفر أسئلة لهذا الامتحان حالياً.');
                 return;
             }
 
+            const guaranteedQuestions: Question[] = [];
+            const allRemainingQuestions: Question[] = [];
+
             validResults.forEach(res => {
-                // Pick one random guaranteed question from each lesson
                 const randomIndex = Math.floor(Math.random() * res.questions.length);
                 guaranteedQuestions.push(res.questions[randomIndex]);
-                
-                // Add others to pool for extra filling
                 const others = res.questions.filter((_, idx) => idx !== randomIndex);
                 allRemainingQuestions.push(...others);
             });
 
             let finalQuestions: Question[] = [];
             if (guaranteedQuestions.length >= 40) {
-                // If more than 40 lessons, pick 40 unique lessons randomly
-                finalQuestions = guaranteedQuestions
-                    .sort(() => Math.random() - 0.5)
-                    .slice(0, 40);
+                finalQuestions = guaranteedQuestions.sort(() => Math.random() - 0.5).slice(0, 40);
             } else {
-                // If fewer than 40 lessons, take all guaranteed then fill up to 40
                 finalQuestions = [...guaranteedQuestions];
                 const pool = allRemainingQuestions.sort(() => Math.random() - 0.5);
                 const needed = 40 - finalQuestions.length;
                 finalQuestions.push(...pool.slice(0, needed));
             }
 
-            // Final shuffle for the whole set
             finalQuestions = finalQuestions.sort(() => Math.random() - 0.5);
 
             const isEnglish = subjectId === SubjectName.English;
@@ -1443,15 +1939,23 @@ const App: React.FC = () => {
         } finally {
             setIsLoadingExam(false);
         }
-    }, [subjectsData, getExamsForSubject, getQuizzesForLesson, examsDatabase, startSessionExam]);
+    }, [getExamsForSubject, startSessionExam]);
 
-    const handleStartSessionExam = (subjectId: SubjectName, sessionName: string) => {
+    const handleStartSessionExam = async (subjectId: SubjectName, sessionName: string) => {
+        if ((sessionName === 'دورة 2008' || sessionName === 'دورة 2008 تكميلي') && subjectId === SubjectName.Math) {
+            showNotice(
+                'أقرت وزارة التربية والتعليم مادة الرياضيات لطلاب الصف الحادي عشر الأكاديمي جيل 2010 لأول مرة لهذا العام 2026/2027 لذلك لا يتوفر امتحانات وزارة سابقة',
+                'تنبيه',
+                'https://i.postimg.cc/XvYQrc5C/FB-IMG-1780984890803.jpg'
+            );
+            return;
+        }
+
         if (sessionName === 'الدورة التجريبية') {
             handleStartMockExam(subjectId);
             return;
         }
 
-        // Find the subject object to set it as selected
         const subject = subjectsData.find(s => s.id === subjectId);
         if (subject) setSelectedSubject(subject);
         
@@ -1463,57 +1967,55 @@ const App: React.FC = () => {
             return;
         }
 
-        // Handle forceUpdate for session exams
-        if (examInfo.forceUpdate) {
-            updateDatabase(subjectId, examInfo.title, []); // Clear cache
-        }
-
         const isEnglish = subjectId === SubjectName.English;
         const examLabel = isEnglish ? 'Exam (1)' : 'امتحان (1)';
         const fullLessonTitle = `${examInfo.title} - ${examLabel}`;
         const key = `${subjectId}_${fullLessonTitle}`;
         const existingProgress = userProgress.examProgresses?.[key];
 
-        const questions = getQuizzesForLesson(subjectId, examInfo.title);
+        const launchSessionExam = (qs: Question[]) => {
+            if (existingProgress && existingProgress.currentQuestionIndex > 0) {
+                setPendingExamData({ 
+                    lesson: { title: examInfo.title, questions: qs }, 
+                    isUnitExam: false, 
+                    progress: existingProgress,
+                    isSessionExam: true 
+                });
+                setShowResumeModal(true);
+            } else {
+                startSessionExam(fullLessonTitle, qs);
+            }
+        };
+
+        setIsLoadingExam(true);
+        let freshQuestions: Question[] | null = null;
+        try {
+            const res = await fetch(`${examInfo.url}${examInfo.url.includes('?') ? '&' : '?'}t=${Date.now()}`, {
+                cache: 'no-store'
+            });
+            if (res.ok) {
+                const text = await res.text();
+                const qs = cleanAndParseJson(text);
+                if (qs && qs.length > 0) {
+                    updateDatabase(subjectId, examInfo.title, qs, examInfo.url);
+                    saveToCache();
+                    setExamsUpdatedTrigger(prev => prev + 1);
+                    freshQuestions = qs;
+                }
+            }
+        } catch (e) {
+            console.warn("[JoSchool DB] Failed to fetch fresh session exam from GitHub, falling back to cached questions.", e);
+        } finally {
+            setIsLoadingExam(false);
+        }
+
+        const questions = freshQuestions || getQuizzesForLesson(subjectId, examInfo.title);
         if (!questions || questions.length === 0) {
-            setIsLoadingExam(true);
-            fetch(examInfo.url)
-                .then(res => res.text())
-                .then(text => {
-                    const qs = cleanAndParseJson(text);
-                    if (qs && qs.length > 0) {
-                        updateDatabase(subjectId, examInfo.title, qs);
-                        if (existingProgress && existingProgress.currentQuestionIndex > 0) {
-                            setPendingExamData({ 
-                                lesson: { title: examInfo.title, questions: qs }, 
-                                isUnitExam: false, 
-                                progress: existingProgress,
-                                isSessionExam: true 
-                            });
-                            setShowResumeModal(true);
-                        } else {
-                            startSessionExam(fullLessonTitle, qs);
-                        }
-                    } else {
-                        alert('عذراً، لم تتوفر أسئلة لهذا الامتحان حالياً.');
-                    }
-                })
-                .catch(() => alert('فشل تحميل الامتحان. يرجى المحاولة لاحقاً.'))
-                .finally(() => setIsLoadingExam(false));
+            alert('تعذر تحميل أسئلة الامتحان. يرجى التحقق من اتصالك بالإنترنت والمحاولة مجدداً.');
             return;
         }
 
-        if (existingProgress && existingProgress.currentQuestionIndex > 0) {
-            setPendingExamData({ 
-                lesson: { title: examInfo.title, questions: questions }, 
-                isUnitExam: false, 
-                progress: existingProgress,
-                isSessionExam: true 
-            });
-            setShowResumeModal(true);
-        } else {
-            startSessionExam(fullLessonTitle, questions);
-        }
+        launchSessionExam(questions);
     };
 
     const startQuizWithQuestions = (title: string, questions: Question[]) => {
@@ -1522,7 +2024,8 @@ const App: React.FC = () => {
         setCurrentQuestionIndex(0);
         setUserAnswers(new Array(questions.length).fill(null));
         setShowResults(false);
-        setTimer(questions.length * 60);
+        const secondsPerQuestion = (selectedSubject?.id === SubjectName.Math || title.includes("الرياضيات")) ? 240 : 60;
+        setTimer(questions.length * secondsPerQuestion);
         navigateTo(View.Quiz);
     };
 
@@ -1634,10 +2137,11 @@ const App: React.FC = () => {
             return;
         }
 
-        const questions = getQuizzesForLesson(subjectId, baseTitle);
+        const sessionExams = sessionName === 'دورة 2008' ? SESSION_2008_EXAMS : SESSION_2008_SUP_EXAMS;
+        const examInfo = sessionExams.find(e => e.subject === subjectId);
+        
+        const questions = examInfo && hasValidCache(subjectId, baseTitle, examInfo.url) ? getQuizzesForLesson(subjectId, baseTitle) : null;
         if (!questions || questions.length === 0) {
-            const sessionExams = sessionName === 'دورة 2008' ? SESSION_2008_EXAMS : SESSION_2008_SUP_EXAMS;
-            const examInfo = sessionExams.find(e => e.subject === subjectId);
             if (!examInfo || !examInfo.url) {
                 alert('عذراً، محتوى هذا الامتحان غير متوفر حالياً.');
                 return;
@@ -1649,7 +2153,8 @@ const App: React.FC = () => {
                 .then(text => {
                     const qs = cleanAndParseJson(text);
                     if (qs && qs.length > 0) {
-                        updateDatabase(subjectId, baseTitle, qs);
+                        updateDatabase(subjectId, baseTitle, qs, examInfo.url);
+                        setExamsUpdatedTrigger(prev => prev + 1);
                         setupResultView(qs);
                     } else {
                         alert('عذراً، لم نتمكن من استعادة أسئلة الامتحان.');
@@ -1660,7 +2165,7 @@ const App: React.FC = () => {
         } else {
             setupResultView(questions);
         }
-    }, [userProgress.quizResults, subjectsData, navigateTo, getExamsForSubject, getQuizzesForLesson]);
+    }, [userProgress.quizResults, navigateTo, getExamsForSubject]);
 
     const handleResetExamResult = (subjectId: SubjectName, lessonTitle: string) => {
         setUserProgress(prev => {
@@ -1691,7 +2196,7 @@ const App: React.FC = () => {
             SubjectName.JordanHistory,
             SubjectName.IslamicEducation,
             SubjectName.Arabic,
-            SubjectName.English
+            SubjectName.Math
         ];
 
         const sessionExams = sessionName === 'دورة 2008' ? SESSION_2008_EXAMS : SESSION_2008_SUP_EXAMS;
@@ -1710,7 +2215,7 @@ const App: React.FC = () => {
                 }
 
                 if (baseTitle) {
-                    const isEnglish = subjectId === SubjectName.English;
+                    const isEnglish = false;
                     const examLabel = isEnglish ? 'Exam (1)' : 'امتحان (1)';
                     const lessonTitle = `${baseTitle} - ${examLabel}`;
                     
@@ -1764,7 +2269,7 @@ const App: React.FC = () => {
                                 transition={{ duration: 1, repeat: Infinity, ease: "linear" }}
                             />
                             <div className="w-20 h-20 bg-white rounded-2xl p-2 shadow-sm border border-slate-100 flex items-center justify-center overflow-hidden">
-                                <img src="https://i.postimg.cc/y8GJVJ52/1777447368581.png" alt="JoSchool" className="w-full h-auto object-contain" />
+                                <img src={LOGO_DATA_URI} alt="JoSchool" className="w-full h-auto object-contain" />
                             </div>
                         </div>
                         <h3 className="text-2xl font-black text-slate-800 mb-2">جاري التحقق من الهوية...</h3>
@@ -1785,6 +2290,19 @@ const App: React.FC = () => {
             console.log("App: Rendering view:", safeView);
 
             switch (safeView) {
+                case View.Welcome:
+                    return (
+                        <WelcomePage 
+                            onStart={() => {
+                                const key = getStorageKey('has_seen_welcome', user?.uid);
+                                safeLocalStorageSetItem(key, 'true');
+                                safeLocalStorageSetItem('joschool_has_seen_welcome', 'true');
+                                isNavigatingBackRef.current = true;
+                                setViewHistory([View.Landing]);
+                                window.history.replaceState({ view: View.Landing, historyIndex: 0 }, '');
+                            }}
+                        />
+                    );
                 case View.Landing: 
                     return (
                         <LandingPage 
@@ -1821,11 +2339,13 @@ const App: React.FC = () => {
                             handleStartUnitExam={handleStartUnitExam}
                             handleStartComprehensiveExam={handleStartComprehensiveExam} 
                             openExternalBook={openExternalBook} 
+                            showNotice={showNotice}
                             navigateTo={navigateTo} 
                             onBack={goBack}
+                            examsUpdatedTrigger={examsUpdatedTrigger}
                         />
                     );
-                case View.Quiz: 
+                case View.Quiz: {
                     // Safety check for currentQuiz
                     if (!currentQuiz || currentQuiz.length === 0) {
                         console.warn("Quiz view active but currentQuiz is empty. Redirecting...");
@@ -1843,6 +2363,10 @@ const App: React.FC = () => {
                             </div>
                         );
                     }
+
+                    const safeQuestionIndex = (currentQuestionIndex >= 0 && currentQuestionIndex < currentQuiz.length)
+                        ? currentQuestionIndex
+                        : 0;
 
                     return showResults ? (
                         <ResultsPage 
@@ -1883,7 +2407,7 @@ const App: React.FC = () => {
                     ) : (
                         <QuizPage 
                             currentQuiz={currentQuiz} 
-                            currentQuestionIndex={currentQuestionIndex} 
+                            currentQuestionIndex={safeQuestionIndex} 
                             userAnswers={userAnswers as (string | undefined)[]} 
                             handleAnswer={handleAnswer} 
                             handleNext={handleNext} 
@@ -1900,6 +2424,7 @@ const App: React.FC = () => {
                             isFavoriteDisabled={!!sessionTitle}
                         />
                     );
+                }
                 case View.PdfViewer: 
                     return (
                         <PdfViewerScreen 
@@ -1939,7 +2464,7 @@ const App: React.FC = () => {
                                 if (subject) setSelectedSubject(subject);
                                 navigateTo(view);
                             }} 
-                            onBack={goToHome}
+                            onBack={goBack}
                             sessionTitle={sessionTitle}
                             handleStartSessionExam={handleStartSessionExam}
                             handleResetExamResult={handleResetExamResult}
@@ -1955,6 +2480,27 @@ const App: React.FC = () => {
                             userName={user?.displayName || ''}
                             onBack={goBack}
                             sessionTitle={sessionTitle}
+                        />
+                    );
+                case View.SessionsList:
+                    return (
+                        <SessionsListPage 
+                            navigateTo={(view, subject, title) => {
+                                if (subject) setSelectedSubject(subject);
+                                navigateTo(view, title);
+                            }}
+                            onBack={goToHome}
+                        />
+                    );
+                case View.Library:
+                    return (
+                        <LibraryPage 
+                            subjectsData={subjectsData}
+                            navigateTo={(view, subject, title) => {
+                                if (subject) setSelectedSubject(subject);
+                                navigateTo(view, title);
+                            }}
+                            onBack={goToHome}
                         />
                     );
                 default: 
@@ -2018,7 +2564,7 @@ const App: React.FC = () => {
                                     transition={{ duration: 1, repeat: Infinity, ease: "linear" }}
                                 />
                                 <div className="w-20 h-20 bg-white rounded-2xl p-2 shadow-sm border border-slate-100 flex items-center justify-center overflow-hidden">
-                                    <img src="https://i.postimg.cc/y8GJVJ52/1777447368581.png" alt="JoSchool" className="w-full h-auto object-contain" />
+                                    <img src={LOGO_DATA_URI} alt="JoSchool" className="w-full h-auto object-contain" />
                                 </div>
                             </div>
                             <h3 className="text-2xl font-black text-slate-800 mb-3">جاري تحضير الامتحان...</h3>
@@ -2028,7 +2574,7 @@ const App: React.FC = () => {
                 )}
             </AnimatePresence>
 
-            {user && ![View.Landing, View.Quiz, View.SubjectIndex, View.Results, View.SessionSubjects, View.Favorites].includes(currentView) && (
+            {user && ![View.Welcome, View.Landing, View.Quiz, View.SubjectIndex, View.Results, View.SessionSubjects, View.Favorites, View.SessionsList, View.Library].includes(currentView) && (
                 <button 
                     onClick={goBack}
                     className={`fixed top-4 z-[9999] p-3 bg-white border border-slate-900 rounded-full shadow-lg text-slate-600 hover:text-primary transition-all active:scale-95 
@@ -2177,7 +2723,44 @@ const App: React.FC = () => {
                 )}
             </AnimatePresence>
 
-            {showMultiBooksModal && <div className="fixed inset-0 z-[100] flex items-center justify-center p-6 bg-secondary/60 backdrop-blur-sm" dir="rtl"><div className="bg-white w-full max-w-xs rounded-xl p-8 shadow-2xl relative border-t-4 border-primary border border-slate-900"><button onClick={() => setShowMultiBooksModal(false)} className="absolute top-6 left-6 p-2 bg-app-bg rounded-full border border-slate-900"><XIcon className="w-5 h-5"/></button><h3 className="text-xl font-black text-text-main text-center mb-8 pt-2">اختر الكتاب</h3><div className="space-y-4">{selectedSubject?.multiBooks?.map((book, idx) => (<button key={idx} onClick={() => { window.open(book.url, '_blank'); setShowMultiBooksModal(false); }} className="w-full p-6 bg-app-bg border-2 border-slate-900 rounded-lg flex items-center gap-3 transition-all hover:bg-primary/5 group"><div className="w-10 h-10 bg-white rounded-lg flex items-center justify-center border border-slate-900"><BookOpenIcon className="w-5 h-5 text-primary" /></div><span className="text-base font-black text-text-main">{book.label}</span></button>))}</div></div></div>}
+            {showMultiBooksModal && (
+                <div className="fixed inset-0 z-[100] flex items-center justify-center p-6 bg-secondary/60 backdrop-blur-sm" dir="rtl">
+                    <div className="bg-white w-full max-w-sm rounded-xl p-8 shadow-2xl relative border-t-4 border-primary border border-slate-900">
+                        <button 
+                            onClick={() => setShowMultiBooksModal(false)} 
+                            className="absolute top-6 left-6 p-2 bg-app-bg rounded-full border border-slate-900 hover:bg-slate-100 transition-colors"
+                        >
+                            <XIcon className="w-5 h-5"/>
+                        </button>
+                        <h3 className="text-xl font-black text-text-main text-center mb-8 pt-2">اختر الكتاب</h3>
+                        <div className="space-y-4">
+                            {selectedSubject?.multiBooks?.map((book, idx) => (
+                                <button 
+                                    key={idx} 
+                                    onClick={() => { window.open(book.url, '_blank'); setShowMultiBooksModal(false); }} 
+                                    className="w-full p-4 bg-white border-r-[6px] border-sky-400 border-l border-t border-b border-sky-400 shadow-md shadow-sky-400/30 rounded-2xl flex items-center gap-3 transition-all duration-100 hover:scale-[1.01] active:scale-[0.99] hover:shadow-lg hover:shadow-sky-400/40 group whitespace-nowrap touch-manipulation"
+                                >
+                                    {book.coverImage ? (
+                                        <div className="w-10 h-14 bg-white rounded-md overflow-hidden flex items-center justify-center border border-slate-900 shadow-sm shrink-0">
+                                            <img 
+                                                src={book.coverImage} 
+                                                alt={book.label} 
+                                                className="w-full h-full object-cover" 
+                                                referrerPolicy="no-referrer"
+                                            />
+                                        </div>
+                                    ) : (
+                                        <div className="w-10 h-10 bg-white rounded-lg flex items-center justify-center border border-slate-200 shadow-sm shrink-0">
+                                            <BookOpenIcon className="w-5 h-5 text-primary" />
+                                        </div>
+                                    )}
+                                    <span className="text-base font-black text-text-main">{book.label}</span>
+                                </button>
+                            ))}
+                        </div>
+                    </div>
+                </div>
+            )}
 
             <AnimatePresence>
                 {showResumeModal && (
@@ -2223,6 +2806,37 @@ const App: React.FC = () => {
                     </motion.div>
                 )}
             </AnimatePresence>
+
+            {noticeModal?.show && (
+                <div className="fixed inset-0 z-[2000] flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm animate-fast-fade" dir="rtl">
+                    <div className="bg-white w-full max-w-sm rounded-[2.5rem] p-6 shadow-2xl border-2 border-slate-900 relative text-center">
+                        <button 
+                            onClick={() => setNoticeModal(null)} 
+                            className="absolute top-4 left-4 p-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-full transition-colors border border-slate-300"
+                        >
+                            <XIcon className="w-5 h-5"/>
+                        </button>
+                        <div className="w-16 h-16 rounded-full overflow-hidden border border-slate-900 shadow-md mx-auto mb-3 flex items-center justify-center bg-white shrink-0">
+                            <img 
+                                src={noticeModal.imageUrl || "https://i.postimg.cc/XvYQrc5C/FB-IMG-1780984890803.jpg"} 
+                                alt="شعار التنبيه" 
+                                className="w-full h-full object-cover"
+                                referrerPolicy="no-referrer"
+                            />
+                        </div>
+                        <h3 className="text-xl font-black text-slate-900 mb-3">{noticeModal.title || "تنبيه"}</h3>
+                        <p className="text-slate-700 font-bold text-sm leading-relaxed mb-6 px-2">
+                            {noticeModal.message}
+                        </p>
+                        <button 
+                            onClick={() => setNoticeModal(null)}
+                            className="w-full py-3.5 bg-slate-900 hover:bg-slate-800 text-white rounded-2xl font-black shadow-lg transition-all active:scale-95 text-sm"
+                        >
+                            حسناً، فهمت
+                        </button>
+                    </div>
+                </div>
+            )}
         </div>
     );
 };

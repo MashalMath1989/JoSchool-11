@@ -1,12 +1,54 @@
 import React, { useState } from 'react';
 import { ClockIcon, TrophyIcon, CheckCircleIcon, CheckIcon, StarIcon, BookmarkIcon, UserIcon } from './data/Icons';
 import { UserProgress } from './types';
+import {
+    ResponsiveContainer,
+    AreaChart,
+    Area,
+    BarChart,
+    Bar,
+    XAxis,
+    YAxis,
+    CartesianGrid,
+    Tooltip,
+    Legend,
+    ReferenceLine
+} from 'recharts';
 
 interface ProgressDashboardProps {
     userProgress: UserProgress;
     setUserProgress: React.Dispatch<React.SetStateAction<UserProgress>>;
     goBack?: () => void;
 }
+
+const CustomTooltip = ({ active, payload, label }: any) => {
+    if (active && payload && payload.length) {
+        return (
+            <div className="bg-slate-900 text-white p-3 rounded-xl border border-slate-700 shadow-xl text-right text-xs font-bold leading-relaxed" dir="rtl">
+                <p className="font-extrabold text-[#3b82f6] mb-1.5">{label}</p>
+                <div className="space-y-1">
+                    {payload.map((p: any, i: number) => {
+                        if (p.value === 0) return null;
+                        return (
+                            <p key={i} className="flex items-center justify-between gap-4">
+                                <span className="opacity-80 font-bold">{p.name}:</span>
+                                <span className="font-black" style={{ color: p.color || p.fill }}>{p.value} سؤال</span>
+                            </p>
+                        );
+                    })}
+                    <div className="h-px bg-slate-700 my-1"></div>
+                    <p className="flex items-center justify-between gap-4 font-black text-white">
+                        <span>المجموع:</span>
+                        <span>
+                            {payload.reduce((sum: number, p: any) => sum + (typeof p.value === 'number' ? p.value : 0), 0)} سؤال
+                        </span>
+                    </p>
+                </div>
+            </div>
+        );
+    }
+    return null;
+};
 
 const ProgressDashboard: React.FC<ProgressDashboardProps> = ({
     userProgress,
@@ -24,6 +66,192 @@ const ProgressDashboard: React.FC<ProgressDashboardProps> = ({
     const [phoneNumber, setPhoneNumber] = useState(profile.phoneNumber || '');
     const [isSaving, setIsSaving] = useState(false);
     const [saveMessage, setSaveMessage] = useState('');
+    const [chartMode, setChartMode] = useState<'area' | 'bar'>('area');
+    const [useDemoData, setUseDemoData] = useState<boolean>(() => {
+        return !userProgress.quizResults || userProgress.quizResults.length === 0;
+    });
+
+    const getWeeklyChartData = () => {
+        const last7Days = [];
+        const today = new Date();
+        for (let i = 6; i >= 0; i--) {
+            const d = new Date();
+            d.setDate(today.getDate() - i);
+            last7Days.push(d);
+        }
+
+        const weekdaysArabic = ['الأحد', 'الاثنين', 'الثلاثاء', 'الأربعاء', 'الخميس', 'الجمعة', 'السبت'];
+        
+        if (useDemoData) {
+            const mockValues = [
+                { "تاريخ الأردن": 12, "التربية الإسلامية": 8, "اللغة العربية": 5, "الرياضيات": 10 },
+                { "تاريخ الأردن": 5, "التربية الإسلامية": 15, "اللغة العربية": 12, "الرياضيات": 8 },
+                { "تاريخ الأردن": 18, "التربية الإسلامية": 0, "اللغة العربية": 15, "الرياضيات": 5 },
+                { "تاريخ الأردن": 0, "التربية الإسلامية": 20, "اللغة العربية": 8, "الرياضيات": 12 },
+                { "تاريخ الأردن": 10, "التربية الإسلامية": 12, "اللغة العربية": 18, "الرياضيات": 15 },
+                { "تاريخ الأردن": 15, "التربية الإسلامية": 10, "اللغة العربية": 22, "الرياضيات": 20 },
+                { "تاريخ الأردن": 20, "التربية الإسلامية": 14, "اللغة العربية": 10, "الرياضيات": 25 },
+            ];
+
+            return last7Days.map((date, idx) => {
+                const dayName = weekdaysArabic[date.getDay()];
+                const label = `${dayName} ${date.getDate()}/${date.getMonth() + 1}`;
+                const mock = mockValues[idx];
+                const total = mock["تاريخ الأردن"] + mock["التربية الإسلامية"] + mock["اللغة العربية"] + mock["الرياضيات"];
+                return {
+                    name: label,
+                    dateObj: date,
+                    ...mock,
+                    "المجموع الكلي": total
+                };
+            });
+        }
+
+        return last7Days.map((date) => {
+            const dayName = weekdaysArabic[date.getDay()];
+            const label = `${dayName} ${date.getDate()}/${date.getMonth() + 1}`;
+            
+            const resultsOnDay = userProgress.quizResults.filter(r => {
+                if (!r.date) return false;
+                const rDate = new Date(r.date);
+                return rDate.getFullYear() === date.getFullYear() &&
+                       rDate.getMonth() === date.getMonth() &&
+                       rDate.getDate() === date.getDate();
+            });
+
+            let jordanHistory = 0;
+            let islamicEducation = 0;
+            let arabic = 0;
+            let math = 0;
+
+            resultsOnDay.forEach(r => {
+                const sub = r.subjectId;
+                const qCount = r.totalQuestions || 0;
+                
+                if (sub === "تاريخ الأردن") {
+                    jordanHistory += qCount;
+                } else if (sub === "التربية الإسلامية") {
+                    islamicEducation += qCount;
+                } else if (sub === "اللغة العربية") {
+                    arabic += qCount;
+                } else if (sub === "الرياضيات") {
+                    math += qCount;
+                } else {
+                    const cleanSub = String(sub).toLowerCase();
+                    if (cleanSub.includes('history') || cleanSub.includes('تاريخ')) {
+                        jordanHistory += qCount;
+                    } else if (cleanSub.includes('islamic') || cleanSub.includes('إسلام')) {
+                        islamicEducation += qCount;
+                    } else if (cleanSub.includes('arabic') || cleanSub.includes('عرب')) {
+                        arabic += qCount;
+                    } else if (cleanSub.includes('math') || cleanSub.includes('رياض')) {
+                        math += qCount;
+                    } else {
+                        jordanHistory += qCount;
+                    }
+                }
+            });
+
+            const total = jordanHistory + islamicEducation + arabic + math;
+
+            return {
+                name: label,
+                dateObj: date,
+                "تاريخ الأردن": jordanHistory,
+                "التربية الإسلامية": islamicEducation,
+                "اللغة العربية": arabic,
+                "الرياضيات": math,
+                "المجموع الكلي": total
+            };
+        });
+    };
+
+    const chartData = getWeeklyChartData();
+    const totalWeeklySolved = chartData.reduce((acc, curr) => acc + curr["المجموع الكلي"], 0);
+
+    // Reminder preferences loaded from local storage
+    const [reminderEnabled, setReminderEnabled] = useState<boolean>(() => {
+        try {
+            return localStorage.getItem('joschool_study_reminder_enabled') === 'true';
+        } catch {
+            return false;
+        }
+    });
+    const [reminderTime, setReminderTime] = useState<string>(() => {
+        try {
+            return localStorage.getItem('joschool_study_reminder_time') || '18:00';
+        } catch {
+            return '18:00';
+        }
+    });
+    const [reminderTone, setReminderTone] = useState<string>(() => {
+        try {
+            return localStorage.getItem('joschool_study_reminder_tone') || 'motivational';
+        } catch {
+            return 'motivational';
+        }
+    });
+
+    const [testNotificationText, setTestNotificationText] = useState('');
+    const [showTestBanner, setShowTestBanner] = useState(false);
+
+    const handleToggleReminder = async (checked: boolean) => {
+        setReminderEnabled(checked);
+        try {
+            localStorage.setItem('joschool_study_reminder_enabled', String(checked));
+        } catch (e) {
+            console.warn('LocalStorage error:', e);
+        }
+        
+        try {
+            if (checked && 'Notification' in window) {
+                if (Notification.permission === 'default') {
+                    await Notification.requestPermission();
+                }
+            }
+        } catch (e) {
+            console.log('Notification permission request or access not allowed inside sandboxed template:', e);
+        }
+    };
+
+    const handleTestReminder = async (e?: React.MouseEvent) => {
+        if (e) {
+            e.preventDefault();
+            e.stopPropagation();
+        }
+
+        const message = reminderTone === 'motivational'
+            ? '💪 بطلنا المستقبل ينتظرك! حان وقت المذاكرة ومراجعة دروسك اليوم لتحقيق أحلامك وتفوقك! ✨'
+            : reminderTone === 'challenging'
+            ? '🔥 تحدي اليوم قد بدأ! ربع ساعة من التركيز تصنع فارقاً عظيماً في نتيجتك النهائية. أثبت لنفسك قوتك! 🎯'
+            : '📚 تفوقك غايتنا. خذ نفساً عميقاً، وابدأ بالاطلاع على دروسك اليوم بخطوات واثقة وهادئة. 🌸';
+
+        setTestNotificationText(message);
+        setShowTestBanner(true);
+
+        // Standard notification if permission was allowed
+        try {
+            if ('Notification' in window) {
+                const perm = Notification.permission;
+                if (perm === 'granted') {
+                    new Notification('تذكير الدراسة اليومي 🎓', {
+                        body: message,
+                        referrerPolicy: 'no-referrer'
+                    });
+                } else if (perm !== 'denied') {
+                    const permission = await Notification.requestPermission();
+                    if (permission === 'granted') {
+                        new Notification('تذكير الدراسة اليومي 🎓', {
+                            body: message,
+                            referrerPolicy: 'no-referrer'
+                        });
+                    }
+                }
+            }
+        } catch (err) {
+            console.log('Direct desktop Notification blocked in iframe, fallback to UI banner is active.', err);
+        }
+    };
 
     const totalLessons = userProgress.completedLessons.length;
     const allQuizResults = userProgress.quizResults;
@@ -48,6 +276,14 @@ const ProgressDashboard: React.FC<ProgressDashboardProps> = ({
         setIsSaving(true);
         setSaveMessage('');
         
+        try {
+            localStorage.setItem('joschool_study_reminder_enabled', String(reminderEnabled));
+            localStorage.setItem('joschool_study_reminder_time', reminderTime);
+            localStorage.setItem('joschool_study_reminder_tone', reminderTone);
+        } catch (err) {
+            console.error('Failed to save reminder preferences to localStorage', err);
+        }
+
         setTimeout(() => {
             setUserProgress(prev => ({
                 ...prev,
@@ -61,7 +297,7 @@ const ProgressDashboard: React.FC<ProgressDashboardProps> = ({
                 }
             }));
             setIsSaving(false);
-            setSaveMessage('تم حفظ البيانات بنجاح! ✨');
+            setSaveMessage('تم حفظ إعدادات الدراسة والبيانات بنجاح! ✨');
             
             // Clear message after 3 seconds
             setTimeout(() => {
@@ -224,6 +460,90 @@ const ProgressDashboard: React.FC<ProgressDashboardProps> = ({
                             />
                         </div>
 
+                        {/* إعدادات تذكير الدراسة (الأجهزة والتنبيهات) */}
+                        <div className="bg-slate-50/50 p-5 rounded-xl border border-slate-900 space-y-4 text-right pt-4 mt-6">
+                            <h4 className="text-xs font-black text-slate-800 flex items-center gap-2 pb-2 border-b border-slate-200">
+                                <span className="text-lg leading-none select-none">🔔</span>
+                                إعدادات التنبيهات وتذكير الدراسة اليومي
+                            </h4>
+
+                            {showTestBanner && (
+                                <div className="bg-[#f0f9ff] border-r-4 border-primary p-3 rounded-lg text-right text-xs font-bold text-slate-800 animate-pulse relative border border-slate-200">
+                                    <div className="font-extrabold text-primary mb-1">🔔 تنبيه تجريبي للمذاكرة:</div>
+                                    {testNotificationText}
+                                    <button 
+                                        type="button" 
+                                        onClick={() => setShowTestBanner(false)}
+                                        className="absolute top-2 left-2 text-slate-600 hover:text-slate-900 font-extrabold"
+                                    >
+                                        ✕
+                                    </button>
+                                </div>
+                            )}
+
+                            <div className="flex items-center justify-between gap-4 py-2 bg-white px-3.5 py-3 rounded-lg border border-slate-900 shadow-sm">
+                                <div className="text-right">
+                                    <span className="block text-xs font-black text-text-main">تفعيل منبه المذاكرة</span>
+                                    <span className="block text-[9px] font-bold text-text-sub mt-0.5">ستتلقى تذكيرًا يوميًا لمراجعة دروسك</span>
+                                </div>
+                                <button
+                                    id="reminder-toggle-btn"
+                                    type="button"
+                                    onClick={() => handleToggleReminder(!reminderEnabled)}
+                                    className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-slate-900 transition-colors duration-200 ease-in-out focus:outline-none ${
+                                        reminderEnabled ? 'bg-primary' : 'bg-slate-300'
+                                    }`}
+                                >
+                                    <span
+                                        className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow-md border border-slate-900 ring-0 transition duration-200 ease-in-out ${
+                                            reminderEnabled ? '-translate-x-5' : 'translate-x-0'
+                                        }`}
+                                    />
+                                </button>
+                            </div>
+
+                            {reminderEnabled && (
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 animate-fade-in duration-200">
+                                    <div>
+                                        <label className="block text-xs font-black text-text-sub mb-1">وقت التنبيه المفضل</label>
+                                        <input
+                                            id="reminder-time-input"
+                                            type="time"
+                                            value={reminderTime}
+                                            onChange={(e) => setReminderTime(e.target.value)}
+                                            className="w-full px-4 py-2 bg-white border border-slate-900 rounded-lg text-sm text-text-main font-bold focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary text-center"
+                                        />
+                                    </div>
+                                    <div>
+                                        <label className="block text-xs font-black text-text-sub mb-1">أسلوب رسالة التذكير</label>
+                                        <select
+                                            id="reminder-tone-select"
+                                            value={reminderTone}
+                                            onChange={(e) => setReminderTone(e.target.value)}
+                                            className="w-full px-4 py-2.5 bg-white border border-slate-900 rounded-lg text-xs text-text-main font-black focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary text-right"
+                                        >
+                                            <option value="motivational" className="font-bold">💪 حماسي وتشجيعي</option>
+                                            <option value="challenging" className="font-bold">🎯 تحدي ومثابرة</option>
+                                            <option value="calm" className="font-bold">🌸 هادئ ومتزن</option>
+                                        </select>
+                                    </div>
+                                </div>
+                            )}
+
+                            {reminderEnabled && (
+                                <div className="flex gap-2 justify-end pt-1">
+                                    <button
+                                        id="test-reminder-btn"
+                                        type="button"
+                                        onClick={(e) => handleTestReminder(e)}
+                                        className="text-[10px] font-black text-slate-800 bg-white border border-slate-900 rounded-lg px-3.5 py-2 shadow-sm hover:bg-slate-100 transition-all active:scale-[0.98] inline-flex items-center gap-1.5"
+                                    >
+                                        <span>📢 تجربة التنبيه الآن</span>
+                                    </button>
+                                </div>
+                            )}
+                        </div>
+
                         {/* زر الحفظ */}
                         <div className="pt-4">
                             <button
@@ -249,20 +569,173 @@ const ProgressDashboard: React.FC<ProgressDashboardProps> = ({
             ) : (
                 /* Achievements Tab (Original Progress Dashboard) */
                 <>
-                    <div className="grid grid-cols-2 gap-4 mb-8">
-                        <div className="bg-white p-6 rounded-xl shadow-md border-b-4 border-primary text-center border border-slate-900">
-                            <div className="w-12 h-12 bg-primary/10 text-primary rounded-lg flex items-center justify-center mx-auto mb-4">
-                                <ClockIcon className="w-6 h-6" />
+                    <div className="grid grid-cols-2 gap-2 sm:gap-4 mb-8">
+                        <div className="bg-white p-3 sm:p-6 rounded-xl shadow-md border-b-4 border-primary text-center border border-slate-900 flex flex-col justify-between">
+                            <div className="w-10 h-10 sm:w-12 sm:h-12 bg-primary/10 text-primary rounded-lg flex items-center justify-center mx-auto mb-3">
+                                <ClockIcon className="w-5 h-5 sm:w-6 sm:h-6" />
                             </div>
-                            <div className="text-sm font-black text-text-main leading-tight">{formatTime(userProgress.totalTimeSpent)}</div>
-                            <div className="text-[9px] font-bold text-text-sub mt-1">وقت التعلم الكلي</div>
+                            <div className="text-[10px] sm:text-xs md:text-sm font-black text-slate-800 leading-tight break-all">{formatTime(userProgress.totalTimeSpent)}</div>
+                            <div className="text-[8px] sm:text-[9px] font-bold text-text-sub mt-1">وقت التعلم الكلي</div>
                         </div>
-                        <div className="bg-white p-6 rounded-xl shadow-md border-b-4 border-accent text-center border border-slate-900">
-                            <div className="w-12 h-12 bg-accent/10 text-accent rounded-lg flex items-center justify-center mx-auto mb-4">
-                                <TrophyIcon className="w-6 h-6" />
+                        <div className="bg-white p-3 sm:p-6 rounded-xl shadow-md border-b-4 border-accent text-center border border-slate-900 flex flex-col justify-between">
+                            <div className="w-10 h-10 sm:w-12 sm:h-12 bg-accent/10 text-accent rounded-lg flex items-center justify-center mx-auto mb-3">
+                                <TrophyIcon className="w-5 h-5 sm:w-6 sm:h-6" />
                             </div>
-                            <div className="text-sm font-black text-text-main leading-tight">{averagePercentage}%</div>
-                            <div className="text-[9px] font-bold text-text-sub mt-1">معدل الإنجاز</div>
+                            <div className="text-[10px] sm:text-xs md:text-sm font-black text-slate-800 leading-tight">{averagePercentage}%</div>
+                            <div className="text-[8px] sm:text-[9px] font-bold text-text-sub mt-1">معدل الإنجاز</div>
+                        </div>
+                    </div>
+
+                    {/* قسم الإحصائيات الرسم البياني للأسبوع الماضي */}
+                    <div className="bg-white p-6 rounded-xl shadow-md border border-slate-900 mb-6 text-right select-none">
+                        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-6 pb-4 border-b border-slate-100">
+                            <div>
+                                <h3 className="text-sm font-black text-slate-900 flex items-center gap-2">
+                                    <span className="text-base leading-none select-none">📈</span>
+                                    تحليل وإحصائيات المذاكرة الأسبوعية
+                                </h3>
+                                <p className="text-[9px] font-bold text-slate-500 mt-1">تتبع عدد الأسئلة التي قمت بحلها في كل مادة خلال الأيام الـ 7 الماضية</p>
+                            </div>
+                            
+                            {/* زر تبديل محاكاة البيانات */}
+                            <button
+                                type="button"
+                                onClick={() => setUseDemoData(!useDemoData)}
+                                className={`text-[9px] font-black px-3 py-1.5 rounded-full border border-slate-900 shadow-sm transition-all active:scale-[0.98] flex items-center gap-1.5 ${
+                                    useDemoData 
+                                        ? 'bg-amber-100 text-amber-800 font-extrabold' 
+                                        : 'bg-slate-100 text-slate-700 hover:bg-slate-200 font-bold'
+                                }`}
+                            >
+                                <span>{useDemoData ? '💡 وضع المعاينة بالتوضيح' : '🌐 وضع بياناتك الحقيقية'}</span>
+                            </button>
+                        </div>
+
+                        {/* أزرار تبديل نمط الرسم البياني */}
+                        <div className="flex bg-slate-100 p-1 rounded-lg border border-slate-200 mb-6 max-w-[280px] mr-auto">
+                            <button
+                                type="button"
+                                onClick={() => setChartMode('area')}
+                                className={`flex-1 py-1 px-2.5 text-center text-[10px] font-black rounded-md transition-all ${
+                                    chartMode === 'area'
+                                        ? 'bg-primary text-white shadow-sm border border-slate-900/10'
+                                        : 'text-slate-600 hover:text-slate-800'
+                                }`}
+                            >
+                                📈 التقدم الزمني
+                            </button>
+                            <button
+                                type="button"
+                                onClick={() => setChartMode('bar')}
+                                className={`flex-1 py-1 px-2.5 text-center text-[10px] font-black rounded-md transition-all ${
+                                    chartMode === 'bar'
+                                        ? 'bg-primary text-white shadow-sm border border-slate-900/10'
+                                        : 'text-slate-600 hover:text-slate-800'
+                                }`}
+                            >
+                                📊 توزيع المواد
+                            </button>
+                        </div>
+
+                        {/* مساحة الرسم البياني */}
+                        <div className="w-full h-60 relative my-2 pr-1" dir="ltr">
+                            {chartMode === 'area' ? (
+                                <ResponsiveContainer width="100%" height="100%">
+                                    <AreaChart
+                                        data={chartData}
+                                        margin={{ top: 10, right: 10, left: -25, bottom: 0 }}
+                                    >
+                                        <defs>
+                                            <linearGradient id="colorTotal" x1="0" y1="0" x2="0" y2="1">
+                                                <stop offset="5%" stopColor="#3b82f6" stopOpacity={0.4}/>
+                                                <stop offset="95%" stopColor="#3b82f6" stopOpacity={0.0}/>
+                                            </linearGradient>
+                                        </defs>
+                                        <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" />
+                                        <XAxis 
+                                            dataKey="name" 
+                                            stroke="#64748b" 
+                                            fontSize={8} 
+                                            fontWeight="900"
+                                            tickLine={false}
+                                        />
+                                        <YAxis 
+                                            stroke="#64748b" 
+                                            fontSize={8} 
+                                            fontWeight="900"
+                                            tickLine={false}
+                                        />
+                                        <Tooltip content={<CustomTooltip />} />
+                                        <Area 
+                                            name="الأسئلة المحلولة" 
+                                            type="monotone" 
+                                            dataKey="المجموع الكلي" 
+                                            stroke="#3b82f6" 
+                                            strokeWidth={3}
+                                            fillOpacity={1} 
+                                            fill="url(#colorTotal)" 
+                                        />
+                                        {/* خط مرجعي مستهدف ومميز */}
+                                        <ReferenceLine 
+                                            y={15} 
+                                            stroke="#ef4444" 
+                                            strokeDasharray="4 4" 
+                                        />
+                                    </AreaChart>
+                                </ResponsiveContainer>
+                            ) : (
+                                <ResponsiveContainer width="100%" height="100%">
+                                    <BarChart
+                                        data={chartData}
+                                        margin={{ top: 10, right: 10, left: -25, bottom: 0 }}
+                                    >
+                                        <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" />
+                                        <XAxis 
+                                            dataKey="name" 
+                                            stroke="#64748b" 
+                                            fontSize={8} 
+                                            fontWeight="900"
+                                            tickLine={false}
+                                        />
+                                        <YAxis 
+                                            stroke="#64748b" 
+                                            fontSize={8} 
+                                            fontWeight="900"
+                                            tickLine={false}
+                                        />
+                                        <Tooltip content={<CustomTooltip />} />
+                                        <Legend 
+                                            verticalAlign="top" 
+                                            height={32} 
+                                            iconSize={6}
+                                            iconType="circle"
+                                            wrapperStyle={{ fontSize: 8, fontWeight: '900', direction: 'rtl' }}
+                                        />
+                                        <Bar name="تاريخ الأردن" dataKey="تاريخ الأردن" stackId="sub" fill="#f59e0b" />
+                                        <Bar name="التربية الإسلامية" dataKey="التربية الإسلامية" stackId="sub" fill="#0ea5e9" />
+                                        <Bar name="اللغة العربية" dataKey="اللغة العربية" stackId="sub" fill="#10b981" />
+                                        <Bar name="الرياضيات" dataKey="الرياضيات" stackId="sub" fill="#8b5cf6" radius={[4, 4, 0, 0]} />
+                                    </BarChart>
+                                </ResponsiveContainer>
+                            )}
+                        </div>
+
+                        {/* ملخص إرشاد ذكي */}
+                        <div className="bg-slate-50 border border-slate-200 p-4 rounded-xl mt-4 flex items-start gap-3">
+                            <span className="text-sm select-none">💡</span>
+                            <div className="space-y-1">
+                                <h4 className="text-xs font-black text-slate-800">تحليل الأداء للأسبوع الماضي</h4>
+                                <p className="text-[10px] text-slate-600 font-bold leading-relaxed">
+                                    لقد قمت بحل ما مجموعه <span className="text-primary font-black">{totalWeeklySolved} سؤالاً</span> في مختلف المواد خلال الأيام السبعة الماضية.
+                                    {totalWeeklySolved > 100 ? (
+                                        <span> رائع جداً! استمر بهذا الجهد والتركيز العالي، أنت على الطريق الصحيح للتميز والتفوق التام في الثانوية العامة! 🚀</span>
+                                    ) : totalWeeklySolved > 40 ? (
+                                        <span> عمل ممتاز! أنت تحقق تقدماً ثابتاً وملحوظاً، حاول زيادة جهودك اليومية قليلاً للاستحواذ على كامل المادة. ⭐️</span>
+                                    ) : (
+                                        <span> التفوق يأتي بالاستمرارية والتنظيم؛ حدد وقتاً ثابتاً للدراسة يومياً وحافظ على حل الأسئلة والامتحانات المتاحة لكل درس. 🌱</span>
+                                    )}
+                                </p>
+                            </div>
                         </div>
                     </div>
 

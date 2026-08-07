@@ -7,30 +7,38 @@ export const subjectsData: Subject[] = [
     coverImage: 'https://i.postimg.cc/PfB5Smtw/1760536062333-tarykh-alardn.jpg',
     fontClass: 'font-naskh',
     semester: Semester.First,
-    textbookUrl: 'https://drive.google.com/file/d/1S9QTEgpTzZTKKkRdTF0OdDmwQNJFvvxS/view?usp=drivesdk',
+    textbookUrl: 'https://drive.google.com/file/d/1-5IWseH8MExm_MR-KDbKEGTWJCKY6GC0/view?usp=drivesdk',
   },
   {
     id: SubjectName.IslamicEducation,
     coverImage: 'https://i.postimg.cc/gcf2gvY8/1760541071199-aslamyt-11.png',
     fontClass: 'font-naskh',
     semester: Semester.First,
-    textbookUrl: 'https://drive.google.com/file/d/1Fv17znBl9OEKStLMgBvNdECtouiivOiB/view?usp=drivesdk',
+    textbookUrl: 'https://drive.google.com/file/d/1ZRukAOqbsOtpvxBH3RvvJV9EPZJpdLZD/view?usp=drivesdk',
   },
   {
     id: SubjectName.Arabic,
     coverImage: 'https://i.postimg.cc/J79zpb1X/1760540922343-g11.png',
     fontClass: 'font-naskh',
     semester: Semester.First,
-    textbookUrl: 'https://drive.google.com/file/d/1O7zMWn_hGQ-HnsLUZIZm-g68jDDEULCo/view?usp=drivesdk',
+    textbookUrl: 'https://drive.google.com/file/d/1dQFbEowEXkoqv7mZwpaA_IwgEQntJnkG/view?usp=drivesdk',
   },
   {
-    id: SubjectName.English,
-    coverImage: 'https://i.postimg.cc/3rPxtgK2/1760541032985-1760540938507-s11.png',
+    id: SubjectName.Math,
+    coverImage: 'https://i.postimg.cc/15jsZyZM/1783092537930.png',
     fontClass: 'font-sans',
     semester: Semester.First,
     multiBooks: [
-      { label: "Student's Book", url: "https://drive.google.com/file/d/1ZHbhPBZH49_W_HxffR4kV4fBzToMODkU/view?usp=drivesdk" },
-      { label: "Workbook", url: "https://drive.google.com/file/d/1Msvajg0yTe06B8v8NgsiHFirjZJfqeF4/view?usp=drivesdk" }
+      {
+        label: 'الرياضيات(الطالب) ف1',
+        url: 'https://drive.google.com/file/d/17iEYQ6eOWE6fwJgmmI9Cam8_FciL6U8R/view?usp=drivesdk',
+        coverImage: 'https://i.postimg.cc/wMyQGGbz/IMG-20260703-233010-710.jpg'
+      },
+      {
+        label: 'الرياضيات(التمارين) ف1',
+        url: 'https://drive.google.com/file/d/1ed-FVlTrDK8iiWpxAp4zeGkHCJb2yOGc/view?usp=drivesdk',
+        coverImage: 'https://i.postimg.cc/9Mzkc1NL/IMG-20260703-233023-163.jpg'
+      }
     ]
   },
 
@@ -40,31 +48,24 @@ export const subjectsData: Subject[] = [
     coverImage: 'https://i.postimg.cc/ZqcRFFCB/IMG-20260317-205243-209.png',
     fontClass: 'font-naskh',
     semester: Semester.Second,
-    textbookUrl: 'https://drive.google.com/file/d/1aIJZ_nI_rqg9DdFEqqe1wvd45EUVH3MW/preview',
   },
   {
     id: SubjectName.IslamicEducation,
     coverImage: 'https://i.postimg.cc/Gp8R9FvH/IMG-20260317-205816-520.png',
     fontClass: 'font-naskh',
     semester: Semester.Second,
-    textbookUrl: 'https://drive.google.com/file/d/1pFrCSZnSY0iFinv4NKZTiIDg2NMyxNaw/view?usp=drivesdk',
   },
   {
     id: SubjectName.Arabic,
     coverImage: 'https://i.postimg.cc/L5CcDhpX/IMG_20260317_200321_670.png',
     fontClass: 'font-naskh',
     semester: Semester.Second,
-    textbookUrl: 'https://drive.google.com/file/d/1nv6jN5R14is3YuYLCUGWk8alegG10tTE/view?usp=drivesdk',
   },
   {
-    id: SubjectName.English,
-    coverImage: 'https://i.postimg.cc/Wpxzs4Z8/IMG_20260317_201514_910.png',
+    id: SubjectName.Math,
+    coverImage: 'https://i.postimg.cc/0NNGWZMB/1785101340866.png',
     fontClass: 'font-sans',
     semester: Semester.Second,
-    multiBooks: [
-      { label: "Student's Book", url: "https://drive.google.com/file/d/16pYv1Rl04Lj-kjdQDP7HG9e5lwjiS6ko/view?usp=drivesdk" },
-      { label: "Workbook", url: "https://drive.google.com/file/d/1-s-kCsPeAFcifdvNn8oTIkRophhSQT2S/view?usp=drivesdk" }
-    ]
   },
 ];
 
@@ -73,11 +74,11 @@ export const subjectIndexData: SubjectIndexData = {
     {
       title: 'الوحدة الأولى: "وَاعْتَصِمُوا بِحَبْلِ اللَّهِ جَمِيعًا"',
       lessons: [
-        { title: 'الدرس الأول: سورة آل عمران الآيات الكريمة (١٠٢–١٠٥) – صفحة 6', page: 6 },
-        { title: 'الدرس الثاني: الحديث الشريف: اتقاء الشبهات – صفحة 12', page: 12 },
+        { title: 'الدرس الأول: سورة آل عمران، الآيات الكريمة (١٠٢–١٠٥) – صفحة 6', page: 6 },
+        { title: 'الدرس الثاني: الحديث الشريف: اتقاء الشُّبُهات – صفحة 12', page: 12 },
         { title: 'الدرس الثالث: من صور الضلال – صفحة 20', page: 20 },
         { title: 'الدرس الرابع: كرامة الإنسان في الشريعة الإسلامية – صفحة 26', page: 26 },
-        { title: 'الدرس الخامس: الزواج: مشروعيته ومقدماته – صفحة 31', page: 31 },
+        { title: 'الدرس الخامس: الزواج: مشروعيته، ومُقَدِّماته – صفحة 31', page: 31 },
         { title: 'الدرس السادس: الجهاد في الإسلام – صفحة 37', page: 37 },
       ],
     },
@@ -86,33 +87,33 @@ export const subjectIndexData: SubjectIndexData = {
       lessons: [
         { title: 'الدرس الأول: جهود علماء المسلمين في خدمة القرآن الكريم – صفحة 44', page: 44 },
         { title: 'الدرس الثاني: العزيمة والرخصة – صفحة 50', page: 50 },
-        { title: 'الدرس الثالث: معركة مؤتة (8 هـ) – صفحة 56', page: 56 },
-        { title: 'الدرس الرابع: المحرّمات من النساء – صفحة 61', page: 61 },
-        { title: 'الدرس الخامس: التعايش الإنساني – صفحة 67', page: 67 },
-        { title: 'الدرس السادس: الحقوق الاجتماعية للمرأة في الإسلام – صفحة 73', page: 73 },
+        { title: 'الدرس الثالث: معركة مؤتة (8 هـ) – صفحة 55', page: 55 },
+        { title: 'الدرس الرابع: المحرّمات من النساء – صفحة 60', page: 60 },
+        { title: 'الدرس الخامس: التعايش الإنساني – صفحة 66', page: 66 },
+        { title: 'الدرس السادس: الحقوق المالية للمرأة في الإسلام – صفحة 72', page: 72 },
       ],
     },
     {
       title: 'الوحدة الثالثة: "وَقُلْ جَاءَ الْحَقُّ وَزَهَقَ الْبَاطِلُ"',
       lessons: [
-        { title: 'الدرس الأول: سورة آل عمران الآيات الكريمة (169–174) – صفحة 81', page: 81 },
-        { title: 'الدرس الثاني: الحديث الشريف: رضا الله تعالى – صفحة 87', page: 87 },
-        { title: 'الدرس الثالث: فتح مكة (8 هـ) – صفحة 93', page: 93 },
-        { title: 'الدرس الرابع: من خصائص الشريعة الإسلامية: الإيجابية – صفحة 99', page: 99 },
-        { title: 'الدرس الخامس: شروط صحة عقد الزواج – صفحة 105', page: 105 },
-        { title: 'الدرس السادس: الحقوق المالية للمرأة في الإسلام – صفحة 110', page: 110 },
+        { title: 'الدرس الأول: سورة آل عمران، الآيات الكريمة (١٦٩–١٧٤) – صفحة 77', page: 77 },
+        { title: 'الدرس الثاني: الحديث الشريف: رضا الله تعالى – صفحة 83', page: 83 },
+        { title: 'الدرس الثالث: فتح مكة (8 هـ) – صفحة 89', page: 89 },
+        { title: 'الدرس الرابع: من خصائص الشريعة الإسلامية: الإيجابية – صفحة 95', page: 95 },
+        { title: 'الدرس الخامس: شروط صِحَّة عَقْدِ الزواج – صفحة 100', page: 100 },
+        { title: 'الدرس السادس: الحقوق الاجتماعية للمرأة في الإسلام – صفحة 105', page: 105 },
       ],
     },
     {
       title: 'الوحدة الرابعة: "لِتَسْكُنُوا إِلَيْهَا"',
       lessons: [
-        { title: 'الدرس الأول: سورة الروم الآيات الكريمة (21–24) – صفحة 115', page: 115 },
-        { title: 'الدرس الثاني: مكانة السنة النبوية الشريفة في التشريع الإسلامي – صفحة 120', page: 120 },
-        { title: 'الدرس الثالث: مراعاة الأعراف في الشريعة الإسلامية – صفحة 128', page: 128 },
-        { title: 'الدرس الرابع: حقوق الزوجين في الإسلام – صفحة 134', page: 134 },
-        { title: 'الدرس الخامس: تنظيم النسل وتحديده – صفحة 141', page: 141 },
-        { title: 'الدرس السادس: الأمن الغذائي في الإسلام – صفحة 146', page: 146 },
-        { title: 'الدرس السابع: الإسلام والوحدة الوطنية – صفحة 152', page: 152 },
+        { title: 'الدرس الأول: سورة الروم، الآيات الكريمة (٢١–٢٤) – صفحة 112', page: 112 },
+        { title: 'الدرس الثاني: مكانة السنة النبوية الشريفة في التشريع الإسلامي – صفحة 117', page: 117 },
+        { title: 'الدرس الثالث: مراعاة الأعراف في الشريعة الإسلامية – صفحة 124', page: 124 },
+        { title: 'الدرس الرابع: حقوق الزوجين في الإسلام – صفحة 130', page: 130 },
+        { title: 'الدرس الخامس: تنظيم النسل وتحديده – صفحة 137', page: 137 },
+        { title: 'الدرس السادس: الأمن الغذائي في الإسلام – صفحة 141', page: 141 },
+        { title: 'الدرس السابع: الإسلام والوحدة الوطنية – صفحة 146', page: 146 },
       ],
     },
   ],
@@ -170,27 +171,27 @@ export const subjectIndexData: SubjectIndexData = {
       lessons: [
         { title: 'الدرس الأول: الأردن في العصور الحجرية – صفحة 8', page: 8 },
         { title: 'الدرس الثاني: الأردن في العصر الحديدي – صفحة 16', page: 16 },
-        { title: 'الدرس الثالث: مملكة الأنباط – صفحة 22', page: 22 },
-        { title: 'الدرس الرابع: مظاهر الحضارتين اليونانية والرومانية–البيزنطية في الأردن – صفحة 31', page: 31 },
+        { title: 'الدرس الثالث: مملكة الأنباط – صفحة 21', page: 21 },
+        { title: 'الدرس الرابع: مظاهر الحضارتين اليونانية والرومانية–البيزنطية في الأردن – صفحة 29', page: 29 },
       ],
     },
     {
-      title: 'الوحدة الثانية: الأردن في العصور الإسلامية (صفحة 44)',
+      title: 'الوحدة الثانية: الأردن في العصور الإسلامية (صفحة 42)',
       lessons: [
-        { title: 'الدرس الأول: الأردن في صدر الإسلام – صفحة 46', page: 46 },
-        { title: 'الدرس الثاني: الأردن في العصرين الأموي والعباسي – صفحة 56', page: 56 },
-        { title: 'الدرس الثالث: الأردن خلال حملات الفرنجة – صفحة 66', page: 66 },
-        { title: 'الدرس الرابع: الأردن في العصر الأيوبي – صفحة 72', page: 72 },
-        { title: 'الدرس الخامس: الأردن في العصر المملوكي – صفحة 77', page: 77 },
+        { title: 'الدرس الأول: الأردن في صدر الإسلام – صفحة 44', page: 44 },
+        { title: 'الدرس الثاني: الأردن في العصرين الأموي والعباسي – صفحة 53', page: 53 },
+        { title: 'الدرس الثالث: الأردن خلال حملات الفرنجة – صفحة 62', page: 62 },
+        { title: 'الدرس الرابع: الأردن في العصر الأيوبي – صفحة 68', page: 68 },
+        { title: 'الدرس الخامس: الأردن في العصر المملوكي – صفحة 73', page: 73 },
       ],
     },
     {
-      title: 'الوحدة الثالثة: الأردن في العصر الحديث (صفحة 86)',
+      title: 'الوحدة الثالثة: الأردن في العصر الحديث (صفحة 80)',
       lessons: [
-        { title: 'الدرس الأول: الأوضاع السياسية والإدارية في الأردن في العهد العثماني – صفحة 88', page: 88 },
-        { title: 'الدرس الثاني: الأوضاع الاجتماعية والاقتصادية في الأردن في العهد العثماني – صفحة 94', page: 94 },
-        { title: 'الدرس الثالث: الثورة العربية الكبرى (النهضة العربية) – صفحة 105', page: 105 },
-        { title: 'الدرس الرابع: الأردن في عهد المملكة العربية السورية والحكومات المحلية – صفحة 118', page: 118 },
+        { title: 'الدرس الأول: الأوضاع السياسية والإدارية في الأردن في العهد العثماني – صفحة 82', page: 82 },
+        { title: 'الدرس الثاني: الأوضاع الاجتماعية والاقتصادية في الأردن في العهد العثماني – صفحة 88', page: 88 },
+        { title: 'الدرس الثالث: الثورة العربية الكبرى (النهضة العربية) – صفحة 98', page: 98 },
+        { title: 'الدرس الرابع: الأردن في عهد المملكة العربية السورية والحكومات المحلية – صفحة 111', page: 111 },
       ],
     },
   ],
@@ -241,68 +242,82 @@ export const subjectIndexData: SubjectIndexData = {
   ],
   [SubjectName.Arabic]: [
     {
-      title: 'الوِحْدَةُ الأُولَى: مِنَ القِيَمِ الإِنْسَانِيَّةِ فِي القُرْآنِ',
-      lessons: Array.from({ length: 12 }, (_, i) => ({ title: `الوحدة الأولى - امتحان ${i + 1}`, page: 10 + i }))
+      title: 'الوِحْدَةُ الأُولَى: مِنَ القِيَمِ الإِنْسَانِيَّةِ فِي القُرْآنِ الكَرِيمِ (صَفْحَةُ 6)',
+      lessons: Array.from({ length: 10 }, (_, i) => ({ title: `الوحدة الأولى - امتحان ${i + 1}`, page: 6 })),
     },
     {
-      title: 'الوِحْدَةُ الثَّانِيَةُ: فِي حُبِّ الوَطَنِ',
-      lessons: Array.from({ length: 12 }, (_, i) => ({ title: `الوحدة الثانية - امتحان ${i + 1}`, page: 25 + i }))
+      title: 'الوِحْدَةُ الثَّانِيَةُ: فِي حُبِّ الوَطَنِ (صَفْحَةُ 28)',
+      lessons: Array.from({ length: 10 }, (_, i) => ({ title: `الوحدة الثانية - امتحان ${i + 1}`, page: 28 })),
     },
     {
-      title: 'الوِحْدَةُ الثَّالِثَةُ: أَمْرَاضُ العَصْرِ',
-      lessons: Array.from({ length: 13 }, (_, i) => ({ title: `الوحدة الثالثة - امتحان ${i + 1}`, page: 40 + i }))
+      title: 'الوِحْدَةُ الثَّالِثَةُ: أَمْرَاضُ العَصْرِ (صَفْحَةُ 48)',
+      lessons: Array.from({ length: 10 }, (_, i) => ({ title: `الوحدة الثالثة - امتحان ${i + 1}`, page: 48 })),
     },
     {
-      title: 'الوِحْدَةُ الرَّابِعَةُ: الإِعْلامُ الرَّقْمِيُّ',
-      lessons: Array.from({ length: 13 }, (_, i) => ({ title: `الوحدة الرابعة - امتحان ${i + 1}`, page: 55 + i }))
+      title: 'الوِحْدَةُ الرَّابِعَةُ: الإِعْلَامُ الرَّقْمِيُّ (صَفْحَةُ 68)',
+      lessons: Array.from({ length: 10 }, (_, i) => ({ title: `الوحدة الرابعة - امتحان ${i + 1}`, page: 68 })),
     },
     {
-      title: 'الوِحْدَةُ الخَامِسَةُ: التَّعْلِيمُ التِّقَنِيُّ بَوَّابَةُ المُسْتَقْبَلِ',
-      lessons: Array.from({ length: 14 }, (_, i) => ({ title: `الوحدة الخامسة - امتحان ${i + 1}`, page: 70 + i }))
-    }
+      title: 'الوِحْدَةُ الخَامِسَةُ: مِنَ الأَدَبِ الوَاقِعِيِّ (صَفْحَةُ 92)',
+      lessons: Array.from({ length: 10 }, (_, i) => ({ title: `الوحدة الخامسة - امتحان ${i + 1}`, page: 92 })),
+    },
   ],
-  [SubjectName.English]: [
+  [SubjectName.Math]: [
     {
-      title: 'Unit 01 – Get the message',
-      lessons: Array.from({ length: 10 }, (_, i) => ({ title: `Unit 01 - Exam ${i + 1}`, page: 1 + i }))
+      title: 'الوحدة الأولى: الاقترانات والمقادير الجبرية (صفحة 6)',
+      lessons: [
+        { title: 'الدرس الأول: الاقترانات المتشعبة – صفحة 8', page: 8 },
+        { title: 'الدرس الثاني: حل معادلات القيمة المطلقة ومتبايناتها – صفحة 19', page: 19 },
+        { title: 'الدرس الثالث: نظريتا الباقي والعوامل – صفحة 26', page: 26 },
+        { title: 'الدرس الرابع: الكسور الجزئية – صفحة 39', page: 39 },
+      ],
     },
     {
-      title: 'Unit 02 – Looking ahead',
-      lessons: Array.from({ length: 10 }, (_, i) => ({ title: `Unit 02 - Exam ${i + 1}`, page: 11 + i }))
+      title: 'الوحدة الثانية: الاقترانات المثلثية (صفحة 50)',
+      lessons: [
+        { title: 'الدرس الأول: قياس الزاوية بالراديان – صفحة 52', page: 52 },
+        { title: 'الدرس الثاني: الاقترانات المثلثية – صفحة 63', page: 63 },
+        { title: 'الدرس الثالث: تمثيل الاقترانات الجيبية بيانياً – صفحة 76', page: 76 },
+      ],
     },
     {
-      title: 'Unit 03 – Influences',
-      lessons: Array.from({ length: 10 }, (_, i) => ({ title: `Unit 03 - Exam ${i + 1}`, page: 21 + i }))
+      title: 'الوحدة الثالثة: النهايات والمشتقات (صفحة 92)',
+      lessons: [
+        { title: 'الدرس الأول: النهايات والاتصال – صفحة 94', page: 94 },
+        { title: 'الدرس الثاني: الاشتقاق – صفحة 108', page: 108 },
+        { title: 'الدرس الثالث: القيم العظمى والصغرى – صفحة 119', page: 119 },
+        { title: 'الدرس الرابع: المشتقة الثانية وتطبيقاتها – صفحة 128', page: 128 },
+        { title: 'الدرس الخامس: تطبيقات القيم القصوى – صفحة 137', page: 137 },
+        { title: 'الدرس السادس: قاعدة السلسلة – صفحة 148', page: 148 },
+      ],
     },
-    {
-      title: 'Unit 04 – Inside story',
-      lessons: Array.from({ length: 10 }, (_, i) => ({ title: `Unit 04 - Exam ${i + 1}`, page: 31 + i }))
-    },
-    {
-      title: 'Unit 05 – Making sense of the senses',
-      lessons: Array.from({ length: 10 }, (_, i) => ({ title: `Unit 05 - Exam ${i + 1}`, page: 41 + i }))
-    }
   ],
-  [`${SubjectName.English}-${Semester.Second}`]: [
+  [`${SubjectName.Math}-${Semester.Second}`]: [
     {
-      title: 'Unit 06 – Where we live',
-      lessons: Array.from({ length: 10 }, (_, i) => ({ title: `Unit 06 - Exam ${i + 1}`, page: 51 + i }))
+      title: 'الوحدة الخامسة: حساب المثلثات',
+      lessons: [
+        { title: 'الدرس الأول: المتطابقات المثلثية (1) — صفحة 6', page: 6 },
+        { title: 'الدرس الثاني: المتطابقات المثلثية (2) — صفحة 12', page: 12 },
+        { title: 'الدرس الثالث: حل المعادلات المثلثية — صفحة 18', page: 18 },
+        { title: 'الدرس الرابع: الاقترانات المثلثية وتمثيلها البياني — صفحة 24', page: 24 },
+        { title: 'الدرس الخامس: الاقتران العكسي للاقترانات المثلثية — صفحة 30', page: 30 },
+        { title: 'الدرس السادس: تطبيقات في حساب المثلثات — صفحة 36', page: 36 },
+      ],
     },
     {
-      title: 'Unit 07 – Is it fair?',
-      lessons: Array.from({ length: 10 }, (_, i) => ({ title: `Unit 07 - Exam ${i + 1}`, page: 61 + i }))
+      title: 'الوحدة السادسة: المتتاليات والمتسلسلات',
+      lessons: [
+        { title: 'الدرس الأول: المتتاليات — صفحة 46', page: 46 },
+        { title: 'الدرس الثاني: المتسلسلات ورمز المجموع — صفحة 52', page: 52 },
+        { title: 'الدرس الثالث: المتتاليات والمتسلسلات الحسابية — صفحة 58', page: 58 },
+      ],
     },
     {
-      title: 'Unit 08 – Digital perspectives',
-      lessons: Array.from({ length: 10 }, (_, i) => ({ title: `Unit 08 - Exam ${i + 1}`, page: 71 + i }))
+      title: 'الوحدة السابعة: الهندسة الفضائية',
+      lessons: [
+        { title: 'الدرس الأول: المسلمات والمفاهيم الفضائية — صفحة 74', page: 74 },
+        { title: 'الدرس الثاني: توازي المستقيمات والمستويات وتعامدها — صفحة 80', page: 80 },
+      ],
     },
-    {
-      title: 'Unit 09 – Highs and lows',
-      lessons: Array.from({ length: 10 }, (_, i) => ({ title: `Unit 09 - Exam ${i + 1}`, page: 81 + i }))
-    },
-    {
-      title: 'Unit 10 – Culture vulture',
-      lessons: Array.from({ length: 10 }, (_, i) => ({ title: `Unit 10 - Exam ${i + 1}`, page: 91 + i }))
-    }
   ],
 };

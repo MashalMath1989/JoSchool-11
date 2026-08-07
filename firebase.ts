@@ -1,7 +1,14 @@
 import { getApps, getApp, initializeApp } from 'firebase/app';
 import { getAuth, GoogleAuthProvider } from 'firebase/auth';
-import { initializeFirestore, getFirestore, doc, getDocFromServer } from 'firebase/firestore';
+import { initializeFirestore, getFirestore, doc, getDocFromServer, setLogLevel } from 'firebase/firestore';
 import firebaseConfig from './firebase-applet-config.json';
+
+// Silence Firestore internal log warnings/errors (especially connection failure/offline warning logs in sandbox iframes)
+try {
+    setLogLevel('silent');
+} catch (e) {
+    // ignore
+}
 
 // Initialize App safely by checking if an instance already exists (prevents Fast Refresh/HMR errors)
 let app;
@@ -50,14 +57,14 @@ async function testConnection() {
         if (isPermissionError) {
             console.log("Firestore reachable (Permission Denied). This indicates a successful network connection.");
         } else if (error instanceof Error && (error.message.includes('the client is offline') || error.message.includes('failed-precondition') || (error as any).code === 'unavailable')) {
-            console.error("Please check your Firebase configuration (Project ID, API Key) or internet connection. Connectivity to Firestore failed (unavailable).");
-            console.error("Diagnostic info:", {
+            console.warn("Firestore is operating in offline/cached mode. Local offline access active. Connectivity details: unavailable.");
+            console.info("Diagnostic info:", {
                 projectId: firebaseConfig.projectId,
                 authDomain: firebaseConfig.authDomain,
                 databaseId: (firebaseConfig as any).firestoreDatabaseId || '(default)'
             });
         } else {
-            console.error("Firestore connection test error:", error);
+            console.warn("Firestore connection test status:", error);
         }
     }
 }

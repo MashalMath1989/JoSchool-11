@@ -5,7 +5,12 @@
     <meta charset="UTF-8" />
     <link rel="icon" type="image/svg+xml" href="/vite.svg" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
-    <title>JoSchool 11</title>
+    <title>JoSchool 11 — منصة الامتحانات التفاعلية</title>
+    <meta name="description" content="تطبيق JoSchool11 - المنصة التعليمية التفاعلية لطلاب الأول ثانوي في الأردن (منهاج 2026/2027 الجديد). امتحانات تفاعلية، ملخصات، وبنوك أسئلة شاملة." />
+    <meta name="theme-color" content="#0ea5e9" />
+    <meta property="og:title" content="JoSchool 11 — منصة الامتحانات التفاعلية" />
+    <meta property="og:description" content="تطبيق JoSchool11 لطلاب الصف الأول ثانوي الأردني - بنوك أسئلة وامتحانات تفاعلية وفق المنهاج الجديد." />
+    <meta property="og:type" content="website" />
     <script src="https://cdn.tailwindcss.com"></script>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -74,6 +79,30 @@
       }
       .font-naskh { font-family: var(--font-body); }
       .font-sans { font-family: var(--font-heading); }
+      
+      .ltr-math {
+        direction: ltr !important;
+        unicode-bidi: isolate !important;
+        display: inline-block;
+        max-width: 100%;
+        overflow: visible !important;
+        vertical-align: middle;
+        --math-font-size: clamp(9.5px, 3.4vw, 0.85em);
+      }
+      
+      .katex, .katex * {
+        direction: ltr !important;
+        unicode-bidi: isolate !important;
+        letter-spacing: normal !important;
+        word-spacing: normal !important;
+        text-indent: 0 !important;
+      }
+      .katex-html {
+        direction: ltr !important;
+        unicode-bidi: isolate !important;
+        display: inline-block !important;
+        white-space: nowrap !important;
+      }
       
       /* تحسين الحركة لتكون بدون وميض تماماً */
       @keyframes fast-fade {

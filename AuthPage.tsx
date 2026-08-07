@@ -3,6 +3,7 @@ import { auth, googleProvider } from './firebase';
 import { signInWithEmailAndPassword, createUserWithEmailAndPassword, updateProfile, signInWithRedirect, getRedirectResult, signInWithPopup } from 'firebase/auth';
 import { motion } from 'framer-motion';
 import { AlertCircle } from 'lucide-react';
+import { LOGO_DATA_URI } from './logoDataUri';
 
 const AuthPage: React.FC = () => {
     const [isLogin, setIsLogin] = useState(true);
@@ -150,12 +151,13 @@ const AuthPage: React.FC = () => {
                 <div className="text-center mb-4 flex flex-col items-center">
                     <div className="w-20 h-20 mb-2 mt-0 flex items-center justify-center border border-slate-900 rounded-2xl p-2 bg-white shadow-sm">
                         <img 
-                            src="https://i.postimg.cc/y8GJVJ52/1777447368581.png" 
+                            src={LOGO_DATA_URI} 
                             alt="JoSchool 11" 
                             className="w-full h-auto object-contain"
                         />
                     </div>
-                    <p className="text-slate-400 font-bold text-[10px]">المسار الأكاديمي 11 . جيل 2009</p>
+                    <p className="text-slate-400 font-bold text-[10px]">المسار الأكاديمي 11 . جيل 2010</p>
+                    <p className="text-slate-400 font-bold text-[10px] mt-0.5">منهاج 2027/2026</p>
                 </div>
 
                 {error && (

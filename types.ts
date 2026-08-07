@@ -2,6 +2,7 @@
 import React from 'react';
 
 export enum View {
+  Welcome,
   Landing,
   Textbooks,
   EnglishBooks,
@@ -14,10 +15,12 @@ export enum View {
   Favorites,
   MoEResults,
   Announcements,
+  SessionsList,
+  Library,
 }
 
 export enum Grade {
-  Eleventh = 2009,
+  Eleventh = 2010,
 }
 
 export enum Semester {
@@ -28,7 +31,7 @@ export enum Semester {
 export enum SubjectName {
   JordanHistory = "تاريخ الأردن",
   IslamicEducation = "التربية الإسلامية",
-  English = "اللغة الإنجليزية",
+  Math = "الرياضيات",
   Arabic = "اللغة العربية",
 }
 
@@ -38,18 +41,29 @@ export interface Subject {
   fontClass: 'font-naskh' | 'font-sans';
   semester: Semester;
   textbookUrl?: string;
-  multiBooks?: { label: string; url: string }[];
+  multiBooks?: { label: string; url: string; coverImage?: string }[];
+}
+
+export interface LessonResource {
+  resourceTitle?: string;
+  type: 'video' | 'pdf' | 'image' | string;
+  url: string;
 }
 
 export interface Lesson {
   title: string;
   page: number;
+  lessonId?: string;
+  resources?: LessonResource[];
 }
 
 export interface Unit {
+  unitId?: string;
+  unitTitle?: string;
   title: string;
   lessons: Lesson[];
   imageUrl?: string;
+  resources?: LessonResource[];
 }
 
 export interface SubjectIndexData {
@@ -63,6 +77,7 @@ export interface Question {
   correct_answer: string;
   page: string;
   source_text: string;
+  explanation?: string;
 }
 
 export interface QuizResult {
@@ -98,6 +113,7 @@ export interface UserProgress {
   examProgresses: Record<string, ExamProgress>;
   totalTimeSpent: number; // in seconds
   lastActive: string;
+  lastActiveDate?: string;
   studentProfile?: {
     name?: string;
     seatNumber?: string;

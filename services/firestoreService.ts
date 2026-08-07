@@ -29,6 +29,14 @@ interface FirestoreErrorInfo {
 }
 
 function handleFirestoreError(error: unknown, operationType: OperationType, path: string | null) {
+  const isPermissionError = 
+      (error as any)?.code === 'permission-denied' || 
+      (error instanceof Error && (
+          error.message.toLowerCase().includes('permission-denied') || 
+          error.message.toLowerCase().includes('insufficient permissions') ||
+          error.message.toLowerCase().includes('missing or insufficient')
+      ));
+
   const errInfo: FirestoreErrorInfo = {
     error: error instanceof Error ? error.message : String(error),
     authInfo: {
@@ -44,9 +52,16 @@ function handleFirestoreError(error: unknown, operationType: OperationType, path
     },
     operationType,
     path
+  };
+
+  if (isPermissionError) {
+    console.error('Firestore Error (Permission Denied): ', JSON.stringify(errInfo));
+    throw new Error(JSON.stringify(errInfo));
+  } else {
+    // For non-permission errors (like network offline, deadline exceeded), keep them as informational warnings
+    // to allow the application to seamlessly work with offline mode without background crashes.
+    console.warn('Firestore Network/Offline Alert: ', JSON.stringify(errInfo));
   }
-  console.error('Firestore Error: ', JSON.stringify(errInfo));
-  throw new Error(JSON.stringify(errInfo));
 }
 
 export const saveUserProgress = async (userId: string, progress: UserProgress) => {

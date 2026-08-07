@@ -30,6 +30,7 @@ const SessionSubjectsPage: React.FC<SessionSubjectsPageProps> = ({
     const [showComingSoon, setShowComingSoon] = useState(false);
     const [confirmReset, setConfirmReset] = useState<{subjectName: SubjectName, lessonTitle: string} | null>(null);
     const [confirmSessionReset, setConfirmSessionReset] = useState(false);
+    const [mathNoticeModal, setMathNoticeModal] = useState(false);
 
     useEffect(() => {
         if (showComingSoon) {
@@ -42,7 +43,7 @@ const SessionSubjectsPage: React.FC<SessionSubjectsPageProps> = ({
         SubjectName.JordanHistory,
         SubjectName.IslamicEducation,
         SubjectName.Arabic,
-        SubjectName.English
+        SubjectName.Math
     ];
 
     const getProgress = (subjectName: SubjectName) => {
@@ -57,7 +58,7 @@ const SessionSubjectsPage: React.FC<SessionSubjectsPageProps> = ({
         
         if (!baseTitle) return { percent: 0, isPerfect: false };
         
-        const isEnglish = subjectName === SubjectName.English;
+        const isEnglish = false;
         const examLabel = isEnglish ? 'Exam (1)' : 'امتحان (1)';
         const lessonTitle = `${baseTitle} - ${examLabel}`;
         const fullKey = `${subjectName}_${lessonTitle}`;
@@ -84,7 +85,7 @@ const SessionSubjectsPage: React.FC<SessionSubjectsPageProps> = ({
         const configs: Record<string, { max: number; min: number }> = {
             [SubjectName.IslamicEducation]: { max: 60, min: 24 },
             [SubjectName.Arabic]: { max: 100, min: 40 },
-            [SubjectName.English]: { max: 100, min: 40 },
+            [SubjectName.Math]: { max: 100, min: 40 },
             [SubjectName.JordanHistory]: { max: 40, min: 16 },
         };
         return configs[subjectName] || { max: 100, min: 50 };
@@ -102,7 +103,7 @@ const SessionSubjectsPage: React.FC<SessionSubjectsPageProps> = ({
             baseTitle = `دورة تجريبية - ${subjectName}`;
         }
 
-        const isEnglish = subjectName === SubjectName.English;
+        const isEnglish = false;
         const examLabel = isEnglish ? 'Exam (1)' : 'امتحان (1)';
         const lessonTitle = baseTitle ? `${baseTitle} - ${examLabel}` : "";
         
@@ -297,6 +298,37 @@ const SessionSubjectsPage: React.FC<SessionSubjectsPageProps> = ({
                             </motion.div>
                         </div>
                     )}
+
+                    {mathNoticeModal && (
+                        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-md">
+                            <motion.div
+                                initial={{ opacity: 0, scale: 0.9, y: 20 }}
+                                animate={{ opacity: 1, scale: 1, y: 0 }}
+                                exit={{ opacity: 0, scale: 0.9, y: 20 }}
+                                className="bg-white rounded-2xl p-6 shadow-2xl border-2 border-slate-900 max-w-sm w-full text-center"
+                                dir="rtl"
+                            >
+                                <div className="w-16 h-16 rounded-2xl mx-auto mb-4 border border-slate-900 select-none overflow-hidden shadow-sm">
+                                    <img 
+                                        src="https://i.postimg.cc/XvYQrc5C/FB-IMG-1780984890803.jpg" 
+                                        alt="دورة 2008" 
+                                        className="w-full h-full object-cover"
+                                        referrerPolicy="no-referrer"
+                                    />
+                                </div>
+                                <h3 className="text-xl font-black text-slate-900 mb-3">تنبيه</h3>
+                                <p className="text-slate-700 font-extrabold text-sm leading-relaxed mb-6 bg-amber-50/80 p-4 rounded-xl border border-amber-200">
+                                    أقرت وزارة التربية والتعليم مادة الرياضيات لطلاب الصف الحادي عشر الأكاديمي جيل 2010 لأول مرة لهذا العام 2026/2027 لذلك لا يتوفر امتحانات وزارة سابقة
+                                </p>
+                                <button
+                                    onClick={() => setMathNoticeModal(false)}
+                                    className="w-full bg-primary hover:bg-sky-600 text-white font-black py-3 rounded-xl shadow-[0_4px_0_rgb(15,23,42)] border-2 border-slate-900 transition-all active:translate-y-1 active:shadow-none"
+                                >
+                                    حسناً، فهمت
+                                </button>
+                            </motion.div>
+                        </div>
+                    )}
                 </AnimatePresence>
 
                 {sessionSubjects.map((subjectName, idx) => {
@@ -330,10 +362,10 @@ const SessionSubjectsPage: React.FC<SessionSubjectsPageProps> = ({
                             initial={{ opacity: 0, x: 20 }}
                             animate={{ opacity: 1, x: 0 }}
                             transition={{ delay: idx * 0.1 }}
-                            whileHover={{ scale: 1.02 }}
-                            whileTap={{ scale: 0.98 }}
                             onClick={() => {
-                                if (sessionTitle === 'دورة 2008' || sessionTitle === 'دورة 2008 تكميلي' || sessionTitle === 'الدورة التجريبية') {
+                                if ((sessionTitle === 'دورة 2008' || sessionTitle === 'دورة 2008 تكميلي') && subjectName === SubjectName.Math) {
+                                    setMathNoticeModal(true);
+                                } else if (sessionTitle === 'دورة 2008' || sessionTitle === 'دورة 2008 تكميلي' || sessionTitle === 'الدورة التجريبية') {
                                     handleStartSessionExam(subjectName as SubjectName, sessionTitle);
                                 } else if (sessionTitle === 'الدوسيات') {
                                     setShowComingSoon(true);
@@ -341,7 +373,7 @@ const SessionSubjectsPage: React.FC<SessionSubjectsPageProps> = ({
                                     navigateTo(View.SubjectIndex, subject);
                                 }
                             }}
-                            className={`relative bg-white ${isSubjectFinished ? (isPass ? 'shadow-emerald-100 border-emerald-500' : 'shadow-red-100 border-red-500') : (isPerfect ? 'shadow-emerald-100 border-emerald-500' : 'shadow-sky-100 border-sky-500')} rounded-lg p-4 shadow-lg border-r-8 flex items-center justify-between cursor-pointer hover:shadow-xl transition-all group border border-slate-900 overflow-hidden`}
+                            className={`relative bg-white ${isSubjectFinished ? (isPass ? 'shadow-emerald-100 border-emerald-500' : 'shadow-red-100 border-red-500') : (isPerfect ? 'shadow-emerald-100 border-emerald-500' : 'shadow-sky-100 border-sky-500')} rounded-lg p-4 shadow-lg border-r-8 flex items-center justify-between cursor-pointer hover:scale-[1.02] active:scale-[0.98] hover:shadow-xl transition-all duration-100 group border border-slate-900 overflow-hidden touch-manipulation`}
                         >
                             {/* Progress overlay */}
                             {isPerfect && !isSubjectFinished ? (
@@ -425,12 +457,10 @@ const SessionSubjectsPage: React.FC<SessionSubjectsPageProps> = ({
                         initial={{ opacity: 0, y: 10 }}
                         animate={{ opacity: 1, y: 0 }}
                         transition={{ delay: 0.5 }}
-                        whileHover={isFinished ? { scale: 1.05 } : {}}
-                        whileTap={isFinished ? { scale: 0.95 } : {}}
                         onClick={() => isFinished && navigateTo(View.MoEResults)}
-                        className={`rounded-lg p-3 shadow-lg border border-slate-900 flex items-center justify-center transition-all group mx-auto w-40 mt-2 ${
+                        className={`rounded-lg p-3 shadow-lg border border-slate-900 flex items-center justify-center transition-all duration-100 group mx-auto w-40 mt-2 touch-manipulation ${
                             isFinished 
-                                ? 'bg-green-50 border-green-500 shadow-green-100 cursor-pointer' 
+                                ? 'bg-green-50 border-green-500 shadow-green-100 cursor-pointer hover:scale-105 active:scale-95' 
                                 : 'bg-gray-100 border-gray-300 opacity-50 cursor-not-allowed'
                         }`}
                     >

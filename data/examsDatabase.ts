@@ -6,10 +6,30 @@ export const examsDatabase: {
     }
 } = {};
 
+export const examsUrlsDatabase: {
+    [cacheKey: string]: string
+} = {};
+
+/**
+ * التحقق من وجود تخزين مؤقت صالح للرابط المحدد
+ */
+export const hasValidCache = (subject: SubjectName, lessonTitle: string, currentUrl?: string, chunkIndex?: number): boolean => {
+    if (subject === SubjectName.Math && chunkIndex !== undefined) {
+        if (!examsDatabase[subject]?.[lessonTitle]?.[chunkIndex]) return false;
+        if (!currentUrl) return true;
+        const cacheKey = `${subject}_${lessonTitle}_${chunkIndex}`;
+        return examsUrlsDatabase[cacheKey] === currentUrl;
+    }
+    if (!examsDatabase[subject]?.[lessonTitle]) return false;
+    if (!currentUrl) return true;
+    const cacheKey = `${subject}_${lessonTitle}`;
+    return examsUrlsDatabase[cacheKey] === currentUrl;
+};
+
 /**
  * تحديث قاعدة البيانات بأسئلة لدرس محدد
  */
-export const updateDatabase = (subject: SubjectName, lessonTitle: string, questions: Question[]) => {
+export const updateDatabase = (subject: SubjectName, lessonTitle: string, questions: Question[], url?: string, chunkIndex?: number) => {
     try {
         if (!questions || !Array.isArray(questions)) return;
 
@@ -17,21 +37,37 @@ export const updateDatabase = (subject: SubjectName, lessonTitle: string, questi
             examsDatabase[subject] = {};
         }
 
-        // بالنسبة للغة العربية والإنجليزية، أو امتحانات الدورات (2008/2009)، يتم تحميل الامتحان كاملاً كمجموعة واحدة (Chunk)
-        // أما المواد الأخرى فيتم تقسيمها إلى مجموعات من 10 أسئلة
-        const chunks: Question[][] = [];
-        const isSessionExam = lessonTitle.includes('دورة 2008') || lessonTitle.includes('دورة 2009');
-        
-        if (subject === SubjectName.Arabic || subject === SubjectName.English || isSessionExam) {
-            chunks.push(questions);
+        if (subject === SubjectName.Math && chunkIndex !== undefined) {
+            if (!examsDatabase[subject]![lessonTitle]) {
+                examsDatabase[subject]![lessonTitle] = [];
+            }
+            examsDatabase[subject]![lessonTitle][chunkIndex] = questions;
+            
+            if (url) {
+                const cacheKey = `${subject}_${lessonTitle}_${chunkIndex}`;
+                examsUrlsDatabase[cacheKey] = url;
+            }
         } else {
-            for (let i = 0; i < questions.length; i += 10) {
-                chunks.push(questions.slice(i, i + 10));
+            // بالنسبة للغة العربية والإنجليزية، أو امتحانات الدورات (2008/2010)، يتم تحميل الامتحان كاملاً كمجموعة واحدة (Chunk)
+            // أما المواد الأخرى فيتم تقسيمها إلى مجموعات من 10 أسئلة
+            const chunks: Question[][] = [];
+            const isSessionExam = lessonTitle.includes('دورة 2008') || lessonTitle.includes('دورة 2010');
+            
+            if (subject === SubjectName.Arabic || isSessionExam) {
+                chunks.push(questions);
+            } else {
+                for (let i = 0; i < questions.length; i += 10) {
+                    chunks.push(questions.slice(i, i + 10));
+                }
+            }
+
+            examsDatabase[subject]![lessonTitle] = chunks;
+
+            if (url) {
+                const cacheKey = `${subject}_${lessonTitle}`;
+                examsUrlsDatabase[cacheKey] = url;
             }
         }
-
-        examsDatabase[subject]![lessonTitle] = chunks;
-        // console.log(`[JoSchool DB] Loaded ${questions.length} questions for ${lessonTitle}`);
     } catch (e) {
         console.error("[JoSchool DB] Update failed", e);
     }
@@ -43,6 +79,7 @@ export const updateDatabase = (subject: SubjectName, lessonTitle: string, questi
 export const saveToCache = () => {
     try {
         localStorage.setItem('joschool_exams_cache', JSON.stringify(examsDatabase));
+        localStorage.setItem('joschool_exams_urls_cache', JSON.stringify(examsUrlsDatabase));
         console.log("[JoSchool DB] Saved to cache");
     } catch (e) {
         console.warn("[JoSchool DB] Cache save failed (likely quota exceeded)", e);
@@ -58,9 +95,16 @@ export const loadFromCache = () => {
         if (cached) {
             const parsed = JSON.parse(cached);
             Object.assign(examsDatabase, parsed);
-            console.log("[JoSchool DB] Loaded from cache");
-            return true;
         }
+        
+        const cachedUrls = localStorage.getItem('joschool_exams_urls_cache');
+        if (cachedUrls) {
+            const parsedUrls = JSON.parse(cachedUrls);
+            Object.assign(examsUrlsDatabase, parsedUrls);
+        }
+        
+        console.log("[JoSchool DB] Loaded from cache successfully");
+        return true;
     } catch (e) {
         console.error("[JoSchool DB] Cache load failed", e);
     }

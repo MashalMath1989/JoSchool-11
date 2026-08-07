@@ -4,7 +4,6 @@ import { Printer } from 'lucide-react';
 import { SubjectName, UserProgress, QuizResult } from './types';
 import { SESSION_2008_EXAMS, SESSION_2008_SUP_EXAMS } from './data/exams';
 
-// @ts-expect-error - html2pdf.js lacks standard types
 import html2pdf from 'html2pdf.js';
 
 interface MoEResultsPageProps {
@@ -24,7 +23,7 @@ const MoEResultsPage: React.FC<MoEResultsPageProps> = ({
     const moeConfigs = [
         { id: SubjectName.IslamicEducation, title: "التربية الإسلامية", max: 60, min: 24 },
         { id: SubjectName.Arabic, title: "اللغة العربية", max: 100, min: 40 },
-        { id: SubjectName.English, title: "اللغة الإنجليزية", max: 100, min: 40 },
+        { id: SubjectName.Math, title: "الرياضيات", max: 100, min: 40 },
         { id: SubjectName.JordanHistory, title: "تاريخ الأردن", max: 40, min: 16 },
     ];
 
@@ -42,7 +41,7 @@ const MoEResultsPage: React.FC<MoEResultsPageProps> = ({
             baseTitle = `دورة تجريبية - ${subjectName}`; 
         }
 
-        const isEnglish = subjectName === SubjectName.English;
+        const isEnglish = false;
         const examLabel = isEnglish ? 'Exam (1)' : 'امتحان (1)';
         const lessonTitle = baseTitle ? `${baseTitle} - ${examLabel}` : "";
 
@@ -100,7 +99,7 @@ const MoEResultsPage: React.FC<MoEResultsPageProps> = ({
         // Brief delay to allow React to update the DOM with printing styles
         setTimeout(() => {
             const opt = {
-                margin: [5, 10, 5, 10],
+                margin: [5, 10, 5, 10] as [number, number, number, number],
                 filename: `JoSchool11_Result_${profileName}.pdf`,
                 image: { type: 'jpeg', quality: 0.98 },
                 html2canvas: { 
@@ -149,7 +148,7 @@ const MoEResultsPage: React.FC<MoEResultsPageProps> = ({
             >
                 <div className={`${isPrinting ? 'w-24 h-24 mb-4' : 'w-16 h-16 mb-2'} border border-slate-900 rounded-xl p-1 bg-white shadow-sm overflow-hidden z-10`}>
                     <img 
-                        src="https://i.postimg.cc/y8GJVJ52/1777447368581.png" 
+                        src="https://i.postimg.cc/GtXVRVcp/IMG-20260704-001239-098.png" 
                         alt="JoSchool Logo" 
                         className="w-full h-full object-contain"
                     />
@@ -254,7 +253,7 @@ const MoEResultsPage: React.FC<MoEResultsPageProps> = ({
                                 transition={{ duration: 1, repeat: Infinity, ease: "linear" }}
                             />
                             <div className="w-16 h-16 bg-white rounded-2xl p-2 shadow-sm border border-slate-100 flex items-center justify-center overflow-hidden">
-                                <img src="https://i.postimg.cc/y8GJVJ52/1777447368581.png" alt="JoSchool" className="w-full h-auto object-contain" />
+                                <img src="https://i.postimg.cc/GtXVRVcp/IMG-20260704-001239-098.png" alt="JoSchool" className="w-full h-auto object-contain" />
                             </div>
                         </div>
                         <h3 className="text-xl font-black text-slate-800 mb-2">جاري التحميل...</h3>

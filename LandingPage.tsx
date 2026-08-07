@@ -1,13 +1,14 @@
 import React from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Semester, Subject, SubjectName } from './types';
-import { SparklesIcon, MenuIcon, UserIcon, CalendarIcon, InfoIcon, LogOutIcon, XIcon, BookOpenIcon, ChevronLeftIcon, ChevronRightIcon, DownloadIcon } from './data/Icons';
+import { SparklesIcon, MenuIcon, UserIcon, CalendarIcon, InfoIcon, LogOutIcon, XIcon, BookOpenIcon, ChevronLeftIcon, ChevronRightIcon, DownloadIcon, ChevronDownIcon } from './data/Icons';
 import { User } from 'firebase/auth';
+import { LOGO_DATA_URI } from './logoDataUri';
 
 interface LandingPageProps {
-    subjectsData: Subject[];
-    subjectIndexData: { [key: string]: any[] };
-    userProgress: any;
+    subjectsData?: Subject[];
+    subjectIndexData?: { [key: string]: any[] };
+    userProgress?: any;
     navigateTo: (view: any, subject?: Subject, title?: string) => void;
     View: any;
     user: User | null;
@@ -15,44 +16,63 @@ interface LandingPageProps {
 }
 
 const SubjectGrid = React.memo(({ 
-    subjects, 
+    subjects = [], 
     title, 
     navigateTo, 
     View, 
     showAchievements,
-    subjectIndexData,
-    userProgress
+    subjectIndexData = {},
+    userProgress = {}
 }: { 
-    subjects: Subject[], 
+    subjects?: Subject[], 
     title: string, 
     navigateTo: any, 
     View: any, 
     showAchievements?: boolean,
-    subjectIndexData: { [key: string]: any[] },
-    userProgress: any
+    subjectIndexData?: { [key: string]: any[] },
+    userProgress?: any
 }) => {
     const [showSchedule, setShowSchedule] = React.useState(false);
 
     const calculateProgress = (subject: Subject) => {
+        if (!subjectIndexData || !subject) return 0;
         const semesterKey = `${subject.id}-${subject.semester}`;
         const units = subjectIndexData[semesterKey] || subjectIndexData[subject.id] || [];
         
         let totalExams = 0;
         let completedExams = 0;
 
-        const results = userProgress.quizResults || [];
+        const results = userProgress?.quizResults || [];
 
-        units.forEach(unit => {
-            if (subject.id === SubjectName.Arabic || subject.id === SubjectName.English) {
+        units.forEach((unit: any) => {
+            if (!unit || !unit.lessons) return;
+            if (subject.id === SubjectName.Arabic) {
                 // Each lesson is one exam
                 totalExams += unit.lessons.length;
                 unit.lessons.forEach((lesson: any) => {
                     const isPassed = results.some((r: any) => 
+                        r &&
                         r.subjectId === subject.id && 
-                        r.lessonTitle === lesson.title &&
+                        r.lessonTitle === lesson?.title &&
                         r.score >= 20
                     );
                     if (isPassed) completedExams++;
+                });
+            } else if (subject.id === SubjectName.Math) {
+                // Each lesson has 7 exams (exams 1 to 7)
+                unit.lessons.forEach((lesson: any) => {
+                    totalExams += 7;
+                    for (let i = 1; i <= 7; i++) {
+                        const examLabel = `امتحان (${i})`;
+                        const fullTitle = `${lesson?.title} - ${examLabel}`;
+                        const isPassed = results.some((r: any) => 
+                            r &&
+                            r.subjectId === subject.id && 
+                            r.lessonTitle === fullTitle &&
+                            r.score >= 20
+                        );
+                        if (isPassed) completedExams++;
+                    }
                 });
             } else {
                 // Lessons have chunks (default 5 if not found) + 1 unit exam
@@ -61,8 +81,9 @@ const SubjectGrid = React.memo(({
                     totalExams += chunks;
                     for (let i = 1; i <= chunks; i++) {
                         const examLabel = `امتحان (${i})`;
-                        const fullTitle = `${lesson.title} - ${examLabel}`;
+                        const fullTitle = `${lesson?.title} - ${examLabel}`;
                         const isPassed = results.some((r: any) => 
+                            r &&
                             r.subjectId === subject.id && 
                             r.lessonTitle === fullTitle &&
                             r.score >= 20
@@ -73,9 +94,9 @@ const SubjectGrid = React.memo(({
                 
                 // Unit exam
                 totalExams += 1;
-                const unitOrdinal = unit.title.split(':')[0];
+                const unitOrdinal = unit.title ? unit.title.split(':')[0] : '';
                 const unitExamTitle = `${unitOrdinal} - امتحان (1)`;
-                if (results.some((r: any) => r.subjectId === subject.id && r.lessonTitle === unitExamTitle && r.score >= 20)) {
+                if (results.some((r: any) => r && r.subjectId === subject.id && r.lessonTitle === unitExamTitle && r.score >= 20)) {
                     completedExams++;
                 }
             }
@@ -199,35 +220,27 @@ const SubjectGrid = React.memo(({
                 {showAchievements && <CountdownTimer />}
 
                 {showAchievements && (
-                    <motion.button
-                        whileHover={{ scale: 1.1 }}
-                        whileTap={{ scale: 0.9 }}
+                    <button
                         onClick={() => navigateTo(View.Progress)}
-                        className="w-10 h-10 bg-white border border-slate-900 rounded-lg shadow-sm flex items-center justify-center active:scale-95 transition-all hover:bg-slate-50"
+                        className="w-10 h-10 bg-white border border-slate-900 rounded-lg shadow-sm flex items-center justify-center hover:scale-110 active:scale-90 transition-all hover:bg-slate-50 touch-manipulation"
                     >
                         <span className="text-xl">📊</span>
-                    </motion.button>
+                    </button>
                 )}
             </div>
 
             <div className="bg-gradient-to-br from-sky-400 to-slate-800 p-1.5 sm:p-2.5 rounded-xl shadow-2xl border border-slate-900">
                 <div className="grid grid-cols-2 gap-1.5 sm:gap-2.5">
                     {subjects.map((subject) => {
-                        const isAvailable = 
-                            subject.id === SubjectName.JordanHistory || 
-                            subject.id === SubjectName.IslamicEducation || 
-                            subject.id === SubjectName.English ||
-                            (subject.semester === Semester.First && subject.id === SubjectName.Arabic);
+                        const isAvailable = subject.semester === Semester.First;
                         
                         const progress = calculateProgress(subject);
                         
                         return (
-                            <motion.div
+                            <div
                                 key={`${subject.id}-${subject.semester}`}
-                                whileHover={{ scale: 1.02 }}
-                                whileTap={{ scale: 0.98 }}
                                 onClick={() => navigateTo(View.SubjectIndex, subject)}
-                                className="bg-white rounded-lg p-1 sm:p-1.5 shadow-lg border border-slate-900 cursor-pointer flex flex-col transition-all hover:shadow-xl group relative overflow-hidden h-[74px] sm:h-[88px]"
+                                className="bg-white rounded-lg p-1 sm:p-1.5 shadow-lg border border-slate-900 cursor-pointer flex flex-col transition-all duration-100 hover:scale-[1.02] active:scale-[0.98] hover:shadow-xl group relative overflow-hidden h-[74px] sm:h-[88px] touch-manipulation"
                             >
                                 <div className="flex flex-row items-center gap-1 sm:gap-2 flex-1 min-w-0">
                                     <div className="w-9 h-11 sm:w-12 sm:h-15 rounded-lg overflow-hidden shadow-sm shrink-0 z-10 border border-slate-100">
@@ -263,7 +276,7 @@ const SubjectGrid = React.memo(({
                                         <span className="text-[10px] sm:text-xs font-black text-emerald-600 shrink-0">{Math.round(progress)}%</span>
                                     </div>
                                 )}
-                            </motion.div>
+                            </div>
                         );
                     })}
                 </div>
@@ -273,9 +286,9 @@ const SubjectGrid = React.memo(({
 });
 
 const LandingPage: React.FC<LandingPageProps> = React.memo(({
-    subjectsData,
-    subjectIndexData,
-    userProgress,
+    subjectsData = [],
+    subjectIndexData = {},
+    userProgress = {},
     navigateTo,
     View,
     user,
@@ -299,10 +312,17 @@ const LandingPage: React.FC<LandingPageProps> = React.memo(({
         "https://i.postimg.cc/fLbKFxnm/nmwdhj-alajabt-wrqt-alqary-almash-aldwyy-farght.jpg"
     ];
 
-    const firstSemesterSubjects = subjectsData.filter(s => s.semester === Semester.First);
-    const secondSemesterSubjects = subjectsData.filter(s => s.semester === Semester.Second);
+    const safeSubjectsData = subjectsData || [];
+    const firstSemesterSubjects = safeSubjectsData.filter(s => s && s.semester === Semester.First);
+    const secondSemesterSubjects = safeSubjectsData.filter(s => s && s.semester === Semester.Second);
 
     const menuItems = [
+        { 
+            id: 'welcome', 
+            label: 'رسالة الترحيب (جيل 2010)', 
+            icon: <SparklesIcon className="w-5 h-5 text-amber-500" />, 
+            action: () => navigateTo(View.Welcome) 
+        },
         { 
             id: 'profile', 
             label: 'ملفي', 
@@ -402,12 +422,13 @@ const LandingPage: React.FC<LandingPageProps> = React.memo(({
                             className="w-14 h-14 flex items-center justify-center border border-slate-900 rounded-xl p-1 bg-white shadow-sm group-hover:border-primary transition-colors"
                         >
                             <img 
-                                src="https://i.postimg.cc/y8GJVJ52/1777447368581.png" 
+                                src={LOGO_DATA_URI} 
                                 alt="App Logo" 
                                 className="w-full h-auto object-contain"
                             />
                         </motion.div>
-                        <p className="font-bold text-slate-400 text-[9px] mt-1 whitespace-nowrap group-hover:text-primary transition-colors">المسار الأكاديمي 11 . جيل 2009</p>
+                        <p className="font-bold text-slate-400 text-[9px] mt-1 whitespace-nowrap group-hover:text-primary transition-colors">المسار الأكاديمي 11 . جيل 2010</p>
+                        <p className="font-bold text-slate-400 text-[9px] mt-0.5 whitespace-nowrap group-hover:text-primary transition-colors">منهاج 2027/2026</p>
                     </div>
 
                     <AnimatePresence>
@@ -432,24 +453,26 @@ const LandingPage: React.FC<LandingPageProps> = React.memo(({
                                         onClick={() => setShowInfoModal(false)}
                                         className="absolute top-4 left-4 p-2 bg-slate-50 rounded-full border border-slate-200 hover:bg-slate-100 transition-colors z-10"
                                     >
-                                        <X className="w-4 h-4 text-slate-400" />
+                                        <XIcon className="w-4 h-4 text-slate-400" />
                                     </button>
 
                                     <div className="w-20 h-20 bg-primary/10 rounded-2xl flex items-center justify-center mx-auto mb-6 rotate-3 border-2 border-slate-900 overflow-hidden shadow-sm">
                                         <img 
-                                            src="https://i.postimg.cc/y8GJVJ52/1777447368581.png" 
+                                            src={LOGO_DATA_URI} 
                                             alt="App Logo" 
                                             className="w-12 h-12 object-contain"
                                         />
                                     </div>
 
-                                    <h3 className="text-2xl font-black text-slate-800 mb-4 leading-tight font-jordan">تطبيق الشامل التعليمي</h3>
+                                    <h3 className="text-2xl font-black text-slate-800 mb-4 leading-tight font-jordan">
+                                        تطبيق <span className="text-sky-500 font-sans tracking-wide">JoSchool11</span> التعليمي
+                                    </h3>
                                     
                                     <div className="space-y-4 text-slate-600 font-bold leading-relaxed">
-                                        <p>تطبيق تعليمي مخصص لطلاب الصف الحادي عشر الأكاديمي (جيل 2009) في المواد الوزارية الأربعة:</p>
+                                        <p>تطبيق تعليمي مخصص لطلاب الصف الحادي عشر الأكاديمي (جيل 2010) في المواد الوزارية الأربعة:</p>
                                         
                                         <div className="flex flex-wrap justify-center gap-2 py-2">
-                                            {['تاريخ الأردن', 'التربية الإسلامية', 'اللغة العربية', 'اللغة الإنجليزية'].map((sub, i) => (
+                                            {['تاريخ الأردن', 'التربية الإسلامية', 'اللغة العربية', 'الرياضيات'].map((sub, i) => (
                                                 <span key={i} className="px-3 py-1 bg-slate-50 border border-slate-200 rounded-full text-xs text-primary font-black">
                                                     {sub}
                                                 </span>
@@ -495,7 +518,7 @@ const LandingPage: React.FC<LandingPageProps> = React.memo(({
                     )}
                 </div>
             </div>
-            
+
             <SubjectGrid 
                 subjects={firstSemesterSubjects} 
                 title="الفصل الأول" 
@@ -515,41 +538,33 @@ const LandingPage: React.FC<LandingPageProps> = React.memo(({
             />
 
             {/* Additional Sessions Section */}
-            <div className="grid grid-cols-2 gap-4 mt-4">
+            <div className="grid grid-cols-2 gap-4 mt-4 select-none">
+                {/* زر الدورات */}
                 <motion.div
-                    whileHover={{ scale: 1.02 }}
+                    whileHover={{ scale: 1.02, translateY: -1 }}
                     whileTap={{ scale: 0.98 }}
-                    onClick={() => navigateTo(View.SessionSubjects, undefined, 'الدورة التجريبية')}
+                    onClick={() => navigateTo(View.SessionsList)}
+                    className="bg-white rounded-lg p-4 shadow-lg border-r-4 border-sky-500 flex items-center justify-center cursor-pointer transition-all hover:shadow-xl h-16 border border-slate-900"
+                >
+                    <div className="flex items-center gap-2">
+                        <img 
+                            src="https://i.postimg.cc/XvYQrc5C/FB-IMG-1780984890803.jpg" 
+                            alt="الدورات" 
+                            className="w-8 h-8 rounded-full object-cover border border-slate-300 shadow-sm shrink-0" 
+                            referrerPolicy="no-referrer"
+                        />
+                        <span className="font-black text-slate-800 text-sm">الدورات</span>
+                    </div>
+                </motion.div>
+
+                {/* زر الدوسيات */}
+                <motion.div
+                    whileHover={{ scale: 1.02, translateY: -1 }}
+                    whileTap={{ scale: 0.98 }}
+                    onClick={() => navigateTo(View.Library)}
                     className="bg-white rounded-lg p-4 shadow-lg border-r-4 border-yellow-400 flex items-center justify-center cursor-pointer transition-all hover:shadow-xl h-16 border border-slate-900"
                 >
-                    <span className="font-black text-slate-800 text-sm">دورة تجريبية</span>
-                </motion.div>
-
-                <motion.div
-                    whileHover={{ scale: 1.02 }}
-                    whileTap={{ scale: 0.98 }}
-                    onClick={() => navigateTo(View.SessionSubjects, undefined, 'دورة 2008')}
-                    className="bg-white rounded-lg p-4 shadow-lg border-r-4 border-sky-400 flex items-center justify-center cursor-pointer transition-all hover:shadow-xl h-16 border border-slate-900"
-                >
-                    <span className="font-black text-slate-800 text-sm">دورة 2008</span>
-                </motion.div>
-
-                <motion.div
-                    whileHover={{ scale: 1.02 }}
-                    whileTap={{ scale: 0.98 }}
-                    onClick={() => navigateTo(View.SessionSubjects, undefined, 'الدوسيات')}
-                    className="bg-white rounded-lg p-4 shadow-lg border-r-4 border-yellow-400 flex items-center justify-center cursor-pointer transition-all hover:shadow-xl h-16 border border-slate-900"
-                >
-                    <span className="font-black text-slate-800 text-sm">الدوسيات</span>
-                </motion.div>
-
-                <motion.div
-                    whileHover={{ scale: 1.02 }}
-                    whileTap={{ scale: 0.98 }}
-                    onClick={() => navigateTo(View.SessionSubjects, undefined, 'دورة 2008 تكميلي')}
-                    className="bg-white rounded-lg p-4 shadow-lg border-r-4 border-sky-400 flex items-center justify-center cursor-pointer transition-all hover:shadow-xl h-16 border border-slate-900"
-                >
-                    <span className="font-black text-slate-800 text-sm">دورة 2008 تكميلي</span>
+                    <span className="font-black text-slate-800 text-sm">📚 المكتبة</span>
                 </motion.div>
             </div>
 

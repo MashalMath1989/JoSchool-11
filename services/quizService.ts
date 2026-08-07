@@ -23,6 +23,26 @@ export const getQuizzesForLesson = (subject: SubjectName, lessonTitle: string, c
  * Gets the number of question chunks for a specific lesson.
  */
 export const getLessonChunksCount = (subject: SubjectName, lessonTitle: string): number => {
+  if (subject === SubjectName.Math) {
+    if (
+      lessonTitle.includes("الاقترانات المتشعبة") ||
+      lessonTitle.includes("القيمة المطلقة") ||
+      lessonTitle.includes("الباقي والعوامل") ||
+      lessonTitle.includes("الكسور الجزئية") ||
+      lessonTitle.includes("الراديان") ||
+      lessonTitle.includes("الاقترانات المثلثية") ||
+      lessonTitle.includes("تمثيل الاقترانات الجيبية بيانياً") ||
+      lessonTitle.includes("النهايات والاتصال") ||
+      lessonTitle.includes("الاشتقاق") ||
+      lessonTitle.includes("القيم العظمى والصغرى") ||
+      lessonTitle.includes("المشتقة الثانية") ||
+      lessonTitle.includes("تطبيقات القيم القصوى") ||
+      lessonTitle.includes("قاعدة السلسلة")
+    ) {
+      return 10;
+    }
+    return 7;
+  }
   const chunks = examsDatabase[subject]?.[lessonTitle];
   return chunks ? chunks.length : 0;
 };
@@ -53,4 +73,15 @@ export const getQuizzesForUnit = (subject: SubjectName, unit: any): Question[] =
 export const isSubjectLoaded = (subject: SubjectName): boolean => {
   const subjectData = examsDatabase[subject];
   return !!subjectData && Object.keys(subjectData).length > 0;
+};
+
+/**
+ * Checks if a specific lesson's exam has been loaded in the database.
+ */
+export const isLessonLoaded = (subject: SubjectName, lessonTitle: string): boolean => {
+  if (subject === SubjectName.Math) {
+    const chunks = examsDatabase[subject]?.[lessonTitle];
+    return !!chunks && chunks.some(chunk => chunk && chunk.length > 0);
+  }
+  return !!examsDatabase[subject]?.[lessonTitle];
 };
