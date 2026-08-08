@@ -169,7 +169,7 @@ const ResultsPage: React.FC<ResultsPageProps> = ({
                 subjectId: selectedSubject.id,
                 lessonTitle: currentLessonTitle,
                 examNumber: examNumber,
-                score: score, // Save the raw number of correct answers
+                score: finalMark,
                 totalQuestions: totalQuestions,
                 date: new Date().toISOString(),
                 userAnswers: userAnswers
@@ -179,7 +179,7 @@ const ResultsPage: React.FC<ResultsPageProps> = ({
                 quizResults: [...prev.quizResults, newResult]
             }));
         }
-    }, [selectedSubject, currentLessonTitle, examNumber, score, totalQuestions, setUserProgress, userAnswers]);
+    }, [selectedSubject, currentLessonTitle, examNumber, finalMark, totalQuestions, setUserProgress, userAnswers]);
 
     return (
         <>

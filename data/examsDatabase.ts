@@ -48,8 +48,8 @@ export const updateDatabase = (subject: SubjectName, lessonTitle: string, questi
                 examsUrlsDatabase[cacheKey] = url;
             }
         } else {
-            // بالنسبة للغة العربية والإنجليزية، أو امتحانات الدورات (2008/2010)، يتم تحميل الامتحان كاملاً كمجموعة واحدة (Chunk)
-            // أما المواد الأخرى فيتم تقسيمها إلى مجموعات من 10 أسئلة
+            // بالنسبة للغة العربية أو امتحانات الدورات (2008/2010)، يتم تحميل الامتحان كاملاً كمجموعة واحدة (Chunk)
+            // أما تاريخ الأردن، التربية الإسلامية، والرياضيات وبقية المواد فيتم تقسيم أسئلتها إلى مجموعات (عشرات: 10 أسئلة لكل امتحان)
             const chunks: Question[][] = [];
             const isSessionExam = lessonTitle.includes('دورة 2008') || lessonTitle.includes('دورة 2010');
             

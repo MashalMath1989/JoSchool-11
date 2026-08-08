@@ -44,7 +44,13 @@ export const getLessonChunksCount = (subject: SubjectName, lessonTitle: string):
     return 7;
   }
   const chunks = examsDatabase[subject]?.[lessonTitle];
-  return chunks ? chunks.length : 0;
+  if (chunks && chunks.length > 0) {
+    return chunks.length;
+  }
+  if (subject === SubjectName.JordanHistory || subject === SubjectName.IslamicEducation) {
+    return 5;
+  }
+  return 0;
 };
 
 /**

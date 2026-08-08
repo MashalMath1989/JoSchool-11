@@ -1471,7 +1471,17 @@ const App: React.FC = () => {
             setIsLoadingExam(false);
         }
 
-        const questionsToUse = freshQuestions || getQuizzesForLesson(subjectId, lesson.title, chunkIndex);
+        let questionsToUse = getQuizzesForLesson(subjectId, lesson.title, chunkIndex);
+        if ((!questionsToUse || questionsToUse.length === 0) && freshQuestions && freshQuestions.length > 0) {
+            if (subjectId === SubjectName.Arabic || lesson.title.includes('دورة 2008') || lesson.title.includes('دورة 2010')) {
+                questionsToUse = freshQuestions;
+            } else if (chunkIndex !== undefined) {
+                const start = chunkIndex * 10;
+                questionsToUse = freshQuestions.slice(start, start + 10);
+            } else {
+                questionsToUse = freshQuestions;
+            }
+        }
         if (!questionsToUse || questionsToUse.length === 0) {
             alert('تعذر تحميل أسئلة الامتحان. يرجى التحقق من اتصالك بالإنترنت والمحاولة مجدداً.');
             return;
