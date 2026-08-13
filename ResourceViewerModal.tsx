@@ -59,15 +59,23 @@ export const ResourceViewerModal: React.FC<ResourceViewerModalProps> = ({
     const getEmbedVideoUrl = (url: string) => {
         if (!url) return '';
         try {
-            if (url.includes('youtube.com/watch')) {
-                const urlParams = new URLSearchParams(new URL(url).search);
+            const trimmed = url.trim();
+            if (trimmed.includes('youtube.com/shorts/')) {
+                const id = trimmed.split('youtube.com/shorts/')[1]?.split('?')[0];
+                if (id) return `https://www.youtube.com/embed/${id}?autoplay=1&rel=0&playsinline=1`;
+            }
+            if (trimmed.includes('youtube.com/watch')) {
+                const urlParams = new URLSearchParams(new URL(trimmed).search);
                 const v = urlParams.get('v');
-                if (v) return `https://www.youtube.com/embed/${v}?autoplay=1`;
-            } else if (url.includes('youtu.be/')) {
-                const id = url.split('youtu.be/')[1]?.split('?')[0];
-                if (id) return `https://www.youtube.com/embed/${id}?autoplay=1`;
-            } else if (url.includes('youtube.com/embed/')) {
-                return url;
+                if (v) return `https://www.youtube.com/embed/${v}?autoplay=1&rel=0&playsinline=1`;
+            } else if (trimmed.includes('youtu.be/')) {
+                const id = trimmed.split('youtu.be/')[1]?.split('?')[0];
+                if (id) return `https://www.youtube.com/embed/${id}?autoplay=1&rel=0&playsinline=1`;
+            } else if (trimmed.includes('youtube.com/embed/')) {
+                if (!trimmed.includes('autoplay=')) {
+                    return `${trimmed}${trimmed.includes('?') ? '&' : '?'}autoplay=1&rel=0&playsinline=1`;
+                }
+                return trimmed;
             }
         } catch (e) {
             // Return raw url
@@ -184,6 +192,63 @@ export const ResourceViewerModal: React.FC<ResourceViewerModalProps> = ({
         }
     };
 
+    const handleToggleVideoLandscapeFullScreen = async () => {
+        setIsFullScreen(true);
+
+        setTimeout(async () => {
+            try {
+                if (videoContainerRef.current) {
+                    const elem = videoContainerRef.current as any;
+                    if (elem.requestFullscreen) {
+                        await elem.requestFullscreen();
+                    } else if (elem.webkitRequestFullscreen) {
+                        await elem.webkitRequestFullscreen();
+                    } else if (elem.msRequestFullscreen) {
+                        await elem.msRequestFullscreen();
+                    }
+                }
+            } catch (e) {
+                console.warn('Native fullscreen request warning:', e);
+            }
+
+            try {
+                if (window.screen && window.screen.orientation && typeof (window.screen.orientation as any).lock === 'function') {
+                    await (window.screen.orientation as any).lock('landscape').catch(() => {
+                        return (window.screen.orientation as any).lock('landscape-primary').catch(() => {});
+                    });
+                }
+            } catch (e) {
+                console.warn('Screen orientation lock warning:', e);
+            }
+        }, 50);
+    };
+
+    const handleExitVideoLandscapeFullScreen = async () => {
+        setIsFullScreen(false);
+
+        try {
+            if (window.screen && window.screen.orientation && typeof (window.screen.orientation as any).unlock === 'function') {
+                (window.screen.orientation as any).unlock();
+            }
+        } catch (e) {
+            // Ignore
+        }
+
+        try {
+            if (document.fullscreenElement || (document as any).webkitFullscreenElement || (document as any).msFullscreenElement) {
+                if (document.exitFullscreen) {
+                    await document.exitFullscreen();
+                } else if ((document as any).webkitExitFullscreen) {
+                    await (document as any).webkitExitFullscreen();
+                } else if ((document as any).msExitFullscreen) {
+                    await (document as any).msExitFullscreen();
+                }
+            }
+        } catch (e) {
+            // Ignore
+        }
+    };
+
     return (
         <AnimatePresence>
             <div className="fixed inset-0 z-[100] flex items-center justify-center p-3 sm:p-6 bg-slate-900/80 backdrop-blur-md animate-fast-fade" dir="rtl">
@@ -197,19 +262,13 @@ export const ResourceViewerModal: React.FC<ResourceViewerModalProps> = ({
                     <div className="p-3.5 sm:p-4 bg-slate-900 text-white flex items-center justify-between gap-3 shrink-0">
                         <div className="flex items-center gap-2.5 min-w-0">
                             <div className="w-9 h-9 rounded-xl bg-white/10 flex items-center justify-center text-white shrink-0">
-                                {resource.type === 'video' && <PlayCircle className="w-5 h-5 text-purple-400" />}
+                                {resource.type === 'video' && <PlayCircle className="w-5 h-5 text-red-500" />}
                                 {resource.type === 'pdf' && <FileText className="w-5 h-5 text-rose-400" />}
                                 {resource.type === 'image' && <ImageIcon className="w-5 h-5 text-emerald-400" />}
                             </div>
                             <div className="flex flex-col text-right truncate">
                                 <div className="flex items-center gap-2">
                                     <h3 className="font-black text-sm sm:text-base text-white truncate">{title}</h3>
-                                    {isSyncing && (
-                                        <span className="flex items-center gap-1 text-[10px] text-amber-300 font-bold bg-amber-950/60 px-2 py-0.5 rounded-full border border-amber-500/30 animate-pulse shrink-0">
-                                            <Loader2 className="w-3 h-3 animate-spin" />
-                                            مباشر GitHub
-                                        </span>
-                                    )}
                                 </div>
                                 {lessonTitle && <span className="text-[10px] sm:text-xs text-slate-400 font-bold truncate">{lessonTitle}</span>}
                             </div>
@@ -249,7 +308,7 @@ export const ResourceViewerModal: React.FC<ResourceViewerModalProps> = ({
                             {(resource.type === 'image' || resource.type === 'pdf') && (
                                 <button
                                     onClick={() => setIsFullScreen(true)}
-                                    className="p-2 bg-slate-800 hover:bg-slate-700 text-white rounded-xl flex items-center gap-1 text-xs font-bold transition-all active:scale-95"
+                                    className="p-2 bg-slate-800 hover:bg-slate-700 text-white rounded-xl flex items-center gap-1.5 text-xs font-bold transition-all active:scale-95 border border-slate-700/50 shadow-sm cursor-pointer"
                                     title="عرض الشاشة كاملة"
                                 >
                                     <Maximize2 className="w-4 h-4 text-emerald-400" />
@@ -257,16 +316,18 @@ export const ResourceViewerModal: React.FC<ResourceViewerModalProps> = ({
                                 </button>
                             )}
 
-                            {/* Download Button */}
-                            <button
-                                onClick={handleInitiateDownload}
-                                disabled={isDownloading}
-                                className="p-2 bg-emerald-600 hover:bg-emerald-500 disabled:opacity-50 text-white rounded-xl flex items-center gap-1.5 text-xs font-black transition-all active:scale-95 shadow-sm"
-                                title="تحميل الملف إلى جهازك"
-                            >
-                                {isDownloading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Download className="w-4 h-4" />}
-                                <span className="hidden sm:inline">{isDownloading ? 'جاري التحميل...' : 'تحميل'}</span>
-                            </button>
+                            {/* Download Button (Image and PDF only) */}
+                            {(resource.type === 'image' || resource.type === 'pdf') && (
+                                <button
+                                    onClick={handleInitiateDownload}
+                                    disabled={isDownloading}
+                                    className="p-2 bg-emerald-600 hover:bg-emerald-500 disabled:opacity-50 text-white rounded-xl flex items-center gap-1.5 text-xs font-black transition-all active:scale-95 shadow-sm"
+                                    title="تحميل الملف إلى جهازك"
+                                >
+                                    {isDownloading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Download className="w-4 h-4" />}
+                                    <span className="hidden sm:inline">{isDownloading ? 'جاري التحميل...' : 'تحميل'}</span>
+                                </button>
+                            )}
 
                             {/* Close Button */}
                             <button
@@ -282,12 +343,12 @@ export const ResourceViewerModal: React.FC<ResourceViewerModalProps> = ({
                     {/* Content Container */}
                     <div className="flex-1 bg-slate-100 relative overflow-auto flex items-center justify-center p-2 sm:p-4">
                         {resource.type === 'video' && (
-                            <div className="w-full h-full max-h-[75vh] flex items-center justify-center bg-black rounded-xl overflow-hidden shadow-inner">
+                            <div className="w-full h-full max-h-[78vh] flex items-center justify-center bg-black rounded-xl overflow-hidden shadow-inner border border-slate-800">
                                 <iframe
                                     src={getEmbedVideoUrl(resource.url)}
                                     className="w-full h-full border-none rounded-xl"
                                     title={title}
-                                    allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                                    allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
                                     allowFullScreen
                                 />
                             </div>

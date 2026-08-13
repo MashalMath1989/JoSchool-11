@@ -1,10 +1,10 @@
 import React from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { PlayCircle, FileText, Image as ImageIcon } from 'lucide-react';
+import { PlayCircle, FileText, Image as ImageIcon, X } from 'lucide-react';
 import { BookOpenIcon, ChevronDownIcon, StarIcon, BookmarkIcon, RefreshIcon, ChevronLeftIcon, ChevronRightIcon, ArrowLeftIcon, ArrowRightIcon, CheckCircleIcon, Loader2 } from './data/Icons';
 import { Subject, Unit, Lesson, View, SubjectName, Semester, LessonResource } from './types';
 import { isSubjectLoaded, getLessonChunksCount, isLessonLoaded } from './services/quizService';
-import { loadCachedResources, fetchRemoteHistoryResources, getResourcesForLesson, getResourcesForUnit, generatePdfDownloadFileName, ResourceJsonUnit } from './services/resourceService';
+import { loadCachedResources, fetchRemoteResources, fetchRemoteHistoryResources, getResourcesForLesson, getResourcesForUnit, generatePdfDownloadFileName, ResourceJsonUnit, MathBasicsItem, loadCachedMathBasics, fetchRemoteMathBasics, getYoutubeThumbnailUrl, fetchYoutubeVideoTitle } from './services/resourceService';
 import { ResourceViewerModal } from './ResourceViewerModal';
 
 interface SubjectIndexPageProps {
@@ -42,18 +42,151 @@ const SubjectIndexPage: React.FC<SubjectIndexPageProps> = React.memo(({
     onBack,
     examsUpdatedTrigger
 }) => {
-    const [resourcesData, setResourcesData] = React.useState<ResourceJsonUnit[]>(() => loadCachedResources());
+    const [resourcesData, setResourcesData] = React.useState<ResourceJsonUnit[]>(() => loadCachedResources(selectedSubject?.id));
     const [activeResource, setActiveResource] = React.useState<{ resource: LessonResource; lessonTitle: string; downloadFileName?: string } | null>(null);
     const [isSyncingResource, setIsSyncingResource] = React.useState<boolean>(false);
+    const [showMathBasicsView, setShowMathBasicsView] = React.useState<boolean>(false);
+    const [mathBasicsItems, setMathBasicsItems] = React.useState<MathBasicsItem[]>(() => loadCachedMathBasics());
+    const [activeLessonVideos, setActiveLessonVideos] = React.useState<{ unitTitle: string; lessonTitle: string; videos: LessonResource[] } | null>(null);
+    const [ytTitles, setYtTitles] = React.useState<Record<string, string>>({});
+
+    React.useEffect(() => {
+        if (showMathBasicsView && mathBasicsItems.length > 0) {
+            mathBasicsItems.forEach(item => {
+                if (item.youtubeTitle) {
+                    setYtTitles(prev => ({ ...prev, [item.url]: item.youtubeTitle! }));
+                } else {
+                    fetchYoutubeVideoTitle(item.url).then(title => {
+                        if (title) {
+                            setYtTitles(prev => ({ ...prev, [item.url]: title }));
+                        }
+                    });
+                }
+            });
+        }
+    }, [showMathBasicsView, mathBasicsItems]);
+
+    React.useEffect(() => {
+        if (activeLessonVideos && activeLessonVideos.videos.length > 0) {
+            activeLessonVideos.videos.forEach(item => {
+                if (item.url) {
+                    fetchYoutubeVideoTitle(item.url).then(title => {
+                        if (title) {
+                            setYtTitles(prev => ({ ...prev, [item.url]: title }));
+                        }
+                    });
+                }
+            });
+        }
+    }, [activeLessonVideos]);
+
+    const openMathBasicsView = () => {
+        setShowMathBasicsView(true);
+        try {
+            const currentState = window.history.state || {};
+            window.history.pushState({ ...currentState, mathBasics: true }, '');
+        } catch (e) {
+            console.warn("pushState error:", e);
+        }
+    };
+
+    const closeMathBasicsView = () => {
+        if (window.history.state?.mathBasics) {
+            window.history.back();
+        } else {
+            setShowMathBasicsView(false);
+        }
+    };
+
+    const openLessonVideosView = (unitTitle: string, lessonTitle: string, videos: LessonResource[]) => {
+        setActiveLessonVideos({ unitTitle, lessonTitle, videos });
+        try {
+            const currentState = window.history.state || {};
+            window.history.pushState({ ...currentState, lessonVideos: true }, '');
+        } catch (e) {
+            console.warn("pushState error:", e);
+        }
+    };
+
+    const closeLessonVideosView = () => {
+        if (window.history.state?.lessonVideos) {
+            window.history.back();
+        } else {
+            setActiveLessonVideos(null);
+        }
+    };
+
+    const openResourceModal = (resData: { resource: LessonResource; lessonTitle: string; downloadFileName?: string }) => {
+        setActiveResource(resData);
+        try {
+            const currentState = window.history.state || {};
+            if (!currentState.activeResourceModal) {
+                window.history.pushState({ ...currentState, activeResourceModal: true }, '');
+            }
+        } catch (e) {
+            console.warn("pushState error:", e);
+        }
+    };
+
+    const closeResourceModal = () => {
+        if (window.history.state?.activeResourceModal) {
+            window.history.back();
+        } else {
+            setActiveResource(null);
+        }
+    };
+
+    React.useEffect(() => {
+        const handlePopState = (e: PopStateEvent) => {
+            const state = e.state || {};
+
+            if (!state.activeResourceModal) {
+                setActiveResource(null);
+            }
+
+            if (!state.mathBasics) {
+                setShowMathBasicsView(false);
+            }
+
+            if (!state.lessonVideos) {
+                setActiveLessonVideos(null);
+            }
+        };
+
+        window.addEventListener('popstate', handlePopState);
+        return () => {
+            window.removeEventListener('popstate', handlePopState);
+        };
+    }, []);
+
+    React.useEffect(() => {
+        if (selectedSubject?.id === SubjectName.Math && selectedSubject?.semester === Semester.First) {
+            setMathBasicsItems(loadCachedMathBasics());
+            fetchRemoteMathBasics().then(items => {
+                if (items && items.length > 0) {
+                    setMathBasicsItems(items);
+                }
+            }).catch(err => {
+                console.warn("Math basics fetch error:", err);
+            });
+        }
+    }, [selectedSubject]);
 
     React.useEffect(() => {
         let isMounted = true;
-        if (selectedSubject?.id === SubjectName.JordanHistory && selectedSubject?.semester === Semester.First) {
-            fetchRemoteHistoryResources().then(updated => {
+        const isSupportedSubject = (selectedSubject?.id === SubjectName.JordanHistory || selectedSubject?.id === SubjectName.Math) && selectedSubject?.semester !== Semester.Second;
+        if (isSupportedSubject) {
+            setResourcesData(loadCachedResources(selectedSubject.id));
+            // Silent background fetch on page load
+            fetchRemoteResources(selectedSubject.id).then(updated => {
                 if (isMounted && updated && updated.length > 0) {
                     setResourcesData(updated);
                 }
+            }).catch(err => {
+                console.warn("Silent resource sync failed:", err);
             });
+        } else {
+            setResourcesData([]);
         }
         return () => { isMounted = false; };
     }, [selectedSubject]);
@@ -78,7 +211,7 @@ const SubjectIndexPage: React.FC<SubjectIndexPageProps> = React.memo(({
         );
 
         // Show current resource immediately so user gets fast UI feedback
-        setActiveResource({ 
+        openResourceModal({ 
             resource: res, 
             lessonTitle: isUnitResource ? unitTitle : lessonTitle,
             downloadFileName: initialDownloadFileName
@@ -87,7 +220,7 @@ const SubjectIndexPage: React.FC<SubjectIndexPageProps> = React.memo(({
 
         try {
             // Re-fetch latest live JSON from GitHub (with timestamp cache-buster)
-            const freshUnits = await fetchRemoteHistoryResources();
+            const freshUnits = await fetchRemoteResources(selectedSubject?.id);
             if (freshUnits && freshUnits.length > 0) {
                 setResourcesData(freshUnits);
                 const freshResources = !isUnitResource 
@@ -105,7 +238,7 @@ const SubjectIndexPage: React.FC<SubjectIndexPageProps> = React.memo(({
                             updatedRes.resourceTitle,
                             updatedRes.type
                         );
-                        setActiveResource({ 
+                        openResourceModal({ 
                             resource: updatedRes, 
                             lessonTitle: isUnitResource ? unitTitle : lessonTitle,
                             downloadFileName: updatedDownloadFileName
@@ -235,6 +368,219 @@ const SubjectIndexPage: React.FC<SubjectIndexPageProps> = React.memo(({
 
     const comprehensiveStatus = getComprehensiveExamStatus();
 
+    if (showMathBasicsView) {
+        return (
+            <div className="container mx-auto max-w-2xl p-4 pt-2 pb-8" dir="rtl">
+                {/* Page Header with Back Button */}
+                <div className="bg-gradient-to-r from-slate-900 via-slate-800 to-slate-900 text-white p-4 sm:p-5 rounded-2xl border-2 border-slate-900 shadow-[4px_4px_0px_0px_rgba(0,0,0,1)] flex items-center justify-between gap-3 mb-6">
+                    <div className="flex items-center gap-3 min-w-0">
+                        <div className="w-11 h-11 sm:w-12 sm:h-12 rounded-xl bg-red-600 flex items-center justify-center border-2 border-slate-900 shadow-md shrink-0">
+                            <PlayCircle className="w-6 h-6 sm:w-7 sm:h-7 text-white" />
+                        </div>
+                        <div className="min-w-0">
+                            <h2 className="font-black text-base sm:text-xl text-white leading-tight truncate">
+                                حصص التأسيس - الرياضيات
+                            </h2>
+                            <p className="text-xs text-slate-300 font-bold mt-0.5 truncate">
+                                الفصل الأول • فيديوهات التأسيس الشاملة ({mathBasicsItems.length} حصة)
+                            </p>
+                        </div>
+                    </div>
+
+                    <button 
+                        onClick={closeMathBasicsView}
+                        className="w-10 h-10 sm:w-12 sm:h-12 shadow-[3px_3px_0px_0px_rgba(0,0,0,1)] bg-white border-2 border-slate-900 rounded-xl text-slate-800 hover:bg-slate-100 transition-all active:translate-x-[2px] active:translate-y-[2px] active:shadow-none shrink-0 flex items-center justify-center cursor-pointer group"
+                        title="رجوع"
+                    >
+                        <ArrowRightIcon className="w-5 h-5 sm:w-6 sm:h-6 group-hover:scale-110 transition-transform" strokeWidth={3} />
+                    </button>
+                </div>
+
+                {/* Videos Grid */}
+                <div className="space-y-4">
+                    <div className="flex items-center justify-between px-1">
+                        <h3 className="text-sm font-black text-slate-800 flex items-center gap-2">
+                            <span className="w-2.5 h-2.5 rounded-full bg-red-600 inline-block animate-pulse"></span>
+                            قائمة فيديوهات التأسيس
+                        </h3>
+                        <span className="text-xs font-bold text-slate-500 bg-slate-200/70 px-2.5 py-1 rounded-lg">
+                            {mathBasicsItems.length} حصة
+                        </span>
+                    </div>
+
+                    {mathBasicsItems.length === 0 ? (
+                        <div className="bg-white rounded-2xl border-2 border-slate-900 shadow-[4px_4px_0px_0px_rgba(0,0,0,1)] p-8 text-center text-slate-500 font-bold flex flex-col items-center justify-center gap-3">
+                            <Loader2 className="w-8 h-8 text-red-600 animate-spin" />
+                            <span>جاري تحميل حصص التأسيس...</span>
+                        </div>
+                    ) : (
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5 sm:gap-4">
+                            {mathBasicsItems.map((item, idx) => {
+                                const thumbUrl = getYoutubeThumbnailUrl(item.url);
+                                return (
+                                    <button
+                                        key={item.videoId || idx}
+                                        onClick={() => {
+                                            openResourceModal({
+                                                resource: {
+                                                    type: 'video',
+                                                    url: item.url,
+                                                    resourceTitle: item.videoTitle
+                                                },
+                                                lessonTitle: 'حصص التأسيس - الرياضيات (الفصل الأول)',
+                                                downloadFileName: `${item.videoTitle}.mp4`
+                                            });
+                                        }}
+                                        className="flex items-center gap-3.5 p-3.5 bg-white rounded-2xl border-2 border-slate-900 shadow-[4px_4px_0px_0px_rgba(0,0,0,1)] hover:shadow-[2px_2px_0px_0px_rgba(0,0,0,1)] hover:translate-x-[2px] hover:translate-y-[2px] active:translate-x-[4px] active:translate-y-[4px] active:shadow-none transition-all text-right group cursor-pointer overflow-hidden"
+                                    >
+                                        <div className="w-28 sm:w-36 aspect-video rounded-md bg-slate-900 border border-slate-900 flex items-center justify-center shrink-0 group-hover:border-red-600 transition-colors shadow-sm overflow-hidden relative">
+                                            {thumbUrl ? (
+                                                <img 
+                                                    src={thumbUrl} 
+                                                    alt={item.videoTitle} 
+                                                    className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300" 
+                                                    loading="lazy"
+                                                />
+                                            ) : (
+                                                <div className="w-full h-full bg-red-50 flex items-center justify-center group-hover:bg-red-600 transition-colors">
+                                                    <PlayCircle className="w-7 h-7 text-red-600 group-hover:text-white transition-colors" />
+                                                </div>
+                                            )}
+                                        </div>
+                                        <div className="flex-1 min-w-0">
+                                            <h4 className="font-black text-slate-800 text-sm leading-snug group-hover:text-red-600 transition-colors line-clamp-1">
+                                                {item.videoTitle}
+                                            </h4>
+                                            <p className="text-[11px] font-semibold text-slate-500 group-hover:text-slate-700 transition-colors line-clamp-2 leading-snug mt-1" title={ytTitles[item.url] || item.youtubeTitle || item.videoTitle}>
+                                                {ytTitles[item.url] || item.youtubeTitle || "فيديو شرح"}
+                                            </p>
+                                        </div>
+                                    </button>
+                                );
+                            })}
+                        </div>
+                    )}
+                </div>
+
+                {/* Resource Viewer Modal */}
+                {activeResource && (
+                    <ResourceViewerModal
+                        resource={activeResource.resource}
+                        lessonTitle={activeResource.lessonTitle}
+                        downloadFileName={activeResource.downloadFileName}
+                        isSyncing={isSyncingResource}
+                        onClose={closeResourceModal}
+                    />
+                )}
+            </div>
+        );
+    }
+
+    if (activeLessonVideos) {
+        return (
+            <div className="container mx-auto max-w-2xl p-4 pt-2 pb-8" dir="rtl">
+                {/* Page Header with Back Button */}
+                <div className="bg-gradient-to-r from-slate-900 via-slate-800 to-slate-900 text-white p-4 sm:p-5 rounded-2xl border-2 border-slate-900 shadow-[4px_4px_0px_0px_rgba(0,0,0,1)] flex items-center justify-between gap-3 mb-6">
+                    <div className="flex items-center gap-3 min-w-0">
+                        <div className="w-11 h-11 sm:w-12 sm:h-12 rounded-xl bg-red-600 flex items-center justify-center border-2 border-slate-900 shadow-md shrink-0">
+                            <PlayCircle className="w-6 h-6 sm:w-7 sm:h-7 text-white" />
+                        </div>
+                        <div className="min-w-0">
+                            <h2 className="font-black text-base sm:text-xl text-white leading-tight truncate">
+                                حصص الشرح - {activeLessonVideos.lessonTitle}
+                            </h2>
+                            <p className="text-xs text-slate-300 font-bold mt-0.5 truncate">
+                                {activeLessonVideos.unitTitle} • ({activeLessonVideos.videos.length} حصة)
+                            </p>
+                        </div>
+                    </div>
+
+                    <button 
+                        onClick={closeLessonVideosView}
+                        className="w-10 h-10 sm:w-12 sm:h-12 shadow-[3px_3px_0px_0px_rgba(0,0,0,1)] bg-white border-2 border-slate-900 rounded-xl text-slate-800 hover:bg-slate-100 transition-all active:translate-x-[2px] active:translate-y-[2px] active:shadow-none shrink-0 flex items-center justify-center cursor-pointer group"
+                        title="رجوع"
+                    >
+                        <ArrowRightIcon className="w-5 h-5 sm:w-6 sm:h-6 group-hover:scale-110 transition-transform" strokeWidth={3} />
+                    </button>
+                </div>
+
+                {/* Videos Grid */}
+                <div className="space-y-4">
+                    <div className="flex items-center justify-between px-1">
+                        <h3 className="text-sm font-black text-slate-800 flex items-center gap-2">
+                            <span className="w-2.5 h-2.5 rounded-full bg-red-600 inline-block animate-pulse"></span>
+                            قائمة فيديوهات الشرح
+                        </h3>
+                        <span className="text-xs font-bold text-slate-500 bg-slate-200/70 px-2.5 py-1 rounded-lg">
+                            {activeLessonVideos.videos.length} حصة
+                        </span>
+                    </div>
+
+                    {activeLessonVideos.videos.length === 0 ? (
+                        <div className="bg-white rounded-2xl border-2 border-slate-900 shadow-[4px_4px_0px_0px_rgba(0,0,0,1)] p-8 text-center text-slate-500 font-bold">
+                            لا توجد فيديوهات مجهزة لهذا الدرس حالياً
+                        </div>
+                    ) : (
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5 sm:gap-4">
+                            {activeLessonVideos.videos.map((res, idx) => {
+                                const thumbUrl = getYoutubeThumbnailUrl(res.url);
+                                const videoTitle = res.resourceTitle?.trim() || `حصة شرح ${idx + 1}`;
+
+                                return (
+                                    <button
+                                        key={idx}
+                                        onClick={() => {
+                                            openResourceModal({
+                                                resource: res,
+                                                lessonTitle: activeLessonVideos.lessonTitle,
+                                                downloadFileName: `${videoTitle}.mp4`
+                                            });
+                                        }}
+                                        className="flex items-center gap-3.5 p-3.5 bg-white rounded-2xl border-2 border-slate-900 shadow-[4px_4px_0px_0px_rgba(0,0,0,1)] hover:shadow-[2px_2px_0px_0px_rgba(0,0,0,1)] hover:translate-x-[2px] hover:translate-y-[2px] active:translate-x-[4px] active:translate-y-[4px] active:shadow-none transition-all text-right group cursor-pointer overflow-hidden"
+                                    >
+                                        <div className="w-28 sm:w-36 aspect-video rounded-md bg-slate-900 border border-slate-900 flex items-center justify-center shrink-0 group-hover:border-red-600 transition-colors shadow-sm overflow-hidden relative">
+                                            {thumbUrl ? (
+                                                <img 
+                                                    src={thumbUrl} 
+                                                    alt={videoTitle} 
+                                                    className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300" 
+                                                    loading="lazy"
+                                                />
+                                            ) : (
+                                                <div className="w-full h-full bg-red-50 flex items-center justify-center group-hover:bg-red-600 transition-colors">
+                                                    <PlayCircle className="w-7 h-7 text-red-600 group-hover:text-white transition-colors" />
+                                                </div>
+                                            )}
+                                        </div>
+                                        <div className="flex-1 min-w-0">
+                                            <h4 className="font-black text-slate-800 text-sm leading-snug group-hover:text-red-600 transition-colors line-clamp-1">
+                                                {videoTitle}
+                                            </h4>
+                                            <p className="text-[11px] font-semibold text-slate-500 group-hover:text-slate-700 transition-colors line-clamp-2 leading-snug mt-1" title={ytTitles[res.url] || videoTitle}>
+                                                {ytTitles[res.url] || "فيديو شرح"}
+                                            </p>
+                                        </div>
+                                    </button>
+                                );
+                            })}
+                        </div>
+                    )}
+                </div>
+
+                {/* Resource Viewer Modal */}
+                {activeResource && (
+                    <ResourceViewerModal
+                        resource={activeResource.resource}
+                        lessonTitle={activeResource.lessonTitle}
+                        downloadFileName={activeResource.downloadFileName}
+                        isSyncing={isSyncingResource}
+                        onClose={closeResourceModal}
+                    />
+                )}
+            </div>
+        );
+    }
+
     return (
         <div className="container mx-auto max-w-2xl p-4 pt-2 pb-8" dir="rtl">
             <div className="flex items-stretch justify-between px-2 gap-4 sm:gap-8 mb-5">
@@ -262,10 +608,22 @@ const SubjectIndexPage: React.FC<SubjectIndexPageProps> = React.memo(({
                 <div className="flex-1 text-right min-w-0 order-2 flex flex-col justify-between py-1">
                     <div>
                         <div className="flex items-center justify-between gap-2">
-                             <div className="flex flex-col text-right">
+                             <div className="flex flex-col text-right min-w-0">
                                  <h2 className={`text-lg sm:text-2xl font-black text-slate-800 truncate ${selectedSubject.fontClass}`}>{selectedSubject.id}</h2>
                                  <span className="text-xs font-black text-primary/80">{selectedSubject.semester}</span>
                              </div>
+
+                             {selectedSubject.id === SubjectName.Math && selectedSubject.semester === Semester.First && (
+                                  <button
+                                      onClick={openMathBasicsView}
+                                      className="w-11 h-11 sm:w-13 sm:h-13 bg-gradient-to-b from-red-600 to-rose-600 hover:from-red-700 hover:to-rose-700 text-white font-black rounded-xl border-2 border-slate-900 shadow-[3px_3px_0px_0px_rgba(0,0,0,1)] active:translate-x-[1px] active:translate-y-[1px] active:shadow-none transition-all cursor-pointer shrink-0 flex flex-col items-center justify-center text-[11px] sm:text-xs leading-none p-1 text-center"
+                                      title="حصص التأسيس"
+                                  >
+                                      <span>حصص</span>
+                                      <span className="mt-0.5">التأسيس</span>
+                                  </button>
+                             )}
+
                              <button 
                                 onClick={onBack}
                                 className="w-10 h-10 sm:w-13 sm:h-13 shadow-[3px_3px_0px_0px_rgba(0,0,0,1)] bg-white border-2 border-slate-900 rounded-lg text-slate-800 hover:bg-slate-50 transition-all active:translate-x-[2px] active:translate-y-[2px] active:shadow-none shrink-0 flex items-center justify-center group"
@@ -491,50 +849,63 @@ const SubjectIndexPage: React.FC<SubjectIndexPageProps> = React.memo(({
                                                                                     })}
                                                                                 </div>
 
-                                                                                {/* Lesson Resources Horizontal Row */}
+                                                                                {/* Lesson Resources Grid (RTL Organized Compact Grid) */}
                                                                                 {(() => {
-                                                                                    if (selectedSubject?.id !== SubjectName.JordanHistory || selectedSubject?.semester !== Semester.First) {
-                                                                                        return null;
-                                                                                    }
+                                                                                    const isSupportedSubject = (selectedSubject?.id === SubjectName.JordanHistory || selectedSubject?.id === SubjectName.Math) && selectedSubject?.semester !== Semester.Second;
 
-                                                                                    const lessonResources = getResourcesForLesson(
+                                                                                    const lessonResources = isSupportedSubject ? getResourcesForLesson(
                                                                                         unit.title,
                                                                                         lesson.title,
                                                                                         uIdx,
                                                                                         lIdx,
                                                                                         resourcesData
-                                                                                    );
+                                                                                    ) : [];
+
                                                                                     if (!lessonResources || lessonResources.length === 0) {
                                                                                         return (
-                                                                                            <div className="w-full mt-3.5 pt-2.5 text-center text-xs sm:text-sm font-bold text-slate-600 bg-slate-100/90 border border-slate-200 rounded-xl py-2.5 px-3 shadow-inner">
-                                                                                                يتم توفير ملخصات وشرح الدروس أولا بأول
+                                                                                            <div className="w-full mt-2.5 pt-2 border-t border-slate-200/80 text-center" dir="rtl">
+                                                                                                <span className="inline-block text-[11px] sm:text-xs font-bold text-slate-500 bg-slate-50 px-3 py-1 rounded-lg border border-slate-200/60 shadow-2xs">
+                                                                                                    يتم توفير ملخصات وشرح الدروس أولا بأول
+                                                                                                </span>
                                                                                             </div>
                                                                                         );
                                                                                     }
 
+                                                                                    const videoResources = lessonResources.filter(r => r.type === 'video');
+                                                                                    const nonVideoResources = lessonResources.filter(r => r.type !== 'video');
+
                                                                                     return (
-                                                                                        <div className="w-full mt-3.5 pt-3 border-t border-slate-200/80 flex flex-wrap items-center justify-center gap-2 sm:gap-2.5">
-                                                                                            {lessonResources.map((res, rIdx) => {
+                                                                                        <div className="w-full mt-2.5 pt-2 border-t border-slate-200/80 grid grid-cols-2 sm:grid-cols-3 gap-1.5" dir="rtl">
+                                                                                            {videoResources.length > 0 && (
+                                                                                                <button
+                                                                                                    onClick={() => openLessonVideosView(unit.title, lesson.title, videoResources)}
+                                                                                                    className="w-full flex items-center gap-1.5 px-2 py-1.5 rounded-lg border-2 border-slate-900 bg-red-600 hover:bg-red-700 text-white font-black text-xs active:scale-95 transition-all shadow-2xs group cursor-pointer"
+                                                                                                >
+                                                                                                    <div className="w-4 h-4 rounded flex items-center justify-center shrink-0">
+                                                                                                        <PlayCircle className="w-3.5 h-3.5 text-white group-hover:scale-110 transition-transform" />
+                                                                                                    </div>
+                                                                                                    <span className="truncate text-right flex-1 text-[11px] leading-tight">حصص الشرح</span>
+                                                                                                </button>
+                                                                                            )}
+
+                                                                                            {nonVideoResources.map((res, rIdx) => {
                                                                                                 const resTitle = res.resourceTitle?.trim() 
                                                                                                     ? res.resourceTitle 
-                                                                                                    : res.type === 'video' 
-                                                                                                        ? 'فيديو شرح' 
-                                                                                                        : res.type === 'pdf' 
-                                                                                                            ? 'ملخص PDF' 
-                                                                                                            : 'ملخص مصور';
+                                                                                                    : res.type === 'pdf' 
+                                                                                                        ? 'ملخص PDF' 
+                                                                                                        : 'ملخص مصور';
 
                                                                                                 return (
                                                                                                     <button
                                                                                                         key={rIdx}
                                                                                                         onClick={() => handleResourceClick(unit.title, lesson.title, uIdx, lIdx, rIdx, res)}
-                                                                                                        className="flex items-center gap-2 px-3 sm:px-3.5 py-1.5 sm:py-2 rounded-xl border-2 border-slate-900 bg-white hover:bg-slate-50 active:scale-95 transition-all shadow-[2px_2px_0px_0px_rgba(0,0,0,1)] text-slate-800 font-black text-xs sm:text-sm group"
+                                                                                                        className="w-full flex items-center gap-1.5 px-2 py-1.5 rounded-lg border border-slate-900 bg-white hover:bg-slate-50 active:scale-95 transition-all shadow-2xs text-slate-800 font-bold text-xs group cursor-pointer"
                                                                                                     >
-                                                                                                        <div className="w-5 h-5 sm:w-6 sm:h-6 rounded-lg flex items-center justify-center shrink-0">
-                                                                                                            {res.type === 'video' && <PlayCircle className="w-4 h-4 sm:w-5 sm:h-5 text-purple-600 group-hover:scale-110 transition-transform" />}
-                                                                                                            {res.type === 'pdf' && <FileText className="w-4 h-4 sm:w-5 sm:h-5 text-rose-600 group-hover:scale-110 transition-transform" />}
-                                                                                                            {res.type === 'image' && <ImageIcon className="w-4 h-4 sm:w-5 sm:h-5 text-emerald-600 group-hover:scale-110 transition-transform" />}
+                                                                                                        <div className="w-4 h-4 rounded flex items-center justify-center shrink-0">
+                                                                                                            {res.type === 'pdf' && <FileText className="w-3.5 h-3.5 text-rose-600 group-hover:scale-110 transition-transform" />}
+                                                                                                            {res.type === 'image' && <ImageIcon className="w-3.5 h-3.5 text-emerald-600 group-hover:scale-110 transition-transform" />}
                                                                                                         </div>
-                                                                                                        <span className="truncate">{resTitle}</span>
+                                                                                                        <span className="truncate text-right flex-1 text-[11px] leading-tight">{resTitle}</span>
                                                                                                     </button>
                                                                                                 );
                                                                                             })}
@@ -569,38 +940,51 @@ const SubjectIndexPage: React.FC<SubjectIndexPageProps> = React.memo(({
                                                 </div>
                                             )}
 
-                                            {/* Unit Resources Section */}
+                                            {/* Unit Resources Section (RTL Grid Layout) */}
                                             {(() => {
-                                                if (selectedSubject?.id !== SubjectName.JordanHistory || selectedSubject?.semester !== Semester.First) {
+                                                const isSupportedSubject = (selectedSubject?.id === SubjectName.JordanHistory || selectedSubject?.id === SubjectName.Math) && selectedSubject?.semester === Semester.First;
+                                                if (!isSupportedSubject) {
                                                     return null;
                                                 }
 
                                                 const unitResources = getResourcesForUnit(unit.title, uIdx, resourcesData, unit);
                                                 if (!unitResources || unitResources.length === 0) return null;
 
+                                                const videoResources = unitResources.filter(r => r.type === 'video');
+                                                const nonVideoResources = unitResources.filter(r => r.type !== 'video');
+
                                                 return (
-                                                    <div className="w-full mt-3.5 pt-3 border-t border-slate-200/80 flex flex-wrap items-center justify-center gap-2 sm:gap-2.5" dir="rtl">
-                                                        {unitResources.map((res, rIdx) => {
+                                                    <div className="w-full mt-3 pt-2.5 border-t border-slate-200/80 grid grid-cols-2 sm:grid-cols-3 gap-1.5" dir="rtl">
+                                                        {videoResources.length > 0 && (
+                                                            <button
+                                                                onClick={() => openLessonVideosView(unit.title, `شرح ${unit.title}`, videoResources)}
+                                                                className="w-full flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border-2 border-slate-900 bg-red-600 hover:bg-red-700 text-white font-black text-xs active:scale-95 transition-all shadow-2xs group cursor-pointer"
+                                                            >
+                                                                <div className="w-4 h-4 rounded flex items-center justify-center shrink-0">
+                                                                    <PlayCircle className="w-3.5 h-3.5 text-white group-hover:scale-110 transition-transform" />
+                                                                </div>
+                                                                <span className="truncate text-right flex-1 text-[11px] leading-tight">حصص الشرح</span>
+                                                            </button>
+                                                        )}
+
+                                                        {nonVideoResources.map((res, rIdx) => {
                                                             const resTitle = res.resourceTitle?.trim() 
                                                                 ? res.resourceTitle 
-                                                                : res.type === 'video' 
-                                                                    ? 'فيديو شرح الوحدة' 
-                                                                    : res.type === 'pdf' 
-                                                                        ? 'ملخص الوحدة PDF' 
-                                                                        : 'خريطة ذهنية للوحدة';
+                                                                : res.type === 'pdf' 
+                                                                    ? 'ملخص الوحدة PDF' 
+                                                                    : 'خريطة ذهنية للوحدة';
 
                                                             return (
                                                                 <button
                                                                     key={rIdx}
                                                                     onClick={() => handleResourceClick(unit.title, resTitle, uIdx, -1, rIdx, res, unit)}
-                                                                    className="flex items-center gap-2 px-3 sm:px-3.5 py-1.5 sm:py-2 rounded-xl border-2 border-slate-900 bg-white hover:bg-slate-50 active:scale-95 transition-all shadow-[2px_2px_0px_0px_rgba(0,0,0,1)] text-slate-800 font-black text-xs sm:text-sm group"
+                                                                    className="w-full flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border border-slate-900 bg-white hover:bg-slate-50 active:scale-95 transition-all shadow-2xs text-slate-800 font-bold text-xs group cursor-pointer"
                                                                 >
-                                                                    <div className="w-5 h-5 sm:w-6 sm:h-6 rounded-lg flex items-center justify-center shrink-0">
-                                                                        {res.type === 'video' && <PlayCircle className="w-4 h-4 sm:w-5 sm:h-5 text-purple-600 group-hover:scale-110 transition-transform" />}
-                                                                        {res.type === 'pdf' && <FileText className="w-4 h-4 sm:w-5 sm:h-5 text-rose-600 group-hover:scale-110 transition-transform" />}
-                                                                        {res.type === 'image' && <ImageIcon className="w-4 h-4 sm:w-5 sm:h-5 text-emerald-600 group-hover:scale-110 transition-transform" />}
+                                                                    <div className="w-4 h-4 rounded flex items-center justify-center shrink-0">
+                                                                        {res.type === 'pdf' && <FileText className="w-3.5 h-3.5 text-rose-600 group-hover:scale-110 transition-transform" />}
+                                                                        {res.type === 'image' && <ImageIcon className="w-3.5 h-3.5 text-emerald-600 group-hover:scale-110 transition-transform" />}
                                                                     </div>
-                                                                    <span className="truncate">{resTitle}</span>
+                                                                    <span className="truncate text-right flex-1 text-[11px] leading-tight">{resTitle}</span>
                                                                 </button>
                                                             );
                                                         })}
