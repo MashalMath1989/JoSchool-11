@@ -25,7 +25,7 @@ export const subjectsData: Subject[] = [
   },
   {
     id: SubjectName.Math,
-    coverImage: 'https://i.postimg.cc/15jsZyZM/1783092537930.png',
+    coverImage: 'https://raw.githubusercontent.com/MashalMath/Pdf_Library/main/Math11_S1_Cover.png',
     fontClass: 'font-sans',
     semester: Semester.First,
     multiBooks: [

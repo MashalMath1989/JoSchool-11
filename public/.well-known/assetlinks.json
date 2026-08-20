@@ -1,0 +1,8 @@
+[{
+      "relation": ["delegate_permission/common.handle_all_urls"],
+      "target": {
+        "namespace": "android_app",
+        "package_name": "app.netlify.joschool11.twa",
+        "sha256_cert_fingerprints": ["9B:AF:32:0E:18:1E:03:5B:36:4D:98:64:56:E3:EB:15:C7:01:54:E6:19:BF:82:4F:67:2C:07:D2:A9:21:13:7F"]
+      }
+    }]
