@@ -1,6 +1,6 @@
 import React from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { PlayCircle, FileText, Image as ImageIcon, X } from 'lucide-react';
+import { PlayCircle, FileText, Image as ImageIcon, X, ExternalLink } from 'lucide-react';
 import { BookOpenIcon, ChevronDownIcon, StarIcon, BookmarkIcon, RefreshIcon, ChevronLeftIcon, ChevronRightIcon, ArrowLeftIcon, ArrowRightIcon, CheckCircleIcon, Loader2 } from './data/Icons';
 import { Subject, Unit, Lesson, View, SubjectName, Semester, LessonResource } from './types';
 import { isSubjectLoaded, getLessonChunksCount, isLessonLoaded } from './services/quizService';
@@ -175,9 +175,12 @@ const SubjectIndexPage: React.FC<SubjectIndexPageProps> = React.memo(({
     React.useEffect(() => {
         let isMounted = true;
         const isSupportedSubject = (selectedSubject?.id === SubjectName.JordanHistory || selectedSubject?.id === SubjectName.Math) && selectedSubject?.semester !== Semester.Second;
-        if (isSupportedSubject) {
-            setResourcesData(loadCachedResources(selectedSubject.id));
-            // Silent background fetch on page load
+        if (!isSupportedSubject) {
+            setResourcesData([]);
+            return;
+        }
+
+        const syncResources = () => {
             fetchRemoteResources(selectedSubject.id).then(updated => {
                 if (isMounted && updated && updated.length > 0) {
                     setResourcesData(updated);
@@ -185,10 +188,29 @@ const SubjectIndexPage: React.FC<SubjectIndexPageProps> = React.memo(({
             }).catch(err => {
                 console.warn("Silent resource sync failed:", err);
             });
-        } else {
-            setResourcesData([]);
-        }
-        return () => { isMounted = false; };
+        };
+
+        setResourcesData(loadCachedResources(selectedSubject.id));
+        syncResources();
+
+        const handleVisibilityChange = () => {
+            if (document.visibilityState === 'visible') {
+                syncResources();
+            }
+        };
+
+        const handleFocus = () => {
+            syncResources();
+        };
+
+        document.addEventListener('visibilitychange', handleVisibilityChange);
+        window.addEventListener('focus', handleFocus);
+
+        return () => {
+            isMounted = false;
+            document.removeEventListener('visibilitychange', handleVisibilityChange);
+            window.removeEventListener('focus', handleFocus);
+        };
     }, [selectedSubject]);
 
     const handleResourceClick = async (
@@ -200,19 +222,38 @@ const SubjectIndexPage: React.FC<SubjectIndexPageProps> = React.memo(({
         res: LessonResource,
         unitObj?: Unit
     ) => {
+        // If type is link, open immediately in browser
+        if (res.type?.toLowerCase() === 'link') {
+            if (res.url) {
+                window.open(res.url, '_blank', 'noopener,noreferrer');
+            }
+            return;
+        }
+
         const isUnitResource = lIdx < 0;
+        const isPdfUrl = (res.url || '').toLowerCase().includes('.pdf') || 
+            ((res.url || '').includes('drive.google.com') && !(res.url || '').includes('youtube'));
+        const normalizedRes: LessonResource = isPdfUrl ? { ...res, type: 'pdf' } : res;
+
+        if (normalizedRes.type?.toLowerCase() === 'link') {
+            if (normalizedRes.url) {
+                window.open(normalizedRes.url, '_blank', 'noopener,noreferrer');
+            }
+            return;
+        }
+
         const initialDownloadFileName = generatePdfDownloadFileName(
             isUnitResource ? 'unit' : 'lesson',
             uIdx,
             lIdx,
             isUnitResource ? unitTitle : lessonTitle,
-            res.resourceTitle,
-            res.type
+            normalizedRes.resourceTitle,
+            normalizedRes.type
         );
 
         // Show current resource immediately so user gets fast UI feedback
         openResourceModal({ 
-            resource: res, 
+            resource: normalizedRes, 
             lessonTitle: isUnitResource ? unitTitle : lessonTitle,
             downloadFileName: initialDownloadFileName
         });
@@ -228,8 +269,15 @@ const SubjectIndexPage: React.FC<SubjectIndexPageProps> = React.memo(({
                     : getResourcesForUnit(unitTitle, uIdx, freshUnits, unitObj);
 
                 if (freshResources && freshResources.length > 0) {
-                    const updatedRes = freshResources[rIdx] || freshResources.find(r => r.type === res.type) || freshResources[0];
-                    if (updatedRes && updatedRes.url) {
+                    // CRITICAL: Filter by the same type so a PDF is never replaced by a video!
+                    const sameTypeResources = freshResources.filter(r => r.type === normalizedRes.type);
+                    
+                    const updatedRes = sameTypeResources.find(r => r.url === normalizedRes.url)
+                        || sameTypeResources.find(r => r.resourceTitle?.trim() && r.resourceTitle?.trim() === normalizedRes.resourceTitle?.trim())
+                        || sameTypeResources[rIdx]
+                        || sameTypeResources[0];
+
+                    if (updatedRes && updatedRes.url && updatedRes.type === normalizedRes.type) {
                         const updatedDownloadFileName = generatePdfDownloadFileName(
                             isUnitResource ? 'unit' : 'lesson',
                             uIdx,
@@ -260,11 +308,10 @@ const SubjectIndexPage: React.FC<SubjectIndexPageProps> = React.memo(({
     const units = (subjectIndexData && (subjectIndexData[semesterKey] || subjectIndexData[selectedSubject.id])) || [];
     
     const isArabic = selectedSubject.id === SubjectName.Arabic;
-    const isLoaded = selectedSubject.id === SubjectName.English || isSubjectLoaded(selectedSubject.id as SubjectName);
+    const isLoaded = isSubjectLoaded(selectedSubject.id as SubjectName);
 
     const getExamStatus = (lessonTitle: string, examNumber: number) => {
-        const isEnglish = selectedSubject.id === SubjectName.English;
-        const examLabel = isEnglish ? `Exam (${examNumber})` : `امتحان (${examNumber})`;
+        const examLabel = `امتحان (${examNumber})`;
         const fullTitle = `${lessonTitle} - ${examLabel}`;
 
         const results = userProgress.quizResults?.filter((r: any) => 
@@ -281,8 +328,7 @@ const SubjectIndexPage: React.FC<SubjectIndexPageProps> = React.memo(({
 
     const getUnitExamStatus = (unitTitle: string) => {
         const unitOrdinal = unitTitle.split(':')[0];
-        const isEnglish = selectedSubject.id === SubjectName.English;
-        const examLabel = isEnglish ? 'Exam (1)' : 'امتحان (1)';
+        const examLabel = 'امتحان (1)';
         const fullTitle = `${unitOrdinal} - ${examLabel}`;
 
         const results = userProgress.quizResults?.filter((r: any) => 
@@ -308,8 +354,7 @@ const SubjectIndexPage: React.FC<SubjectIndexPageProps> = React.memo(({
             };
         }
 
-        const isEnglish = selectedSubject.id === SubjectName.English;
-        const examLabel = isEnglish ? `Exam (${examNumber})` : `امتحان (${examNumber})`;
+        const examLabel = `امتحان (${examNumber})`;
         const fullTitle = `${lessonTitle} - ${examLabel}`;
         const key = `${selectedSubject.id}_${fullTitle}`;
         const progress = userProgress.examProgresses?.[key];
@@ -336,8 +381,7 @@ const SubjectIndexPage: React.FC<SubjectIndexPageProps> = React.memo(({
         }
 
         const unitOrdinal = unitTitle.split(':')[0];
-        const isEnglish = selectedSubject.id === SubjectName.English;
-        const examLabel = isEnglish ? 'Exam (1)' : 'امتحان (1)';
+        const examLabel = 'امتحان (1)';
         const fullTitle = `${unitOrdinal} - ${examLabel}`;
         const key = `${selectedSubject.id}_${fullTitle}`;
         const progress = userProgress.examProgresses?.[key];
@@ -353,7 +397,7 @@ const SubjectIndexPage: React.FC<SubjectIndexPageProps> = React.memo(({
     };
 
     const getComprehensiveExamStatus = () => {
-        const fullTitle = selectedSubject.id === SubjectName.English ? 'Comprehensive Exam' : 'امتحان شامل';
+        const fullTitle = 'امتحان شامل';
         const results = userProgress.quizResults?.filter((r: any) => 
             r.subjectId === selectedSubject.id && r.lessonTitle.includes(fullTitle)
         ) || [];
@@ -393,6 +437,30 @@ const SubjectIndexPage: React.FC<SubjectIndexPageProps> = React.memo(({
                         title="رجوع"
                     >
                         <ArrowRightIcon className="w-5 h-5 sm:w-6 sm:h-6 group-hover:scale-110 transition-transform" strokeWidth={3} />
+                    </button>
+                </div>
+
+                {/* Math Basics Booklet Action (Centered above videos list) */}
+                <div className="flex justify-center mb-5">
+                    <button
+                        onClick={() => {
+                            openResourceModal({
+                                resource: {
+                                    type: 'pdf',
+                                    url: 'https://raw.githubusercontent.com/MashalMath/Pdf_Library/main/MathBasics_Book.pdf',
+                                    resourceTitle: 'دوسية أساسيات الرياضيات'
+                                },
+                                lessonTitle: 'حصص التأسيس - الرياضيات',
+                                downloadFileName: 'دوسية_أساسيات_الرياضيات.pdf'
+                            });
+                        }}
+                        className="inline-flex items-center justify-center gap-2 px-5 py-2.5 rounded-xl border-2 border-slate-900 bg-red-600 hover:bg-red-700 text-white active:scale-95 transition-all shadow-[3px_3px_0px_0px_rgba(0,0,0,1)] hover:shadow-[1px_1px_0px_0px_rgba(0,0,0,1)] hover:translate-x-[1px] hover:translate-y-[1px] text-xs sm:text-sm font-black group cursor-pointer"
+                        title="عرض ملف PDF: دوسية أساسيات الرياضيات"
+                    >
+                        <div className="w-5 h-5 rounded flex items-center justify-center shrink-0">
+                            <FileText className="w-4 h-4 sm:w-4.5 sm:h-4.5 text-white group-hover:scale-110 transition-transform" />
+                        </div>
+                        <span className="leading-tight">دوسية أساسيات الرياضيات</span>
                     </button>
                 </div>
 
@@ -487,10 +555,10 @@ const SubjectIndexPage: React.FC<SubjectIndexPageProps> = React.memo(({
                         </div>
                         <div className="min-w-0">
                             <h2 className="font-black text-base sm:text-xl text-white leading-tight truncate">
-                                حصص الشرح - {activeLessonVideos.lessonTitle}
+                                {activeLessonVideos.unitTitle}
                             </h2>
                             <p className="text-xs text-slate-300 font-bold mt-0.5 truncate">
-                                {activeLessonVideos.unitTitle} • ({activeLessonVideos.videos.length} حصة)
+                                {activeLessonVideos.lessonTitle}
                             </p>
                         </div>
                     </div>
@@ -629,11 +697,7 @@ const SubjectIndexPage: React.FC<SubjectIndexPageProps> = React.memo(({
                                 className="w-10 h-10 sm:w-13 sm:h-13 shadow-[3px_3px_0px_0px_rgba(0,0,0,1)] bg-white border-2 border-slate-900 rounded-lg text-slate-800 hover:bg-slate-50 transition-all active:translate-x-[2px] active:translate-y-[2px] active:shadow-none shrink-0 flex items-center justify-center group"
                                 title="رجوع"
                              >
-                                {selectedSubject.id === SubjectName.English ? (
-                                    <ArrowLeftIcon className="w-5 h-5 sm:w-7 sm:h-7 group-hover:scale-110 transition-transform" strokeWidth={3} />
-                                ) : (
-                                    <ArrowRightIcon className="w-5 h-5 sm:w-7 sm:h-7 group-hover:scale-110 transition-transform" strokeWidth={3} />
-                                )}
+                                <ArrowRightIcon className="w-5 h-5 sm:w-7 sm:h-7 group-hover:scale-110 transition-transform" strokeWidth={3} />
                              </button>
                         </div>
                         <p className="text-slate-400/80 font-bold text-xs mt-1">تصفح الوحدات والدروس</p>
@@ -693,7 +757,7 @@ const SubjectIndexPage: React.FC<SubjectIndexPageProps> = React.memo(({
                         let completedExams = 0;
                         const results = userProgress.quizResults || [];
 
-                        if (selectedSubject.id === SubjectName.Arabic || selectedSubject.id === SubjectName.English) {
+                        if (selectedSubject.id === SubjectName.Arabic) {
                             totalExams = unit.lessons.length;
                             unit.lessons.forEach(lesson => {
                                 const isPassed = results.some((r: any) => 
@@ -708,7 +772,7 @@ const SubjectIndexPage: React.FC<SubjectIndexPageProps> = React.memo(({
                                 const chunks = getLessonChunksCount(selectedSubject.id, lesson.title) || 5;
                                 totalExams += chunks;
                                 for (let i = 1; i <= chunks; i++) {
-                                    const examLabel = selectedSubject.id === SubjectName.English ? `Exam (${i})` : `امتحان (${i})`;
+                                    const examLabel = `امتحان (${i})`;
                                     const fullTitle = `${lesson.title} - ${examLabel}`;
                                     const isPassed = results.some((r: any) => 
                                         r.subjectId === selectedSubject.id && 
@@ -722,7 +786,7 @@ const SubjectIndexPage: React.FC<SubjectIndexPageProps> = React.memo(({
                             // Unit exam
                             totalExams += 1;
                             const unitOrdinal = unit.title.split(':')[0];
-                            const examLabel = selectedSubject.id === SubjectName.English ? 'Exam (1)' : 'امتحان (1)';
+                            const examLabel = 'امتحان (1)';
                             const unitExamTitle = `${unitOrdinal} - ${examLabel}`;
                             if (results.some((r: any) => 
                                 r.subjectId === selectedSubject.id && 
@@ -742,11 +806,10 @@ const SubjectIndexPage: React.FC<SubjectIndexPageProps> = React.memo(({
                         <div key={uIdx} className="bg-white rounded-lg shadow-sm overflow-hidden border border-slate-900 transition-all duration-300">
                             <button
                                 onClick={() => toggleUnit(uIdx)}
-                                dir={selectedSubject.id === SubjectName.English ? "ltr" : "rtl"}
                                 className={`w-full flex flex-col p-4 sm:p-5 transition-colors ${isExpanded ? 'bg-slate-50' : 'bg-white'}`}
                             >
                                 <div className="w-full flex items-center justify-between">
-                                    <h3 className={`text-sm sm:text-base font-black text-slate-800 flex-1 ${selectedSubject.id === SubjectName.English ? 'mr-4 text-left' : 'ml-4 text-right'}`}>{unit.title}</h3>
+                                    <h3 className="text-sm sm:text-base font-black text-slate-800 flex-1 ml-4 text-right">{unit.title}</h3>
                                     <div className={`w-9 h-9 sm:w-10 sm:h-10 rounded-full flex items-center justify-center transition-all ${isExpanded ? 'bg-primary text-white rotate-180' : 'bg-slate-100 text-slate-400'}`}>
                                         <ChevronDownIcon className="w-5 h-5 sm:w-6 sm:h-6" />
                                     </div>
@@ -781,10 +844,10 @@ const SubjectIndexPage: React.FC<SubjectIndexPageProps> = React.memo(({
                                                     <span className="text-sm font-black text-amber-900">امتحانات هذه الوحدة قيد التحضير</span>
                                                     <span className="text-xs text-amber-700 font-bold">سيتم إتاحة امتحانات المنهاج الجديد فور اكتمالها</span>
                                                 </div>
-                                            ) : (selectedSubject.id === SubjectName.Arabic || selectedSubject.id === SubjectName.English) ? (
+                                            ) : selectedSubject.id === SubjectName.Arabic ? (
                                                 <div 
                                                     className="grid grid-cols-5 gap-2.5 sm:gap-3 max-w-[280px] mx-auto justify-items-center py-2" 
-                                                    dir={selectedSubject.id === SubjectName.English ? "ltr" : "rtl"}
+                                                    dir="rtl"
                                                 >
                                                     {unit.lessons.map((lesson, lIdx) => {
                                                         const status = getExamStatus(lesson.title, 1);
@@ -871,8 +934,28 @@ const SubjectIndexPage: React.FC<SubjectIndexPageProps> = React.memo(({
                                                                                         );
                                                                                     }
 
-                                                                                    const videoResources = lessonResources.filter(r => r.type === 'video');
-                                                                                    const nonVideoResources = lessonResources.filter(r => r.type !== 'video');
+                                                                                    const isLinkResource = (r: LessonResource) => {
+                                                                                        if (!r) return false;
+                                                                                        const type = (r.type || '').toLowerCase();
+                                                                                        const url = (r.url || '').toLowerCase();
+                                                                                        return type === 'link' || 
+                                                                                               type === 'exam' || 
+                                                                                               type === 'form' || 
+                                                                                               type === 'url' ||
+                                                                                               url.includes('forms.gle') || 
+                                                                                               url.includes('forms.cloud.microsoft') ||
+                                                                                               url.includes('forms.office.com') || 
+                                                                                               url.includes('docs.google.com/forms');
+                                                                                    };
+
+                                                                                    const isPdfResource = (r: LessonResource) => {
+                                                                                        if (isLinkResource(r)) return false;
+                                                                                        const url = (r.url || '').toLowerCase();
+                                                                                        return r.type === 'pdf' || url.includes('.pdf') || (url.includes('drive.google.com') && !url.includes('youtube') && !url.includes('forms'));
+                                                                                    };
+
+                                                                                    const videoResources = lessonResources.filter(r => !isPdfResource(r) && !isLinkResource(r) && (r.type === 'video' || (r.url || '').includes('youtube') || (r.url || '').includes('youtu.be')));
+                                                                                    const nonVideoResources = lessonResources.filter(r => isPdfResource(r) || isLinkResource(r) || (r.type !== 'video' && !(r.url || '').includes('youtube') && !(r.url || '').includes('youtu.be')));
 
                                                                                     return (
                                                                                         <div className="w-full mt-2.5 pt-2 border-t border-slate-200/80 grid grid-cols-2 sm:grid-cols-3 gap-1.5" dir="rtl">
@@ -889,21 +972,39 @@ const SubjectIndexPage: React.FC<SubjectIndexPageProps> = React.memo(({
                                                                                             )}
 
                                                                                             {nonVideoResources.map((res, rIdx) => {
-                                                                                                const resTitle = res.resourceTitle?.trim() 
-                                                                                                    ? res.resourceTitle 
-                                                                                                    : res.type === 'pdf' 
+                                                                                                const isLink = isLinkResource(res);
+                                                                                                const isPdf = !isLink && isPdfResource(res);
+                                                                                                const normalizedRes: LessonResource = isLink 
+                                                                                                    ? { ...res, type: 'link' } 
+                                                                                                    : isPdf 
+                                                                                                        ? { ...res, type: 'pdf' } 
+                                                                                                        : res;
+                                                                                                const resTitle = normalizedRes.resourceTitle?.trim() 
+                                                                                                    ? normalizedRes.resourceTitle 
+                                                                                                    : isPdf 
                                                                                                         ? 'ملخص PDF' 
-                                                                                                        : 'ملخص مصور';
+                                                                                                        : isLink 
+                                                                                                            ? 'رابط خارجي' 
+                                                                                                            : 'ملخص مصور';
 
                                                                                                 return (
                                                                                                     <button
                                                                                                         key={rIdx}
-                                                                                                        onClick={() => handleResourceClick(unit.title, lesson.title, uIdx, lIdx, rIdx, res)}
+                                                                                                        onClick={() => {
+                                                                                                            if (isLink || normalizedRes.type === 'link' || res.type === 'link') {
+                                                                                                                if (res.url) {
+                                                                                                                    window.open(res.url, '_blank', 'noopener,noreferrer');
+                                                                                                                }
+                                                                                                                return;
+                                                                                                            }
+                                                                                                            handleResourceClick(unit.title, lesson.title, uIdx, lIdx, rIdx, normalizedRes);
+                                                                                                        }}
                                                                                                         className="w-full flex items-center gap-1.5 px-2 py-1.5 rounded-lg border border-slate-900 bg-white hover:bg-slate-50 active:scale-95 transition-all shadow-2xs text-slate-800 font-bold text-xs group cursor-pointer"
                                                                                                     >
                                                                                                         <div className="w-4 h-4 rounded flex items-center justify-center shrink-0">
-                                                                                                            {res.type === 'pdf' && <FileText className="w-3.5 h-3.5 text-rose-600 group-hover:scale-110 transition-transform" />}
-                                                                                                            {res.type === 'image' && <ImageIcon className="w-3.5 h-3.5 text-emerald-600 group-hover:scale-110 transition-transform" />}
+                                                                                                            {isLink && <ExternalLink className="w-3.5 h-3.5 text-sky-600 group-hover:scale-110 transition-transform" />}
+                                                                                                            {isPdf && <FileText className="w-3.5 h-3.5 text-rose-600 group-hover:scale-110 transition-transform" />}
+                                                                                                            {!isLink && !isPdf && normalizedRes.type === 'image' && <ImageIcon className="w-3.5 h-3.5 text-emerald-600 group-hover:scale-110 transition-transform" />}
                                                                                                         </div>
                                                                                                         <span className="truncate text-right flex-1 text-[11px] leading-tight">{resTitle}</span>
                                                                                                     </button>
@@ -950,8 +1051,28 @@ const SubjectIndexPage: React.FC<SubjectIndexPageProps> = React.memo(({
                                                 const unitResources = getResourcesForUnit(unit.title, uIdx, resourcesData, unit);
                                                 if (!unitResources || unitResources.length === 0) return null;
 
-                                                const videoResources = unitResources.filter(r => r.type === 'video');
-                                                const nonVideoResources = unitResources.filter(r => r.type !== 'video');
+                                                const isLinkResource = (r: LessonResource) => {
+                                                    if (!r) return false;
+                                                    const type = (r.type || '').toLowerCase();
+                                                    const url = (r.url || '').toLowerCase();
+                                                    return type === 'link' || 
+                                                           type === 'exam' || 
+                                                           type === 'form' || 
+                                                           type === 'url' ||
+                                                           url.includes('forms.gle') || 
+                                                           url.includes('forms.cloud.microsoft') ||
+                                                           url.includes('forms.office.com') || 
+                                                           url.includes('docs.google.com/forms');
+                                                };
+
+                                                const isPdfResource = (r: LessonResource) => {
+                                                    if (isLinkResource(r)) return false;
+                                                    const url = (r.url || '').toLowerCase();
+                                                    return r.type === 'pdf' || url.includes('.pdf') || (url.includes('drive.google.com') && !url.includes('youtube') && !url.includes('forms'));
+                                                };
+
+                                                const videoResources = unitResources.filter(r => !isPdfResource(r) && !isLinkResource(r) && (r.type === 'video' || (r.url || '').includes('youtube') || (r.url || '').includes('youtu.be')));
+                                                const nonVideoResources = unitResources.filter(r => isPdfResource(r) || isLinkResource(r) || (r.type !== 'video' && !(r.url || '').includes('youtube') && !(r.url || '').includes('youtu.be')));
 
                                                 return (
                                                     <div className="w-full mt-3 pt-2.5 border-t border-slate-200/80 grid grid-cols-2 sm:grid-cols-3 gap-1.5" dir="rtl">
@@ -968,21 +1089,39 @@ const SubjectIndexPage: React.FC<SubjectIndexPageProps> = React.memo(({
                                                         )}
 
                                                         {nonVideoResources.map((res, rIdx) => {
-                                                            const resTitle = res.resourceTitle?.trim() 
-                                                                ? res.resourceTitle 
-                                                                : res.type === 'pdf' 
+                                                            const isLink = isLinkResource(res);
+                                                            const isPdf = !isLink && isPdfResource(res);
+                                                            const normalizedRes: LessonResource = isLink 
+                                                                ? { ...res, type: 'link' } 
+                                                                : isPdf 
+                                                                    ? { ...res, type: 'pdf' } 
+                                                                    : res;
+                                                            const resTitle = normalizedRes.resourceTitle?.trim() 
+                                                                ? normalizedRes.resourceTitle 
+                                                                : isPdf 
                                                                     ? 'ملخص الوحدة PDF' 
-                                                                    : 'خريطة ذهنية للوحدة';
+                                                                    : isLink 
+                                                                        ? 'رابط خارجي' 
+                                                                        : 'خريطة ذهنية للوحدة';
 
                                                             return (
                                                                 <button
                                                                     key={rIdx}
-                                                                    onClick={() => handleResourceClick(unit.title, resTitle, uIdx, -1, rIdx, res, unit)}
+                                                                    onClick={() => {
+                                                                        if (isLink || normalizedRes.type === 'link' || res.type === 'link') {
+                                                                            if (res.url) {
+                                                                                window.open(res.url, '_blank', 'noopener,noreferrer');
+                                                                            }
+                                                                            return;
+                                                                        }
+                                                                        handleResourceClick(unit.title, resTitle, uIdx, -1, rIdx, normalizedRes, unit);
+                                                                    }}
                                                                     className="w-full flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border border-slate-900 bg-white hover:bg-slate-50 active:scale-95 transition-all shadow-2xs text-slate-800 font-bold text-xs group cursor-pointer"
                                                                 >
                                                                     <div className="w-4 h-4 rounded flex items-center justify-center shrink-0">
-                                                                        {res.type === 'pdf' && <FileText className="w-3.5 h-3.5 text-rose-600 group-hover:scale-110 transition-transform" />}
-                                                                        {res.type === 'image' && <ImageIcon className="w-3.5 h-3.5 text-emerald-600 group-hover:scale-110 transition-transform" />}
+                                                                        {isLink && <ExternalLink className="w-3.5 h-3.5 text-sky-600 group-hover:scale-110 transition-transform" />}
+                                                                        {isPdf && <FileText className="w-3.5 h-3.5 text-rose-600 group-hover:scale-110 transition-transform" />}
+                                                                        {!isLink && !isPdf && normalizedRes.type === 'image' && <ImageIcon className="w-3.5 h-3.5 text-emerald-600 group-hover:scale-110 transition-transform" />}
                                                                     </div>
                                                                     <span className="truncate text-right flex-1 text-[11px] leading-tight">{resTitle}</span>
                                                                 </button>
@@ -1006,7 +1145,7 @@ const SubjectIndexPage: React.FC<SubjectIndexPageProps> = React.memo(({
                     lessonTitle={activeResource.lessonTitle}
                     downloadFileName={activeResource.downloadFileName}
                     isSyncing={isSyncingResource}
-                    onClose={() => setActiveResource(null)}
+                    onClose={closeResourceModal}
                 />
             )}
         </div>

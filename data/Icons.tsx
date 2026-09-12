@@ -213,3 +213,54 @@ export const Loader2: React.FC<IconProps> = ({ className = 'w-6 h-6' }) => (
     <path d="M21 12a9 9 0 1 1-6.219-8.56" />
   </svg>
 );
+
+export const MessengerIcon: React.FC<IconProps> = ({ className = 'w-5 h-5' }) => (
+  <svg
+    xmlns="http://www.w3.org/2000/svg"
+    viewBox="0 0 24 24"
+    fill="currentColor"
+    className={className}
+  >
+    <path d="M12 0C5.373 0 0 4.974 0 11.111c0 3.498 1.744 6.614 4.469 8.654V24l4.088-2.242c1.092.3 2.246.464 3.443.464 6.627 0 12-4.975 12-11.111C24 4.974 18.627 0 12 0zm1.191 14.963l-3.055-3.26-5.963 3.26 6.559-6.962 3.131 3.259 5.886-3.259-6.558 6.962z" />
+  </svg>
+);
+
+export const FacebookIcon: React.FC<IconProps> = ({ className = 'w-6 h-6' }) => (
+  <svg
+    xmlns="http://www.w3.org/2000/svg"
+    viewBox="0 0 24 24"
+    className={className}
+  >
+    <path
+      fill="#1877F2"
+      d="M24 12.073c0-6.627-5.373-12-12-12s-12 5.373-12 12c0 5.99 4.388 10.954 10.125 11.854v-8.385H7.078v-3.47h3.047V9.43c0-3.007 1.792-4.669 4.533-4.669 1.312 0 2.686.235 2.686.235v2.953H15.83c-1.491 0-1.956.925-1.956 1.874v2.25h3.328l-.532 3.47h-2.796v8.385C19.612 23.027 24 18.062 24 12.073z"
+    />
+    <path
+      fill="#FFFFFF"
+      d="M16.671 15.469l.532-3.47h-3.328v-2.25c0-.949.465-1.874 1.956-1.874h1.533V4.922s-1.374-.235-2.686-.235c-2.741 0-4.533 1.662-4.533 4.669v2.544H7.078v3.47h3.047v8.385a12.09 12.09 0 003.748 0v-8.385h2.798z"
+    />
+  </svg>
+);
+
+export const InstagramIcon: React.FC<IconProps> = ({ className = 'w-6 h-6' }) => (
+  <svg
+    xmlns="http://www.w3.org/2000/svg"
+    viewBox="0 0 24 24"
+    className={className}
+  >
+    <defs>
+      <linearGradient id="ig-grad" x1="0%" y1="100%" x2="100%" y2="0%">
+        <stop offset="0%" stopColor="#f09433" />
+        <stop offset="25%" stopColor="#e6683c" />
+        <stop offset="50%" stopColor="#dc2743" />
+        <stop offset="75%" stopColor="#cc2366" />
+        <stop offset="100%" stopColor="#bc1888" />
+      </linearGradient>
+    </defs>
+    <circle cx="12" cy="12" r="12" fill="url(#ig-grad)" />
+    <rect x="5.25" y="5.25" width="13.5" height="13.5" rx="3.5" ry="3.5" fill="none" stroke="#ffffff" strokeWidth="1.6" />
+    <circle cx="12" cy="12" r="3.3" fill="none" stroke="#ffffff" strokeWidth="1.6" />
+    <circle cx="15.8" cy="8.2" r="0.9" fill="#ffffff" />
+  </svg>
+);
+

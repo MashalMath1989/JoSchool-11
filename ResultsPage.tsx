@@ -3,9 +3,9 @@ import { motion } from 'framer-motion';
 import html2pdf from 'html2pdf.js';
 import { auth } from './firebase';
 import { StarIcon, XIcon, CheckIcon, BookmarkIcon, BookmarkOutlineIcon, ShareIcon, FlagIcon, DownloadIcon, ChevronLeftIcon, ChevronRightIcon, ChevronDownIcon, BookOpenIcon } from './data/Icons';
-import { Question, Subject, SubjectName, UserProgress, QuizResult } from './types';
+import { Question, Subject, SubjectName, UserProgress, QuizResult, FriendChallenge } from './types';
 import { MathRenderer, renderTextWithUnderline } from './textRenderer';
-import { shareQuestionDirectly, isMathSubject } from './shareUtils';
+import { shareQuestionDirectly, isMathSubject, checkIsChoiceCorrect } from './shareUtils';
 import TrigGraph from './TrigGraph';
 import { KATEX_CSS } from './katexCss';
 
@@ -26,6 +26,9 @@ interface ResultsPageProps {
     toggleFavoriteQuestion: (question: Question, subjectId: string, lessonTitle: string) => void;
     isFavoriteDisabled?: boolean;
     userProgress?: UserProgress;
+    onChallengeFriends?: () => void;
+    activeChallenge?: FriendChallenge | null;
+    onViewChallengeRoom?: () => void;
 }
 
 const ResultsPage: React.FC<ResultsPageProps> = ({
@@ -44,10 +47,17 @@ const ResultsPage: React.FC<ResultsPageProps> = ({
     isQuestionFavorite,
     toggleFavoriteQuestion,
     isFavoriteDisabled,
-    userProgress
+    userProgress,
+    onChallengeFriends,
+    activeChallenge,
+    onViewChallengeRoom
 }) => {
     const isEnglish = false;
-    const isMath = selectedSubject?.id === SubjectName.Math;
+    const isMath = selectedSubject?.id === SubjectName.Math ||
+                   (activeChallenge && (activeChallenge.subjectId === SubjectName.Math || isMathSubject(activeChallenge.subjectId) || isMathSubject(activeChallenge.lessonTitle))) ||
+                   isMathSubject(selectedSubject?.id) ||
+                   isMathSubject(currentLessonTitle) ||
+                   (currentQuiz && currentQuiz.some(item => isMathSubject('', item)));
     const isLtr = isEnglish || isMath;
     const isArabicSubject = selectedSubject?.id === SubjectName.JordanHistory || 
                             selectedSubject?.id === SubjectName.IslamicEducation || 
@@ -62,31 +72,9 @@ const ResultsPage: React.FC<ResultsPageProps> = ({
                           currentLessonTitle.includes('تجريبي') ||
                           currentLessonTitle.includes('Comprehensive') ||
                           currentLessonTitle.includes('شامل');
-    const checkIsCorrect = (q: Question, userAnswer: string | undefined) => {
+    const checkIsCorrect = (q: Question, userAnswer: string | undefined, choiceIndex?: number) => {
         if (!userAnswer || !q.correct_answer) return false;
-        
-        const trimmedUser = userAnswer.trim();
-        const trimmedCorrect = String(q.correct_answer).trim();
-        
-        // 1. Direct match
-        if (trimmedUser === trimmedCorrect) return true;
-        
-        // 2. Match by letter (أ, ب, ج, د or A, B, C, D)
-        const arabicLetters = ['أ', 'ب', 'ج', 'د'];
-        const englishLetters = ['A', 'B', 'C', 'D'];
-        const lowerEnglishLetters = ['a', 'b', 'c', 'd'];
-        
-        let letterIndex = arabicLetters.indexOf(trimmedCorrect);
-        if (letterIndex === -1) letterIndex = englishLetters.indexOf(trimmedCorrect.toUpperCase());
-        if (letterIndex === -1) letterIndex = lowerEnglishLetters.indexOf(trimmedCorrect.toLowerCase());
-        
-        if (letterIndex !== -1 && q.choices[letterIndex]?.trim() === trimmedUser) return true;
-        
-        // 3. Match by index (0, 1, 2, 3)
-        const numericIndex = parseInt(trimmedCorrect);
-        if (!isNaN(numericIndex) && q.choices[numericIndex]?.trim() === trimmedUser) return true;
-        
-        return false;
+        return checkIsChoiceCorrect(q, userAnswer, choiceIndex);
     };
 
     const getSubjectMaxMark = (subjectId: string | undefined) => {
@@ -132,7 +120,7 @@ const ResultsPage: React.FC<ResultsPageProps> = ({
         const opt = {
             margin: mode === 'mobile' ? ([10, 10] as [number, number]) : ([15, 10] as [number, number]),
             filename: `JoSchool_${mode === 'mobile' ? 'Mobile' : 'Print'}_${currentLessonTitle.replace(/\s+/g, '_')}.pdf`,
-            image: { type: 'jpeg', quality: 0.98 },
+            image: { type: 'jpeg' as const, quality: 0.98 },
             html2canvas: { 
                 scale: 2, 
                 useCORS: true, 
@@ -141,7 +129,7 @@ const ResultsPage: React.FC<ResultsPageProps> = ({
                 scrollY: 0,
                 windowWidth: 1200
             },
-            jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' },
+            jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' as const },
             pagebreak: { 
                 mode: ['avoid-all', 'css', 'legacy'],
                 avoid: ['.pdf-question-card', '.pdf-graph-block', '.pdf-graph-option']
@@ -267,6 +255,29 @@ const ResultsPage: React.FC<ResultsPageProps> = ({
 
             {/* ملخص النتيجة */}
             <div className="bg-white rounded-xl p-8 shadow-2xl border-t-4 border-primary mb-10 text-center border border-slate-900 relative">
+                {/* بانر تحدي الأصدقاء إذا كان الاختبار جزءاً من تحدٍّ نشط */}
+                {activeChallenge && (
+                    <div className="mb-6 bg-gradient-to-r from-amber-300 via-yellow-300 to-amber-400 border-2 border-slate-900 rounded-xl p-3.5 text-slate-950 flex flex-col sm:flex-row items-center justify-between gap-3 shadow-md text-right">
+                        <div className="flex items-center gap-2.5">
+                            <div className="w-9 h-9 rounded-lg bg-slate-950 text-amber-300 flex items-center justify-center text-lg shrink-0 border border-slate-900">
+                                🏆
+                            </div>
+                            <div>
+                                <h4 className="font-black text-xs sm:text-sm">تحدي الأصدقاء: {activeChallenge.lessonTitle}</h4>
+                                <p className="text-[11px] font-bold text-slate-800 mt-0.5">تم تسجيل نتيجتك بنجاح! قارن ترتيبك وأداءك مع زملائك في الغرفة</p>
+                            </div>
+                        </div>
+                        {onViewChallengeRoom && (
+                            <button
+                                onClick={onViewChallengeRoom}
+                                className="w-full sm:w-auto px-4 py-2 bg-slate-950 hover:bg-slate-800 active:scale-95 text-white font-black text-xs rounded-lg border border-slate-900 shadow-sm cursor-pointer whitespace-nowrap transition-transform"
+                            >
+                                📊 عرض النتائج والترتيب
+                            </button>
+                        )}
+                    </div>
+                )}
+
                 {/* زر الرجوع داخل البطاقة */}
                 <div className={`absolute top-4 ${isEnglish ? 'left-4' : 'right-4'}`}>
                     <button 
@@ -292,6 +303,25 @@ const ResultsPage: React.FC<ResultsPageProps> = ({
                 </div>
                 
                 <div className="grid grid-cols-2 gap-3 w-full max-w-sm mx-auto">
+                    {/* زر تحدي الأصدقاء في هذا الاختبار أو العودة لغرفة التحدي */}
+                    {activeChallenge && onViewChallengeRoom ? (
+                        <button 
+                            onClick={onViewChallengeRoom}
+                            className="col-span-2 py-3.5 bg-slate-950 text-amber-300 rounded-lg font-black shadow-lg flex items-center justify-center gap-2 border-2 border-slate-900 hover:bg-slate-800 active:scale-95 transition-all text-xs cursor-pointer"
+                        >
+                            <span className="text-base">🏆</span>
+                            <span>العودة إلى غرفة التحدي ومراجعة الأسئلة</span>
+                        </button>
+                    ) : onChallengeFriends ? (
+                        <button 
+                            onClick={onChallengeFriends}
+                            className="col-span-2 py-3.5 bg-gradient-to-r from-amber-400 via-yellow-400 to-amber-500 text-slate-950 rounded-lg font-black shadow-lg flex items-center justify-center gap-2 border-2 border-slate-900 hover:brightness-105 active:scale-95 transition-all text-xs cursor-pointer"
+                        >
+                            <span className="text-base">⚔️</span>
+                            <span>تحدَّ زملاءك في هذا الاختبار وقارنوا النتائج فوراً</span>
+                        </button>
+                    ) : null}
+
                     {/* Row 1: Home and Export */}
                     <button 
                         onClick={goToHome} 
@@ -299,14 +329,23 @@ const ResultsPage: React.FC<ResultsPageProps> = ({
                     >
                         الرئيسية
                     </button>
-                    <button 
-                        onClick={() => setShowExportDialog(true)} 
-                        disabled={isExporting}
-                        className="py-4 bg-white text-primary rounded-lg font-black shadow-lg flex items-center justify-center gap-2 border-2 border-slate-900 hover:bg-primary hover:text-white transition-all active:scale-95 disabled:opacity-50 text-xs"
-                    >
-                        <DownloadIcon className="w-5 h-5" />
-                        <span>تصدير PDF</span>
-                    </button>
+                    {!activeChallenge ? (
+                        <button 
+                            onClick={() => setShowExportDialog(true)} 
+                            disabled={isExporting}
+                            className="py-4 bg-white text-primary rounded-lg font-black shadow-lg flex items-center justify-center gap-2 border-2 border-slate-900 hover:bg-primary hover:text-white transition-all active:scale-95 disabled:opacity-50 text-xs"
+                        >
+                            <DownloadIcon className="w-5 h-5" />
+                            <span>تصدير PDF</span>
+                        </button>
+                    ) : (
+                        <button 
+                            onClick={onViewChallengeRoom} 
+                            className="py-4 bg-amber-400 text-slate-950 rounded-lg font-black shadow-lg flex items-center justify-center gap-2 border-2 border-slate-900 hover:bg-amber-300 transition-all active:scale-95 text-xs"
+                        >
+                            <span>غرفة التحدي</span>
+                        </button>
+                    )}
 
                     {/* Row 2: Back to Index and Retry */}
                     <button 
@@ -315,17 +354,47 @@ const ResultsPage: React.FC<ResultsPageProps> = ({
                     >
                         {onBackToIndexLabel || (isEnglish ? 'Back to Index' : 'العودة للفهرس')}
                     </button>
-                    <button 
-                        onClick={goBack} 
-                        className="py-4 bg-secondary text-white rounded-lg font-black shadow-xl border-2 border-slate-900 hover:brightness-110 active:scale-95 transition-all text-xs"
-                    >
-                        إعادة المحاولة
-                    </button>
+                    {!activeChallenge ? (
+                        <button 
+                            onClick={goBack} 
+                            className="py-4 bg-secondary text-white rounded-lg font-black shadow-xl border-2 border-slate-900 hover:brightness-110 active:scale-95 transition-all text-xs"
+                        >
+                            إعادة المحاولة
+                        </button>
+                    ) : (
+                        <button 
+                            onClick={goToHome} 
+                            className="py-4 bg-secondary text-white rounded-lg font-black shadow-xl border-2 border-slate-900 hover:brightness-110 active:scale-95 transition-all text-xs"
+                        >
+                            إنهاء
+                        </button>
+                    )}
                 </div>
             </div>
 
             {/* مراجعة الأسئلة */}
-            <div id="review-section" className="text-right mb-6 px-2 flex flex-col md:flex-row md:items-center justify-between gap-4">
+            {activeChallenge ? (
+                <div className="bg-white rounded-2xl p-6 sm:p-8 border-2 border-slate-900 shadow-md text-center mb-16" dir="rtl">
+                    <div className="w-14 h-14 rounded-2xl bg-amber-100 border border-amber-300 text-amber-900 flex items-center justify-center mx-auto mb-4 text-2xl shadow-xs">
+                        🏆
+                    </div>
+                    <h3 className="text-base sm:text-lg font-black text-slate-900 mb-2">مراجعة أسئلة التحدي والإجابات النموذجية</h3>
+                    <p className="text-xs sm:text-sm font-bold text-slate-600 max-w-md mx-auto mb-6 leading-relaxed">
+                        تم تسجيل إجاباتك بنجاح! في امتحان التحدي، تُعرض الإجابات النموذجية ومراجعة الأسئلة ومقارنة النتائج مع زملائك داخل غرفة التحدي بعد العودة إليها.
+                    </p>
+                    {onViewChallengeRoom && (
+                        <button
+                            onClick={onViewChallengeRoom}
+                            className="px-6 py-3.5 bg-slate-950 hover:bg-slate-800 active:scale-95 text-amber-300 rounded-xl font-black text-xs sm:text-sm border border-slate-900 shadow-md transition-all cursor-pointer inline-flex items-center gap-2"
+                        >
+                            <span>العودة إلى غرفة التحدي ومراجعة الأسئلة</span>
+                            <span className="text-base">←</span>
+                        </button>
+                    )}
+                </div>
+            ) : (
+                <>
+                    <div id="review-section" className="text-right mb-6 px-2 flex flex-col md:flex-row md:items-center justify-between gap-4">
                 <div>
                     <h3 className="text-base font-black text-text-main flex items-center gap-3">
                         <div className="w-2 h-8 bg-primary rounded-full"></div>
@@ -415,9 +484,9 @@ const ResultsPage: React.FC<ResultsPageProps> = ({
                                             isEnglish: isEnglish
                                         })}
                                         className="p-2 rounded-lg bg-slate-100 text-slate-400 hover:bg-slate-200 transition-colors border border-slate-900"
-                                        title={isMathSubject(selectedSubject?.id, q) ? "تصدير بطاقة السؤال كملف PDF" : "مشاركة السؤال كنص"}
+                                        title="مشاركة السؤال"
                                     >
-                                        {isMathSubject(selectedSubject?.id, q) ? <DownloadIcon className="w-4 h-4 text-emerald-600" /> : <ShareIcon className="w-4 h-4" />}
+                                        <ShareIcon className="w-4 h-4" />
                                     </button>
                                     <button 
                                         className="p-2 rounded-lg bg-slate-100 text-slate-400 hover:bg-slate-200 transition-colors border border-slate-900"
@@ -445,49 +514,55 @@ const ResultsPage: React.FC<ResultsPageProps> = ({
                                 )}
 
                                 <div className={`grid gap-3 mb-6 ${(q as any).options && (q as any).options.some((opt: any) => opt.graph) ? 'grid-cols-1 sm:grid-cols-2' : 'grid-cols-1'}`}>
-                                    {q.choices && Array.isArray(q.choices) && q.choices.map((choice, cIdx) => {
-                                        const isUserChoice = userAnswer === choice;
-                                        const isCorrectChoice = checkIsCorrect(q, choice);
-                                        const option = (q as any).options && (q as any).options[cIdx];
-                                        const optionGraph = option && option.graph;
+                                    {(() => {
+                                        const currentChoices = (q.choices && Array.isArray(q.choices) && q.choices.length > 0)
+                                            ? q.choices
+                                            : ((q as any).options && Array.isArray((q as any).options) ? (q as any).options.map((opt: any) => opt.label) : []);
                                         
-                                        let bgColor = 'bg-app-bg/30';
-                                        let borderColor = 'border-transparent';
-                                        let textColor = 'text-text-main';
+                                        return currentChoices.map((choice: string, cIdx: number) => {
+                                            const isUserChoice = userAnswer === choice;
+                                            const isCorrectChoice = checkIsCorrect(q, choice, cIdx);
+                                            const option = (q as any).options && (q as any).options[cIdx];
+                                            const optionGraph = option && option.graph;
+                                            
+                                            let bgColor = 'bg-app-bg/30';
+                                            let borderColor = 'border-transparent';
+                                            let textColor = 'text-text-main';
 
-                                        if (isCorrectChoice) {
-                                            bgColor = 'bg-emerald-500/10';
-                                            borderColor = 'border-emerald-500/30';
-                                            textColor = 'text-emerald-600';
-                                        } else if (isUserChoice && !isCorrect) {
-                                            bgColor = 'bg-red-500/10';
-                                            borderColor = 'border-red-500/30';
-                                            textColor = 'text-red-500';
-                                        }
+                                            if (isCorrectChoice) {
+                                                bgColor = 'bg-emerald-500/10';
+                                                borderColor = 'border-emerald-500/30';
+                                                textColor = 'text-emerald-600';
+                                            } else if (isUserChoice && !isCorrect) {
+                                                bgColor = 'bg-red-500/10';
+                                                borderColor = 'border-red-500/30';
+                                                textColor = 'text-red-500';
+                                            }
 
-                                        return (
-                                            <div 
-                                                key={cIdx} 
-                                                dir={isLtr ? 'ltr' : 'rtl'}
-                                                className={`p-3 rounded-lg border font-bold text-xs flex items-center gap-3 border-slate-900 ${bgColor} ${textColor}`}
-                                            >
-                                                <div className={`w-8 h-8 rounded-md border-2 flex items-center justify-center shrink-0 font-black text-xs transition-colors ${isCorrectChoice ? 'bg-emerald-500 text-white border-emerald-400' : isUserChoice ? 'bg-red-500 text-white border-red-400' : 'bg-white text-text-sub border-primary/10'}`}>
-                                                    {optionLabels[cIdx] || ['A', 'B', 'C', 'D'][cIdx]}
-                                                </div>
-                                                {optionGraph ? (
-                                                    <div className="flex-1 flex justify-center items-center h-[105px] max-w-[160px] mx-auto py-1">
-                                                        <TrigGraph graphData={optionGraph} isOption={true} />
+                                            return (
+                                                <div 
+                                                    key={cIdx} 
+                                                    dir={isLtr ? 'ltr' : 'rtl'}
+                                                    className={`p-3 rounded-lg border font-bold text-xs flex items-center gap-3 border-slate-900 ${bgColor} ${textColor}`}
+                                                >
+                                                    <div className={`w-8 h-8 rounded-md border-2 flex items-center justify-center shrink-0 font-black text-xs transition-colors ${isCorrectChoice ? 'bg-emerald-500 text-white border-emerald-400' : isUserChoice ? 'bg-red-500 text-white border-red-400' : 'bg-white text-text-sub border-primary/10'}`}>
+                                                        {optionLabels[cIdx] || ['A', 'B', 'C', 'D'][cIdx]}
                                                     </div>
-                                                ) : (
-                                                    <div className={`flex-1 min-w-0 w-full ${isLtr ? 'text-left font-sans' : 'text-right font-naskh'}`}><MathRenderer text={choice} /></div>
-                                                )}
-                                                <div className={`${isLtr ? 'ml-auto' : 'mr-auto'} shrink-0`}>
-                                                    {isCorrectChoice && <CheckIcon className="w-5 h-5 text-emerald-600" />}
-                                                    {isUserChoice && !isCorrect && <XIcon className="w-5 h-5 text-red-600" />}
+                                                    {optionGraph ? (
+                                                        <div className="flex-1 flex justify-center items-center h-[105px] max-w-[160px] mx-auto py-1">
+                                                            <TrigGraph graphData={optionGraph} isOption={true} />
+                                                        </div>
+                                                    ) : (
+                                                        <div className={`flex-1 min-w-0 w-full ${isLtr ? 'text-left font-sans' : 'text-right font-naskh'}`}><MathRenderer text={choice} /></div>
+                                                    )}
+                                                    <div className={`${isLtr ? 'ml-auto' : 'mr-auto'} shrink-0`}>
+                                                        {isCorrectChoice && <CheckIcon className="w-5 h-5 text-emerald-600" />}
+                                                        {isUserChoice && !isCorrect && <XIcon className="w-5 h-5 text-red-600" />}
+                                                    </div>
                                                 </div>
-                                            </div>
-                                        );
-                                    })}
+                                            );
+                                        });
+                                    })()}
                                 </div>
 
                                 {explanationText && (
@@ -518,6 +593,8 @@ const ResultsPage: React.FC<ResultsPageProps> = ({
                     });
                 })()}
             </div>
+            </>
+            )}
             </div>
 
             {/* Hidden PDF Content */}

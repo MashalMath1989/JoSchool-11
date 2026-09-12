@@ -5,7 +5,6 @@ export enum View {
   Welcome,
   Landing,
   Textbooks,
-  EnglishBooks,
   ComprehensiveExams,
   SubjectIndex,
   Quiz,
@@ -17,6 +16,8 @@ export enum View {
   Announcements,
   SessionsList,
   Library,
+  FriendChallenge,
+  Results,
 }
 
 export enum Grade {
@@ -46,7 +47,7 @@ export interface Subject {
 
 export interface LessonResource {
   resourceTitle?: string;
-  type: 'video' | 'pdf' | 'image' | string;
+  type: 'video' | 'pdf' | 'image' | 'link' | string;
   url: string;
 }
 
@@ -54,6 +55,7 @@ export interface Lesson {
   title: string;
   page: number;
   lessonId?: string;
+  url?: string;
   resources?: LessonResource[];
 }
 
@@ -70,6 +72,12 @@ export interface SubjectIndexData {
   [key: string]: Unit[];
 }
 
+export interface QuestionOption {
+  label: string;
+  graph?: any;
+  text?: string;
+}
+
 export interface Question {
   number: number;
   question: string;
@@ -78,6 +86,12 @@ export interface Question {
   page: string;
   source_text: string;
   explanation?: string;
+  questionGraph?: any;
+  graph?: any;
+  options?: QuestionOption[];
+  topic?: string;
+  type?: string;
+  final_answer_text?: string;
 }
 
 export interface QuizResult {
@@ -122,4 +136,33 @@ export interface UserProgress {
     gender?: 'ذكر' | 'أنثى' | string;
     phoneNumber?: string;
   };
+}
+
+export interface ChallengeParticipant {
+  id: string;
+  name: string;
+  avatar?: string;
+  score: number;
+  totalQuestions: number;
+  percentage: number;
+  timeSpent: number; // in seconds
+  userAnswers?: (string | undefined)[];
+  completedAt?: string;
+  status: 'in_progress' | 'completed';
+}
+
+export interface FriendChallenge {
+  id: string; // Document ID (usually the 6-digit code uppercase)
+  code: string; // 6-digit code
+  creatorId: string;
+  creatorName: string;
+  subjectId: string;
+  subjectName: string;
+  lessonTitle: string;
+  examNumber?: number | null;
+  questions: Question[];
+  totalQuestions: number;
+  createdAt: string;
+  status: 'active' | 'completed';
+  participantsCount?: number;
 }

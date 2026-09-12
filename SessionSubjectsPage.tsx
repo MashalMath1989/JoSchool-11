@@ -147,8 +147,7 @@ const SessionSubjectsPage: React.FC<SessionSubjectsPageProps> = ({
                 baseTitle = `دورة تجريبية - ${subjectName}`;
             }
 
-            const isEnglish = subjectName === SubjectName.English;
-            const examLabel = isEnglish ? 'Exam (1)' : 'امتحان (1)';
+            const examLabel = 'امتحان (1)';
             const lessonTitle = baseTitle ? `${baseTitle} - ${examLabel}` : "";
             
             return userProgress?.quizResults?.some((r: QuizResult) => 
@@ -352,8 +351,7 @@ const SessionSubjectsPage: React.FC<SessionSubjectsPageProps> = ({
                     } else if (sessionTitle === 'الدورة التجريبية') {
                         baseTitleForReset = `دورة تجريبية - ${subjectName}`;
                     }
-                    const isEnglish = subjectName === SubjectName.English;
-                    const examLabel = isEnglish ? 'Exam (1)' : 'امتحان (1)';
+                    const examLabel = 'امتحان (1)';
                     const lessonTitleForReset = baseTitleForReset ? `${baseTitleForReset} - ${examLabel}` : "";
                     
                     return (

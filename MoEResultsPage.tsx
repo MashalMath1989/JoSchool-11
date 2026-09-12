@@ -101,7 +101,7 @@ const MoEResultsPage: React.FC<MoEResultsPageProps> = ({
             const opt = {
                 margin: [5, 10, 5, 10] as [number, number, number, number],
                 filename: `JoSchool11_Result_${profileName}.pdf`,
-                image: { type: 'jpeg', quality: 0.98 },
+                image: { type: 'jpeg' as const, quality: 0.98 },
                 html2canvas: { 
                     scale: 3, 
                     useCORS: true,
@@ -109,7 +109,7 @@ const MoEResultsPage: React.FC<MoEResultsPageProps> = ({
                     scrollY: 0,
                     windowWidth: 1200 // Force a wider capture context for PDF
                 },
-                jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' },
+                jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' as const },
                 pagebreak: { mode: ['css', 'legacy'] }
             };
             

@@ -165,7 +165,8 @@ export const INITIAL_MATH_RESOURCES: ResourceJsonUnit[] = [
         unitTitle: "الاقترانات والمقادير الجبرية",
         resources: [
             { resourceTitle: "", type: "video", url: "" },
-            { resourceTitle: "ملخص الوحدة", type: "pdf", url: "" },
+            { resourceTitle: "دوسية الوحدة", type: "pdf", url: "https://raw.githubusercontent.com/MashalMath/Pdf_Library/main/Math11_Unit1_Dosya.pdf" },
+            { resourceTitle: "دفتر الوحدة", type: "pdf", url: "https://raw.githubusercontent.com/MashalMath/Pdf_Library/main/Math11_Unit1_StudentBook.pdf" },
             { resourceTitle: "", type: "image", url: "" }
         ],
         lessons: [
@@ -185,8 +186,9 @@ export const INITIAL_MATH_RESOURCES: ResourceJsonUnit[] = [
                     { resourceTitle: "شرح الدرس ج10", type: "video", url: "https://youtu.be/6Devz730Yb8?si=ohwPL6UI-hEFtDQr" },
                     { resourceTitle: "شرح الدرس ج11", type: "video", url: "https://youtu.be/zOr8os5XA9g?si=YxscFlcGbuoc-Cpi" },
                     { resourceTitle: "شرح الدرس ج12", type: "video", url: "https://youtu.be/jallt-ZBsO0?si=12zDIDq1wM0GOvrO" },
-                    { resourceTitle: "تلخيص الدرس", type: "pdf", url: "" },
-                    { resourceTitle: "", type: "image", url: "" }
+                    { resourceTitle: "ورقة عمل1", type: "pdf", url: "https://raw.githubusercontent.com/MashalMath/Pdf_Library/main/Math11_U1_L1_Questions.pdf" },
+                    { resourceTitle: "ورقة عمل2", type: "pdf", url: "https://raw.githubusercontent.com/MashalMath/Pdf_Library/main/Math11_U1_L1_Questions1.pdf" },
+                    { resourceTitle: "امتحان الكتروني", type: "link", url: "https://forms.gle/c9NwktkqA1yRT76m8" }
                 ]
             },
             {
@@ -195,6 +197,8 @@ export const INITIAL_MATH_RESOURCES: ResourceJsonUnit[] = [
                 resources: [
                     { resourceTitle: "شرح الدرس ج1", type: "video", url: "https://youtu.be/Y50B4zpo47U?si=T-TbiSkTOpHdcfhd" },
                     { resourceTitle: "شرح الدرس ج2", type: "video", url: "https://youtu.be/lz1sMBiyzDo?si=NDjEBqxfE5RJXSDm" },
+                    { resourceTitle: "شرح الدرس ج3", type: "video", url: "https://youtu.be/JbK41eaEMt4?si=DpbLlJlVjwzOjJER" },
+                    { resourceTitle: "امتحان الكتروني", type: "link", url: "https://forms.cloud.microsoft/Pages/ResponsePage.aspx?id=DQSIkWdsW0yxEjajBLZtrQAAAAAAAAAAAAN__7gm-NdURDZBSUdYRkNGNkJMN1pVWkpXVEdFVVpEUy4u" },
                     { resourceTitle: "تلخيص الدرس", type: "pdf", url: "" },
                     { resourceTitle: "", type: "image", url: "" }
                 ]
@@ -224,7 +228,7 @@ export const INITIAL_MATH_RESOURCES: ResourceJsonUnit[] = [
         unitTitle: "الاقترانات المثلثية",
         resources: [
             { resourceTitle: "", type: "video", url: "" },
-            { resourceTitle: "ملخص الوحدة", type: "pdf", url: "" },
+            { resourceTitle: "دفتر الوحدة", type: "pdf", url: "https://raw.githubusercontent.com/MashalMath/Pdf_Library/main/Math11_Unit2_StudentBook.pdf" },
             { resourceTitle: "", type: "image", url: "" }
         ],
         lessons: [
@@ -515,6 +519,47 @@ function getResourceUrls(subject?: string): string[] {
     return JORDAN_HISTORY_RESOURCE_GITHUB_URLS;
 }
 
+export function normalizeResource(r: LessonResource): LessonResource {
+    if (!r) return r;
+    const url = (r.url || '').trim();
+    const lowerUrl = url.toLowerCase();
+    const rawType = (r.type || '').toLowerCase();
+    
+    // If explicitly marked as link/exam/form/url, preserve it as link
+    if (rawType === 'link' || rawType === 'exam' || rawType === 'form' || rawType === 'url') {
+        return {
+            ...r,
+            url,
+            type: 'link'
+        };
+    }
+
+    let detectedType = r.type;
+
+    if (lowerUrl.includes('.pdf') || (lowerUrl.includes('drive.google.com') && !lowerUrl.includes('youtube') && !lowerUrl.includes('forms'))) {
+        detectedType = 'pdf';
+    } else if (lowerUrl.includes('youtube.com') || lowerUrl.includes('youtu.be')) {
+        detectedType = 'video';
+    } else if (lowerUrl.includes('.png') || lowerUrl.includes('.jpg') || lowerUrl.includes('.jpeg') || lowerUrl.includes('.webp') || lowerUrl.includes('.gif')) {
+        detectedType = 'image';
+    } else if (
+        lowerUrl.includes('forms.gle') || 
+        lowerUrl.includes('docs.google.com/forms') || 
+        lowerUrl.includes('forms.office.com') || 
+        lowerUrl.includes('forms.cloud.microsoft') ||
+        lowerUrl.startsWith('http://') || 
+        lowerUrl.startsWith('https://')
+    ) {
+        detectedType = 'link';
+    }
+
+    return {
+        ...r,
+        url,
+        type: detectedType || r.type || 'link'
+    };
+}
+
 export function isValidResource(r: LessonResource | null | undefined): boolean {
     if (!r) return false;
     if (!r.url || typeof r.url !== 'string') return false;
@@ -532,6 +577,118 @@ export function isValidResource(r: LessonResource | null | undefined): boolean {
         return false;
     }
     return true;
+}
+
+/**
+ * Robust JSON parser and auto-repair function.
+ * Handles mobile-editing mistakes such as accidental closing brackets, trailing commas,
+ * smart quotes, unexpected trailing non-whitespace characters, and unclosed tags.
+ */
+export function cleanAndRepairJson<T = any>(rawText: string): T | null {
+    if (!rawText || typeof rawText !== 'string') return null;
+
+    // 1. Normalize smart quotes, non-breaking spaces, and hidden control characters
+    let text = rawText
+        .replace(/[\u201C\u201D\u201E\u201F\u00AB\u00BB]/g, '"')
+        .replace(/[\u2018\u2019]/g, '"')
+        .replace(/\u00a0/g, ' ')
+        .replace(/[\u200B-\u200D\uFEFF]/g, '');
+
+    // Fast path: try standard JSON.parse first
+    try {
+        return JSON.parse(text);
+    } catch (e) {
+        // Proceed with repairs
+    }
+
+    // 2. Fix misplaced resource array close before subsequent resource objects
+    // Example: user inserted a resource and closed with `] },` right before another resource `{ "resourceTitle": ... }`
+    text = text.replace(/\]\s*\}\s*,\s*\{\s*(?=(?:"resourceTitle"|"type"|"url"))/g, ',\n          {');
+
+    // 3. Fix trailing commas before } or ]
+    text = text.replace(/,\s*([\]}])/g, '$1');
+
+    try {
+        return JSON.parse(text);
+    } catch (e) {
+        // Proceed
+    }
+
+    // 4. Handle "Unexpected non-whitespace character after JSON at position X"
+    try {
+        JSON.parse(text);
+    } catch (err: any) {
+        const match = err?.message?.match(/after JSON at position (\d+)/);
+        if (match) {
+            const pos = parseInt(match[1], 10);
+            const sub = text.slice(0, pos).trim();
+            try {
+                return JSON.parse(sub);
+            } catch {
+                // Continue to next repair strategy
+            }
+        }
+    }
+
+    // 5. Extract balanced JSON array if outer boundaries have mismatched trailing brackets
+    const firstBracket = text.indexOf('[');
+    if (firstBracket !== -1) {
+        let depth = 0;
+        let inString = false;
+        let escape = false;
+        for (let i = firstBracket; i < text.length; i++) {
+            const c = text[i];
+            if (escape) { escape = false; continue; }
+            if (c === '\\') { escape = true; continue; }
+            if (c === '"') { inString = !inString; continue; }
+            if (!inString) {
+                if (c === '[') depth++;
+                else if (c === ']') {
+                    depth--;
+                    if (depth === 0) {
+                        const candidate = text.slice(firstBracket, i + 1);
+                        try {
+                            return JSON.parse(candidate);
+                        } catch {
+                            // Continue to next repair strategy
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    // 6. Stack-based repair for unclosed brackets at the end of the file
+    const stack: string[] = [];
+    let inString = false;
+    let escape = false;
+    for (let i = 0; i < text.length; i++) {
+        const c = text[i];
+        if (escape) { escape = false; continue; }
+        if (c === '\\') { escape = true; continue; }
+        if (c === '"') { inString = !inString; continue; }
+        if (!inString) {
+            if (c === '{') stack.push('}');
+            else if (c === '[') stack.push(']');
+            else if (c === '}' || c === ']') {
+                if (stack.length > 0 && stack[stack.length - 1] === c) {
+                    stack.pop();
+                }
+            }
+        }
+    }
+
+    let balanced = text.trim();
+    while (stack.length > 0) {
+        balanced += stack.pop();
+    }
+    try {
+        return JSON.parse(balanced);
+    } catch {
+        // All repair attempts completed
+    }
+
+    return null;
 }
 
 function countValidResourcesInUnits(units: ResourceJsonUnit[]): number {
@@ -558,7 +715,7 @@ export function loadCachedResources(subject?: string): ResourceJsonUnit[] {
         const key = getLocalStorageKey(subject);
         const cached = localStorage.getItem(key);
         if (cached) {
-            const parsed = JSON.parse(cached);
+            const parsed = cleanAndRepairJson<any>(cached);
             let units: ResourceJsonUnit[] = [];
             if (Array.isArray(parsed) && parsed.length > 0) {
                 if (parsed[0].units && Array.isArray(parsed[0].units)) {
@@ -598,13 +755,14 @@ export async function fetchRemoteResources(subject?: string): Promise<ResourceJs
 
             const cacheBuster = (url.includes('?') ? '&' : '?') + `t=${Date.now()}`;
             const response = await fetch(`${url}${cacheBuster}`, { 
-                headers
+                headers,
+                cache: 'no-store'
             });
             if (!response.ok) continue;
             const text = await response.text();
-            // Clean non-breaking spaces (\u00a0) and hidden control chars
-            const cleanedText = text.replace(/\u00a0/g, ' ').replace(/[\u200B-\u200D\uFEFF]/g, '');
-            const data = JSON.parse(cleanedText);
+            
+            const data = cleanAndRepairJson<any>(text);
+            if (!data) continue;
             
             let units: ResourceJsonUnit[] = [];
             if (Array.isArray(data) && data.length > 0) {
@@ -688,8 +846,8 @@ export function getResourcesForLesson(
         return [];
     }
 
-    // 3. Filter valid resources using isValidResource
-    return matchedLesson.resources.filter(isValidResource);
+    // 3. Filter valid resources using isValidResource and normalize type
+    return matchedLesson.resources.filter(isValidResource).map(normalizeResource);
 }
 
 export function getResourcesForUnit(
@@ -720,7 +878,7 @@ export function getResourcesForUnit(
 
     if (!rawResources || rawResources.length === 0) return [];
 
-    return rawResources.filter(isValidResource);
+    return rawResources.filter(isValidResource).map(normalizeResource);
 }
 
 export function getOrdinalText(num: number, type: 'lesson' | 'unit'): string {

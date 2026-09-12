@@ -39,8 +39,10 @@ self.addEventListener('fetch', (event) => {
   const url = new URL(event.request.url);
   if (!url.protocol.startsWith('http')) return;
 
-  // Never cache Vite dev server internal assets, live modules, or hot-updates
+  // Never cache Vite dev server internal assets, live modules, hot-updates, or the service worker itself
   if (
+    url.pathname.endsWith('/sw.js') ||
+    url.pathname === '/sw.js' ||
     url.pathname.includes('/@vite/') ||
     url.pathname.includes('/@react-refresh') ||
     url.pathname.includes('/@fs/') ||

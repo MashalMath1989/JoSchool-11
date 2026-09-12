@@ -49,15 +49,11 @@ export const QuestionCardVisual = forwardRef<HTMLDivElement, QuestionCardVisualP
     if (s.includes('عربية')) {
       return 'سؤال لغة عربية 📝';
     }
-    if (s.includes('إنجليزية') || s.toLowerCase().includes('english')) {
-      return 'سؤال لغة إنجليزية 📝';
-    }
     if (s) {
       let cleanName = s;
       if (cleanName === 'الرياضيات') cleanName = 'رياضيات';
       else if (cleanName === 'التربية الإسلامية') cleanName = 'تربية إسلامية';
       else if (cleanName === 'اللغة العربية') cleanName = 'لغة عربية';
-      else if (cleanName === 'اللغة الإنجليزية') cleanName = 'لغة إنجليزية';
       else if (cleanName.startsWith('ال') && cleanName.length > 3 && !cleanName.includes(' ')) {
         cleanName = cleanName.slice(2);
       }

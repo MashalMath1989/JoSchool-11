@@ -1,7 +1,7 @@
 import React from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Semester, Subject, SubjectName } from './types';
-import { SparklesIcon, MenuIcon, UserIcon, CalendarIcon, InfoIcon, LogOutIcon, XIcon, BookOpenIcon, ChevronLeftIcon, ChevronRightIcon, DownloadIcon, ChevronDownIcon } from './data/Icons';
+import { SparklesIcon, MenuIcon, UserIcon, CalendarIcon, InfoIcon, LogOutIcon, XIcon, BookOpenIcon, ChevronLeftIcon, ChevronRightIcon, DownloadIcon, ChevronDownIcon, MessengerIcon, FacebookIcon, InstagramIcon } from './data/Icons';
 import { User } from 'firebase/auth';
 import { LOGO_DATA_URI } from './logoDataUri';
 
@@ -14,6 +14,68 @@ interface LandingPageProps {
     user: User | null;
     handleLogout: (skipConfirm?: boolean) => void;
 }
+
+const MinistryScheduleModal: React.FC<{ isOpen: boolean; onClose: () => void }> = ({ isOpen, onClose }) => {
+    return (
+        <AnimatePresence>
+            {isOpen && (
+                <motion.div
+                    initial={{ opacity: 0 }}
+                    animate={{ opacity: 1 }}
+                    exit={{ opacity: 0 }}
+                    className="fixed inset-0 z-[2000] bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4"
+                    onClick={onClose}
+                    dir="rtl"
+                >
+                    <motion.div
+                        initial={{ scale: 0.9, opacity: 0, y: 20 }}
+                        animate={{ scale: 1, opacity: 1, y: 0 }}
+                        exit={{ scale: 0.9, opacity: 0, y: 20 }}
+                        className="relative w-full max-w-xs sm:max-w-sm bg-white p-6 sm:p-7 rounded-[2rem] shadow-2xl border border-slate-900 text-center"
+                        onClick={(e) => e.stopPropagation()}
+                    >
+                        {/* Close Button */}
+                        <button
+                            onClick={onClose}
+                            className="absolute top-5 left-5 w-9 h-9 border border-slate-800 rounded-xl flex items-center justify-center text-slate-800 hover:bg-slate-100 active:scale-95 transition-all cursor-pointer"
+                            aria-label="إغلاق"
+                        >
+                            <XIcon className="w-5 h-5 stroke-[2.5px]" />
+                        </button>
+
+                        {/* Ministry Logo */}
+                        <div className="w-20 h-20 sm:w-24 sm:h-24 mx-auto mt-2 mb-5 rounded-2xl border border-slate-800 p-2 flex items-center justify-center bg-white shadow-xs">
+                            <img 
+                                src="https://raw.githubusercontent.com/MashalMath/Pdf_Library/main/Ministry_Logo.jpg" 
+                                alt="وزارة التربية والتعليم" 
+                                className="w-full h-full object-contain"
+                                referrerPolicy="no-referrer"
+                            />
+                        </div>
+
+                        {/* Title */}
+                        <h3 className="text-xl sm:text-2xl font-black text-slate-900 mb-3">
+                            برنامج امتحانات الوزارة
+                        </h3>
+
+                        {/* Message */}
+                        <p className="text-sm sm:text-base font-bold text-slate-700 leading-relaxed mb-6 px-1">
+                            سيتم عرض برنامج امتحانات الوزارة لجيل 2010 فور صدوره من وزارة التربية والتعليم
+                        </p>
+
+                        {/* OK Button */}
+                        <button
+                            onClick={onClose}
+                            className="w-full py-3.5 bg-slate-900 hover:bg-slate-800 active:scale-98 text-white rounded-2xl font-black text-base shadow-md transition-all cursor-pointer"
+                        >
+                            حسناً
+                        </button>
+                    </motion.div>
+                </motion.div>
+            )}
+        </AnimatePresence>
+    );
+};
 
 const SubjectGrid = React.memo(({ 
     subjects = [], 
@@ -106,8 +168,8 @@ const SubjectGrid = React.memo(({
     };
 
     const CountdownTimer = () => {
-        // Thursday 23-7-2026 at 10:00 AM
-        const targetDate = new Date('2026-07-23T10:00:00').getTime();
+        // Thursday 22-7-2027 at 10:00 AM
+        const targetDate = new Date(2027, 6, 22, 10, 0, 0).getTime();
         const [timeLeft, setTimeLeft] = React.useState(targetDate - Date.now());
 
         React.useEffect(() => {
@@ -128,93 +190,66 @@ const SubjectGrid = React.memo(({
         return (
             <>
                 <motion.div 
-                    initial={{ opacity: 0, x: 20 }}
-                    animate={{ opacity: 1, x: 0 }}
-                    whileTap={{ scale: 0.97 }}
+                    initial={{ opacity: 0, scale: 0.95 }}
+                    animate={{ opacity: 1, scale: 1 }}
+                    whileTap={{ scale: 0.98 }}
                     onClick={() => setShowSchedule(true)}
-                    className="flex-1 flex flex-col items-center justify-center bg-yellow-100 rounded-lg h-10 border border-slate-900 shadow-sm mx-2 overflow-hidden py-0.5 cursor-pointer active:bg-yellow-200 transition-colors"
+                    className="flex-1 max-w-[265px] sm:max-w-[315px] flex flex-col items-center justify-center bg-yellow-300 hover:bg-yellow-200 text-slate-950 rounded-lg px-2 py-1 border border-slate-900 mr-2 sm:mr-4 md:mr-5 ml-4 sm:ml-10 md:ml-14 cursor-pointer transition-all overflow-hidden select-none group"
+                    title="امتحانات الوزارة: يوم الخميس 22 - 7 - 2027 الساعة 10:00 صباحاً"
                 >
-                    <span className="text-[6px] font-black text-slate-400 mb-0.5">موعد امتحانات الوزارة</span>
-                    <div className="flex items-center justify-around w-full px-1">
-                        <div className="flex flex-col items-center justify-center min-w-[24px]">
-                            <span className="text-[10px] font-black text-slate-700 leading-none mb-0.5">{s}</span>
-                            <span className="text-[6px] font-bold text-slate-500 italic leading-none">ثانية</span>
+                    {/* Header: امتحانات الوزارة + يوم الامتحان */}
+                    <div className="flex items-center justify-between w-full px-0.5 text-[8.5px] sm:text-[10px] font-black text-slate-950 leading-tight">
+                        <span className="truncate">امتحانات الوزارة</span>
+                        <span className="bg-yellow-400 text-slate-950 px-1.5 py-0.5 rounded font-black text-[8px] sm:text-[9px] shrink-0 border border-slate-900/20">
+                            الخميس 22-7-2027
+                        </span>
+                    </div>
+
+                    {/* Countdown Timer with Day at Far Left (LTR layout) */}
+                    <div className="flex items-center justify-between w-full mt-0.5 px-0.5 text-slate-950 font-black" dir="ltr">
+                        {/* يوم (أقصى اليسار) */}
+                        <div className="flex flex-col items-center justify-center min-w-[28px] sm:min-w-[34px] bg-white/90 rounded-md py-0.5 border border-slate-900/30">
+                            <span className="text-[6.5px] sm:text-[7.5px] font-black text-slate-800 leading-none mb-0.5">يوم</span>
+                            <span className="text-[10px] sm:text-[11px] font-black text-slate-950 leading-none">{d}</span>
                         </div>
-                        <div className="text-yellow-400 font-black text-[8px] pb-2">:</div>
-                        <div className="flex flex-col items-center justify-center min-w-[24px]">
-                            <span className="text-[10px] font-black text-slate-700 leading-none mb-0.5">{m}</span>
-                            <span className="text-[6px] font-bold text-slate-500 italic leading-none">دقيقة</span>
+                        <span className="text-slate-950 font-black text-[9px] leading-none pt-2">:</span>
+
+                        {/* ساعة */}
+                        <div className="flex flex-col items-center justify-center min-w-[28px] sm:min-w-[34px] bg-white/90 rounded-md py-0.5 border border-slate-900/30">
+                            <span className="text-[6.5px] sm:text-[7.5px] font-black text-slate-800 leading-none mb-0.5">ساعة</span>
+                            <span className="text-[10px] sm:text-[11px] font-black text-slate-950 leading-none">{h}</span>
                         </div>
-                        <div className="text-yellow-400 font-black text-[8px] pb-2">:</div>
-                        <div className="flex flex-col items-center justify-center min-w-[24px]">
-                            <span className="text-[10px] font-black text-slate-700 leading-none mb-0.5">{h}</span>
-                            <span className="text-[6px] font-bold text-slate-500 italic leading-none">ساعة</span>
+                        <span className="text-slate-950 font-black text-[9px] leading-none pt-2">:</span>
+
+                        {/* دقيقة */}
+                        <div className="flex flex-col items-center justify-center min-w-[28px] sm:min-w-[34px] bg-white/90 rounded-md py-0.5 border border-slate-900/30">
+                            <span className="text-[6.5px] sm:text-[7.5px] font-black text-slate-800 leading-none mb-0.5">دقيقة</span>
+                            <span className="text-[10px] sm:text-[11px] font-black text-slate-950 leading-none">{m}</span>
                         </div>
-                        <div className="text-yellow-400 font-black text-[8px] pb-2">:</div>
-                        <div className="flex flex-col items-center justify-center min-w-[24px]">
-                            <span className="text-[10px] font-black text-slate-800 leading-none mb-0.5">{d}</span>
-                            <span className="text-[6px] font-bold text-slate-600 italic leading-none">يوم</span>
+                        <span className="text-slate-950 font-black text-[9px] leading-none pt-2">:</span>
+
+                        {/* ثانية (أقصى اليمين) */}
+                        <div className="flex flex-col items-center justify-center min-w-[28px] sm:min-w-[34px] bg-white/90 rounded-md py-0.5 border border-slate-900/30">
+                            <span className="text-[6.5px] sm:text-[7.5px] font-black text-slate-800 leading-none mb-0.5">ثانية</span>
+                            <span className="text-[10px] sm:text-[11px] font-black text-red-700 leading-none">{s}</span>
                         </div>
                     </div>
                 </motion.div>
 
-                <AnimatePresence>
-                    {showSchedule && (
-                        <motion.div
-                            initial={{ opacity: 0 }}
-                            animate={{ opacity: 1 }}
-                            exit={{ opacity: 0 }}
-                            className="fixed inset-0 z-[999] bg-slate-900/95 backdrop-blur-sm flex flex-col items-center justify-center p-4"
-                            onClick={() => setShowSchedule(false)}
-                        >
-                            <motion.button
-                                initial={{ scale: 0 }}
-                                animate={{ scale: 1 }}
-                                exit={{ scale: 0 }}
-                                className="absolute top-4 right-4 w-12 h-12 bg-white rounded-full flex items-center justify-center text-slate-900 shadow-2xl z-[1000] border-2 border-slate-900"
-                                onClick={(e) => {
-                                    e.stopPropagation();
-                                    setShowSchedule(false);
-                                }}
-                            >
-                                <XIcon className="w-6 h-6 stroke-[3px]" />
-                            </motion.button>
-
-                            <motion.div
-                                initial={{ scale: 0.9, opacity: 0, y: 20 }}
-                                animate={{ scale: 1, opacity: 1, y: 0 }}
-                                exit={{ scale: 0.9, opacity: 0, y: 20 }}
-                                className="relative max-w-full max-h-[90vh] bg-white p-1 rounded-2xl border-4 border-slate-900 shadow-[0_20px_50px_rgba(0,0,0,0.5)] overflow-hidden flex items-center justify-center"
-                                onClick={(e) => e.stopPropagation()}
-                            >
-                                <img 
-                                    src="https://i.postimg.cc/7YxNQpbk/FB-IMG-1778071583057.jpg" 
-                                    alt="Exam Schedule" 
-                                    className="max-w-full max-h-full object-contain rounded-lg"
-                                    referrerPolicy="no-referrer"
-                                />
-                            </motion.div>
-                            
-                            <motion.p 
-                                initial={{ opacity: 0, y: 10 }}
-                                animate={{ opacity: 1, y: 0 }}
-                                className="mt-4 text-white font-black text-lg text-center"
-                            >
-                                جدول امتحانات الوزارة ٢٠٢٦
-                            </motion.p>
-                        </motion.div>
-                    )}
-                </AnimatePresence>
+                <MinistryScheduleModal 
+                    isOpen={showSchedule} 
+                    onClose={() => setShowSchedule(false)} 
+                />
             </>
         );
     };
 
     return (
         <div className="mb-1">
-            <div className="flex items-center justify-between mb-0.5 px-2 text-right gap-2">
-                <div className="flex items-center gap-2 shrink-0">
+            <div className="flex items-center justify-between mb-1 px-1 sm:px-2 text-right gap-1.5 sm:gap-2">
+                <div className="flex items-center gap-1.5 sm:gap-2 shrink-0">
                     <div className="w-2 h-6 bg-yellow-400 rounded-full"></div>
-                    <h2 className="text-lg sm:text-xl font-black text-slate-800 leading-tight">{title}</h2>
+                    <h2 className="text-base sm:text-xl font-black text-slate-800 leading-tight">{title}</h2>
                 </div>
                 
                 {showAchievements && <CountdownTimer />}
@@ -222,7 +257,9 @@ const SubjectGrid = React.memo(({
                 {showAchievements && (
                     <button
                         onClick={() => navigateTo(View.Progress)}
-                        className="w-10 h-10 bg-white border border-slate-900 rounded-lg shadow-sm flex items-center justify-center hover:scale-110 active:scale-90 transition-all hover:bg-slate-50 touch-manipulation"
+                        className="w-10 h-10 sm:w-11 sm:h-11 bg-white border-2 border-slate-900 rounded-xl shadow-[2px_2px_0px_0px_rgba(0,0,0,1)] flex items-center justify-center hover:scale-105 active:scale-95 transition-all hover:bg-slate-50 touch-manipulation shrink-0"
+                        title="لوحة الطالب الدراسية"
+                        aria-label="لوحة الطالب الدراسية"
                     >
                         <span className="text-xl">📊</span>
                     </button>
@@ -330,6 +367,12 @@ const LandingPage: React.FC<LandingPageProps> = React.memo(({
             action: () => navigateTo(View.Progress) 
         },
         { 
+            id: 'friendChallenge', 
+            label: 'تحدي الأصدقاء ⚔️', 
+            icon: <span className="text-xl leading-none select-none">🏆</span>, 
+            action: () => navigateTo(View.FriendChallenge) 
+        },
+        { 
             id: 'announcements', 
             label: 'الإعلانات', 
             icon: <span className="text-xl leading-none select-none">📰</span>, 
@@ -348,6 +391,15 @@ const LandingPage: React.FC<LandingPageProps> = React.memo(({
             action: () => setShowScannerModal(true) 
         },
         { 
+            id: 'contact', 
+            label: 'تواصل معنا', 
+            icon: <MessengerIcon className="w-5 h-5 text-[#0084FF]" />, 
+            href: 'https://m.me/JoSchool11',
+            action: () => {
+                window.open('https://m.me/JoSchool11', '_blank', 'noopener,noreferrer');
+            }
+        },
+        { 
             id: 'logout', 
             label: 'تسجيل الخروج', 
             icon: <LogOutIcon className="w-5 h-5 text-red-500" />, 
@@ -359,8 +411,8 @@ const LandingPage: React.FC<LandingPageProps> = React.memo(({
     return (
         <div className="container mx-auto p-4 max-w-2xl text-right" dir="rtl">
             {/* Header - Non-sticky */}
-            <div className="mb-4 mt-1">
-                <div className="relative flex items-center justify-between min-h-[64px]">
+            <div className="mb-4 mt-2">
+                <div className="relative flex items-center justify-between min-h-[72px]">
                     {/* Menu Button (Right side in RTL) */}
                     {user && (
                         <div className="relative z-50">
@@ -391,17 +443,33 @@ const LandingPage: React.FC<LandingPageProps> = React.memo(({
                                             className="absolute right-0 mt-2 w-56 bg-white border-2 border-slate-900 rounded-2xl shadow-2xl overflow-hidden py-1"
                                         >
                                             {menuItems.map((item) => (
-                                                <button
-                                                    key={item.id}
-                                                    onClick={() => {
-                                                        setIsMenuOpen(false);
-                                                        item.action();
-                                                    }}
-                                                    className={`w-full flex items-center gap-3 px-4 py-3.5 hover:bg-slate-50 transition-colors text-right font-black text-sm border-b border-slate-100 last:border-0 ${item.className || 'text-slate-700'}`}
-                                                >
-                                                    <span className="shrink-0">{item.icon}</span>
-                                                    <span className="flex-1">{item.label}</span>
-                                                </button>
+                                                item.href ? (
+                                                    <a
+                                                        key={item.id}
+                                                        id={`menu-item-${item.id}`}
+                                                        href={item.href}
+                                                        target="_blank"
+                                                        rel="noopener noreferrer"
+                                                        onClick={() => setIsMenuOpen(false)}
+                                                        className={`w-full flex items-center gap-3 px-4 py-3.5 hover:bg-slate-50 transition-colors text-right font-black text-sm border-b border-slate-100 last:border-0 ${item.className || 'text-slate-700'}`}
+                                                    >
+                                                        <span className="shrink-0">{item.icon}</span>
+                                                        <span className="flex-1">{item.label}</span>
+                                                    </a>
+                                                ) : (
+                                                    <button
+                                                        key={item.id}
+                                                        id={`menu-item-${item.id}`}
+                                                        onClick={() => {
+                                                            setIsMenuOpen(false);
+                                                            item.action();
+                                                        }}
+                                                        className={`w-full flex items-center gap-3 px-4 py-3.5 hover:bg-slate-50 transition-colors text-right font-black text-sm border-b border-slate-100 last:border-0 ${item.className || 'text-slate-700'}`}
+                                                    >
+                                                        <span className="shrink-0">{item.icon}</span>
+                                                        <span className="flex-1">{item.label}</span>
+                                                    </button>
+                                                )
                                             ))}
                                         </motion.div>
                                     </>
@@ -415,6 +483,11 @@ const LandingPage: React.FC<LandingPageProps> = React.memo(({
                         className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 flex flex-col items-center cursor-pointer group"
                         onClick={() => setShowInfoModal(true)}
                     >
+                        <div className="w-14 max-w-[56px] flex items-center justify-center mb-1.5 select-none overflow-visible">
+                            <span className="font-quran text-slate-400 text-[6.5px] sm:text-[7px] font-normal whitespace-nowrap text-center leading-none tracking-tight group-hover:text-primary transition-colors">
+                                بِسْمِ اللَّهِ الرَّحْمَٰنِ الرَّحِيمِ
+                            </span>
+                        </div>
                         <motion.div 
                             initial={{ opacity: 0, scale: 0.9 }}
                             animate={{ opacity: 1, scale: 1 }}
@@ -537,8 +610,8 @@ const LandingPage: React.FC<LandingPageProps> = React.memo(({
                 userProgress={userProgress}
             />
 
-            {/* Additional Sessions Section */}
-            <div className="grid grid-cols-2 gap-4 mt-4 select-none">
+            {/* Additional Sessions Section (الدورات والمكتبة) */}
+            <div className="grid grid-cols-2 gap-4 mt-5 select-none">
                 {/* زر الدورات */}
                 <motion.div
                     whileHover={{ scale: 1.02, translateY: -1 }}
@@ -557,7 +630,7 @@ const LandingPage: React.FC<LandingPageProps> = React.memo(({
                     </div>
                 </motion.div>
 
-                {/* زر الدوسيات */}
+                {/* زر المكتبة */}
                 <motion.div
                     whileHover={{ scale: 1.02, translateY: -1 }}
                     whileTap={{ scale: 0.98 }}
@@ -566,6 +639,61 @@ const LandingPage: React.FC<LandingPageProps> = React.memo(({
                 >
                     <span className="font-black text-slate-800 text-sm">📚 المكتبة</span>
                 </motion.div>
+            </div>
+
+            {/* بطاقة تحدي الأصدقاء - أسفل بطاقتي الدورات والمكتبة */}
+            <motion.div
+                whileHover={{ scale: 1.01, translateY: -1 }}
+                whileTap={{ scale: 0.99 }}
+                onClick={() => navigateTo(View.FriendChallenge)}
+                className="mt-4 bg-gradient-to-r from-amber-300 via-yellow-300 to-amber-400 rounded-xl p-3.5 shadow-md border-2 border-slate-900 flex items-center justify-between cursor-pointer transition-all hover:shadow-lg select-none"
+            >
+                <div className="flex items-center gap-3">
+                    <div className="w-11 h-11 rounded-xl bg-slate-950 border border-slate-900 flex items-center justify-center text-amber-300 text-2xl shadow-xs shrink-0">
+                        🏆
+                    </div>
+                    <div>
+                        <div className="flex items-center gap-2">
+                            <span className="font-black text-slate-950 text-sm sm:text-base">تحدي الأصدقاء</span>
+                            <span className="px-2 py-0.5 rounded-md bg-slate-950 text-amber-300 font-black text-[10px]">جديد 🔥</span>
+                        </div>
+                        <p className="text-[11px] font-bold text-slate-800 mt-0.5">ادعُ أصدقاءك لنفس الاختبار وقارنوا النتائج فوراً</p>
+                    </div>
+                </div>
+                <div className="w-9 h-9 rounded-lg bg-white/90 border border-slate-900 flex items-center justify-center text-slate-900 font-black text-base shrink-0 shadow-xs">
+                    ⚔️
+                </div>
+            </motion.div>
+
+            {/* أزرار التواصل الاجتماعي في نهاية الواجهة الرئيسية */}
+            <div className="mt-8 mb-6 flex flex-row items-center justify-center gap-4">
+                <motion.a
+                    id="facebook-page-button"
+                    href="https://www.facebook.com/share/1EYUYgHUYi/"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    whileHover={{ scale: 1.1, translateY: -2 }}
+                    whileTap={{ scale: 0.92 }}
+                    className="w-12 h-12 sm:w-14 sm:h-14 rounded-full shadow-md hover:shadow-xl transition-all duration-300 cursor-pointer overflow-hidden flex items-center justify-center bg-[#1877F2]"
+                    title="صفحة الفيسبوك"
+                    aria-label="صفحة الفيسبوك"
+                >
+                    <FacebookIcon className="w-full h-full" />
+                </motion.a>
+
+                <motion.a
+                    id="instagram-page-button"
+                    href="https://www.instagram.com/joschool11_2010?stkn=MXBlNDJjaTIwbDlodg=="
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    whileHover={{ scale: 1.1, translateY: -2 }}
+                    whileTap={{ scale: 0.92 }}
+                    className="w-12 h-12 sm:w-14 sm:h-14 rounded-full shadow-md hover:shadow-xl transition-all duration-300 cursor-pointer overflow-hidden flex items-center justify-center"
+                    title="صفحة الانستجرام"
+                    aria-label="صفحة الانستجرام"
+                >
+                    <InstagramIcon className="w-full h-full" />
+                </motion.a>
             </div>
 
             {/* Additional Modals */}
@@ -603,37 +731,10 @@ const LandingPage: React.FC<LandingPageProps> = React.memo(({
                 )}
 
                 {/* Exam Schedule Modal */}
-                {showScheduleModal && (
-                    <motion.div
-                        initial={{ opacity: 0 }}
-                        animate={{ opacity: 1 }}
-                        exit={{ opacity: 0 }}
-                        className="fixed inset-0 z-[2000] bg-slate-900/95 backdrop-blur-sm flex flex-col items-center justify-center p-4"
-                        onClick={() => setShowScheduleModal(false)}
-                    >
-                        <motion.button
-                            className="absolute top-4 right-4 w-12 h-12 bg-white rounded-full flex items-center justify-center text-slate-900 shadow-2xl z-[2001] border-2 border-slate-900"
-                            onClick={() => setShowScheduleModal(false)}
-                        >
-                            <XIcon className="w-6 h-6" />
-                        </motion.button>
-
-                        <motion.div
-                            initial={{ scale: 0.9, opacity: 0 }}
-                            animate={{ scale: 1, opacity: 1 }}
-                            className="relative max-w-full max-h-[90vh] bg-white p-1 rounded-2xl border-4 border-slate-900 overflow-hidden"
-                            onClick={(e) => e.stopPropagation()}
-                        >
-                            <img 
-                                src="https://i.postimg.cc/7YxNQpbk/FB-IMG-1778071583057.jpg" 
-                                alt="Exam Schedule" 
-                                className="max-w-full max-h-full object-contain"
-                                referrerPolicy="no-referrer"
-                            />
-                        </motion.div>
-                        <p className="mt-4 text-white font-black text-lg font-jordan">جدول امتحانات الوزارة ٢٠٢٦</p>
-                    </motion.div>
-                )}
+                <MinistryScheduleModal 
+                    isOpen={showScheduleModal} 
+                    onClose={() => setShowScheduleModal(false)} 
+                />
 
                 {/* Scanner Instructions Modal */}
                 {showScannerModal && (

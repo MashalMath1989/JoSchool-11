@@ -27,6 +27,40 @@
         "totalQuestions": { "type": "number" },
         "date": { "type": "string", "format": "date-time" }
       }
+    },
+    "Challenge": {
+      "title": "Challenge",
+      "description": "A shared quiz challenge between friends.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "code": { "type": "string" },
+        "creatorId": { "type": "string" },
+        "creatorName": { "type": "string" },
+        "subjectId": { "type": "string" },
+        "subjectName": { "type": "string" },
+        "lessonTitle": { "type": "string" },
+        "totalQuestions": { "type": "number" },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "status": { "type": "string" }
+      },
+      "required": ["id", "code", "creatorName", "subjectId", "lessonTitle"]
+    },
+    "ChallengeParticipant": {
+      "title": "ChallengeParticipant",
+      "description": "Participant in a friend challenge.",
+      "type": "object",
+      "properties": {
+        "participantId": { "type": "string" },
+        "name": { "type": "string" },
+        "score": { "type": "number" },
+        "totalQuestions": { "type": "number" },
+        "percentage": { "type": "number" },
+        "timeSpent": { "type": "number" },
+        "status": { "type": "string" },
+        "completedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["participantId", "name", "status"]
     }
   },
   "firestore": {
@@ -37,6 +71,14 @@
     "/test/connection": {
       "schema": { "type": "object", "properties": {} },
       "description": "Used for testing the Firestore connection on app boot."
+    },
+    "/challenges/{challengeId}": {
+      "schema": "Challenge",
+      "description": "Friend challenge room."
+    },
+    "/challenges/{challengeId}/participants/{participantId}": {
+      "schema": "ChallengeParticipant",
+      "description": "Participant results and status in a challenge."
     }
   }
 }

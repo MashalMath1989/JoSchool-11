@@ -34,6 +34,17 @@ service cloud.firestore {
       allow update: if isOwner(userId) && isValidId(userId) && isValidUser(request.resource.data);
     }
 
+    // Friend Challenge rooms and participants
+    match /challenges/{challengeId} {
+      allow read: if true;
+      allow create, update: if true;
+
+      match /participants/{participantId} {
+        allow read: if true;
+        allow create, update: if true;
+      }
+    }
+
     // Default deny for everything else
     match /{document=**} {
       allow read, write: if false;

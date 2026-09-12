@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Loader2, ExternalLink, AlertCircle, LogOut } from 'lucide-react';
-import { View, Subject, SubjectName, Question, Semester, UserProgress, QuizResult } from './types';
+import { View, Subject, SubjectName, Question, Semester, UserProgress, QuizResult, ExamProgress, FavoriteQuestion } from './types';
 import { subjectsData, subjectIndexData } from './data';
 import { getQuizzesForLesson, getLessonChunksCount, getQuizzesForUnit, isLessonLoaded } from './services/quizService';
 import { updateDatabase, examsDatabase, loadFromCache, saveToCache, hasValidCache } from './data/examsDatabase';
@@ -26,6 +26,9 @@ import SessionsListPage from './SessionsListPage';
 import { LOGO_DATA_URI } from './logoDataUri';
 import LibraryPage from './LibraryPage';
 import WelcomePage from './WelcomePage';
+import FriendChallengePage from './FriendChallengePage';
+import { FriendChallenge } from './types';
+import { createChallenge, submitChallengeResult } from './services/challengeService';
 
 // روابط امتحانات مادة تاريخ الأردن - الفصل الأول
 const HISTORY_U1_EXAMS = [
@@ -654,7 +657,6 @@ const App: React.FC = () => {
     const isJordanHistory = selectedSubject?.id === SubjectName.JordanHistory;
     const isIslamicEducation = selectedSubject?.id === SubjectName.IslamicEducation;
     const isArabic = selectedSubject?.id === SubjectName.Arabic;
-    const isEnglish = selectedSubject?.id === SubjectName.English;
 
     const getDefaultProgress = useCallback((): UserProgress => ({
         completedLessons: [],
@@ -869,6 +871,38 @@ const App: React.FC = () => {
     const [showResults, setShowResults] = useState(false);
     const [expandedUnitIndices, setExpandedUnitIndices] = useState<number[]>([]);
     const [expandedLessonKeys, setExpandedLessonKeys] = useState<string[]>([]);
+
+    // Friend Challenge States
+    const [activeChallengeCode, setActiveChallengeCode] = useState<string | null>(() => {
+        try {
+            const params = new URLSearchParams(window.location.search);
+            return params.get('challenge') || params.get('join') || null;
+        } catch {
+            return null;
+        }
+    });
+    const [activeChallenge, setActiveChallenge] = useState<FriendChallenge | null>(null);
+    const [activeChallengeParticipantId, setActiveChallengeParticipantId] = useState<string>('');
+    const [activeChallengeStartTime, setActiveChallengeStartTime] = useState<number>(0);
+
+    // Only handle initial URL challenge invite link once on mount
+    const hasHandledInitialUrlChallengeRef = useRef(false);
+    useEffect(() => {
+        if (hasHandledInitialUrlChallengeRef.current) return;
+        hasHandledInitialUrlChallengeRef.current = true;
+        try {
+            const params = new URLSearchParams(window.location.search);
+            const urlChallenge = params.get('challenge') || params.get('join');
+            if (urlChallenge) {
+                setViewHistory(prev => {
+                    if (prev[prev.length - 1] === View.FriendChallenge) return prev;
+                    return [...prev, View.FriendChallenge];
+                });
+            }
+        } catch {
+            // Ignore URL parameter reading errors
+        }
+    }, []);
 
     // Save state to localStorage on any change (now isolated per user)
     // Debounced to avoid heavy writes on every timer tick
@@ -1410,12 +1444,13 @@ const App: React.FC = () => {
 
     const startQuiz = async (lesson: any, chunkIndex?: number, unitTitle?: string, resumeProgress?: ExamProgress) => {
         const subjectId = selectedSubject?.id as SubjectName;
-        const isEnglish = selectedSubject?.id === SubjectName.English;
         const examNum = (chunkIndex || 0) + 1;
-        const examLabel = isEnglish ? `Exam (${examNum})` : `امتحان (${examNum})`;
+        const examLabel = `امتحان (${examNum})`;
         const fullLessonTitle = `${lesson.title} - ${examLabel}`;
 
         const launchQuizWithQuestions = (questions: Question[]) => {
+            setActiveChallenge(null);
+            setActiveChallengeParticipantId('');
             setCurrentLessonTitle(fullLessonTitle);
             setCurrentUnitTitle(unitTitle || '');
             setExamNumber(examNum);
@@ -1491,9 +1526,8 @@ const App: React.FC = () => {
     };
 
     const handleStartQuiz = (lesson: any, chunkIndex?: number, unitTitle?: string) => {
-        const isEnglish = selectedSubject?.id === SubjectName.English;
         const examNum = (chunkIndex || 0) + 1;
-        const examLabel = isEnglish ? `Exam (${examNum})` : `امتحان (${examNum})`;
+        const examLabel = `امتحان (${examNum})`;
         const fullLessonTitle = `${lesson.title} - ${examLabel}`;
         const key = `${selectedSubject?.id}_${fullLessonTitle}`;
         const existingProgress = userProgress.examProgresses?.[key];
@@ -1511,8 +1545,7 @@ const App: React.FC = () => {
         
         const subjectId = selectedSubject.id as SubjectName;
         const unitOrdinal = unit.title.split(':')[0];
-        const isEnglish = selectedSubject?.id === SubjectName.English;
-        const examLabel = isEnglish ? 'Exam (1)' : 'امتحان (1)';
+        const examLabel = 'امتحان (1)';
         const fullLessonTitle = `${unitOrdinal} - ${examLabel}`;
 
         const launchUnitExamWithQuestions = (questions: Question[]) => {
@@ -1636,8 +1669,7 @@ const App: React.FC = () => {
 
     const handleStartUnitExam = (unit: any, uIdx: number) => {
         const unitOrdinal = unit.title.split(':')[0];
-        const isEnglish = selectedSubject?.id === SubjectName.English;
-        const examLabel = isEnglish ? 'Exam (1)' : 'امتحان (1)';
+        const examLabel = 'امتحان (1)';
         const fullLessonTitle = `${unitOrdinal} - ${examLabel}`;
         const key = `${selectedSubject?.id}_${fullLessonTitle}`;
         const existingProgress = userProgress.examProgresses?.[key];
@@ -1655,8 +1687,7 @@ const App: React.FC = () => {
         if (pendingExamData.isUnitExam) {
             startUnitExam(pendingExamData.lesson, pendingExamData.progress);
         } else if (pendingExamData.isSessionExam) {
-            const isEnglish = selectedSubject?.id === SubjectName.English;
-            const examLabel = isEnglish ? 'Exam (1)' : 'امتحان (1)';
+            const examLabel = 'امتحان (1)';
             startSessionExam(`${pendingExamData.lesson.title} - ${examLabel}`, pendingExamData.lesson.questions, pendingExamData.progress);
         } else {
             startQuiz(pendingExamData.lesson, pendingExamData.chunkIndex, pendingExamData.unitTitle, pendingExamData.progress);
@@ -1670,8 +1701,7 @@ const App: React.FC = () => {
         if (pendingExamData.isUnitExam) {
             startUnitExam(pendingExamData.lesson);
         } else if (pendingExamData.isSessionExam) {
-            const isEnglish = selectedSubject?.id === SubjectName.English;
-            const examLabel = isEnglish ? 'Exam (1)' : 'امتحان (1)';
+            const examLabel = 'امتحان (1)';
             startSessionExam(`${pendingExamData.lesson.title} - ${examLabel}`, pendingExamData.lesson.questions);
         } else {
             startQuiz(pendingExamData.lesson, pendingExamData.chunkIndex, pendingExamData.unitTitle);
@@ -1732,8 +1762,7 @@ const App: React.FC = () => {
         const shuffled = [...finalAllQuestions].sort(() => 0.5 - Math.random());
         const selected = shuffled.slice(0, 40);
 
-        const isEnglish = selectedSubject?.id === SubjectName.English;
-        const title = isEnglish ? 'Comprehensive Exam - Exam (1)' : 'امتحان شامل - امتحان (1)';
+        const title = 'امتحان شامل - امتحان (1)';
         setCurrentLessonTitle(title);
         setCurrentQuiz(selected);
         setCurrentQuestionIndex(0);
@@ -1744,10 +1773,128 @@ const App: React.FC = () => {
         navigateTo(View.Quiz);
     };
 
+    const checkIsCorrectAnswer = (q: Question, userAnswer: string | undefined | null) => {
+        if (!userAnswer || !q.correct_answer) return false;
+        const trimmedUser = String(userAnswer).trim();
+        const trimmedCorrect = String(q.correct_answer).trim();
+        if (trimmedUser === trimmedCorrect) return true;
+        const arabicLetters = ['أ', 'ب', 'ج', 'د'];
+        const englishLetters = ['A', 'B', 'C', 'D'];
+        const lowerEnglishLetters = ['a', 'b', 'c', 'd'];
+        let letterIndex = arabicLetters.indexOf(trimmedCorrect);
+        if (letterIndex === -1) letterIndex = englishLetters.indexOf(trimmedCorrect.toUpperCase());
+        if (letterIndex === -1) letterIndex = lowerEnglishLetters.indexOf(trimmedCorrect.toLowerCase());
+        if (letterIndex !== -1 && q.choices && q.choices[letterIndex]?.trim() === trimmedUser) return true;
+        const numericIndex = parseInt(trimmedCorrect);
+        if (!isNaN(numericIndex) && q.choices && q.choices[numericIndex]?.trim() === trimmedUser) return true;
+        return false;
+    };
+
+    const startChallengeQuiz = (challenge: FriendChallenge, participantId: string, participantName: string) => {
+        if (!challenge) {
+            console.error("startChallengeQuiz: challenge is null or undefined");
+            return;
+        }
+        const questions = Array.isArray(challenge.questions) ? challenge.questions : [];
+        if (questions.length === 0) {
+            console.warn("startChallengeQuiz: questions array is empty");
+            return;
+        }
+
+        isNavigatingBackRef.current = false;
+        setActiveChallenge(challenge);
+        setActiveChallengeCode(challenge.code);
+        setActiveChallengeParticipantId(participantId);
+        setActiveChallengeStartTime(Date.now());
+        setCurrentQuiz([...questions]);
+        setCurrentQuestionIndex(0);
+        setUserAnswers(new Array(questions.length).fill(null));
+        setCurrentLessonTitle(challenge.lessonTitle);
+        setExamNumber(challenge.examNumber || null);
+        setCurrentUnitTitle('');
+        const matched = subjectsData.find(s => s.id === challenge.subjectId) || subjectsData[0];
+        setSelectedSubject(matched);
+        setShowResults(false);
+        const secondsPerQuestion = challenge.subjectId === SubjectName.Math ? 240 : 60;
+        setTimer(questions.length * secondsPerQuestion);
+        navigateTo(View.Quiz);
+    };
+
+    const handleChallengeFriendsFromResults = async () => {
+        if (!selectedSubject || currentQuiz.length === 0) return;
+        try {
+            let correctCount = 0;
+            currentQuiz.forEach((q, idx) => {
+                const ans = userAnswers[idx];
+                if (ans && checkIsCorrectAnswer(q, ans)) {
+                    correctCount++;
+                }
+            });
+            const total = currentQuiz.length;
+            const percentage = total > 0 ? (correctCount / total) * 100 : 0;
+            const myName = user?.displayName || userProgress?.studentProfile?.name || 'طالب متميز';
+            const myId = user?.email || `student_${Date.now()}`;
+            const timeSpent = Math.max(1, Math.round(activeChallengeStartTime ? ((Date.now() - activeChallengeStartTime) / 1000) : 120));
+
+            const newChallenge = await createChallenge({
+                creatorId: myId,
+                creatorName: myName,
+                subjectId: selectedSubject.id,
+                subjectName: selectedSubject.id,
+                lessonTitle: currentLessonTitle,
+                examNumber: examNumber || 1,
+                questions: currentQuiz,
+                initialParticipant: {
+                    id: myId,
+                    name: myName,
+                    score: correctCount,
+                    totalQuestions: total,
+                    percentage,
+                    timeSpent,
+                    userAnswers: userAnswers as (string | undefined)[],
+                    status: 'completed',
+                    completedAt: new Date().toISOString()
+                }
+            });
+
+            setActiveChallenge(newChallenge);
+            setActiveChallengeCode(newChallenge.code);
+            setActiveChallengeParticipantId(myId);
+            navigateTo(View.FriendChallenge);
+        } catch (e) {
+            console.error('Failed to create challenge from results:', e);
+            navigateTo(View.FriendChallenge);
+        }
+    };
+
     const handleFinish = useCallback(() => {
         setShowResults(true);
         if (timerRef.current) clearInterval(timerRef.current);
         
+        // If this was an active Friend Challenge, submit results
+        if (activeChallenge && activeChallengeParticipantId) {
+            let correctCount = 0;
+            currentQuiz.forEach((q, idx) => {
+                const ans = userAnswers[idx];
+                if (ans && checkIsCorrectAnswer(q, ans)) {
+                    correctCount++;
+                }
+            });
+            const total = currentQuiz.length;
+            const percentage = total > 0 ? (correctCount / total) * 100 : 0;
+            const timeSpent = Math.max(1, Math.round((Date.now() - (activeChallengeStartTime || Date.now())) / 1000));
+
+            submitChallengeResult(activeChallenge.id, activeChallengeParticipantId, {
+                score: correctCount,
+                totalQuestions: total,
+                percentage,
+                timeSpent,
+                userAnswers: userAnswers as (string | undefined)[]
+            }).catch(err => {
+                console.error("Failed to submit friend challenge result:", err);
+            });
+        }
+
         setUserProgress(prev => {
             // Clear active progress for this exam since it's finished
             const newProgresses = { ...(prev.examProgresses || {}) };
@@ -1772,7 +1919,7 @@ const App: React.FC = () => {
                 completedLessons: newCompleted
             };
         });
-    }, [currentLessonTitle, setUserProgress, selectedSubject]);
+    }, [currentLessonTitle, setUserProgress, selectedSubject, activeChallenge, activeChallengeParticipantId, activeChallengeStartTime, currentQuiz, userAnswers]);
 
     const isTimerActive = timer > 0;
     useEffect(() => {
@@ -1937,8 +2084,7 @@ const App: React.FC = () => {
 
             finalQuestions = finalQuestions.sort(() => Math.random() - 0.5);
 
-            const isEnglish = subjectId === SubjectName.English;
-            const examLabel = isEnglish ? 'Exam (1)' : 'امتحان (1)';
+            const examLabel = 'امتحان (1)';
             const fullLessonTitle = `دورة تجريبية - ${subjectId} - ${examLabel}`;
             
             startSessionExam(fullLessonTitle, finalQuestions);
@@ -1977,8 +2123,7 @@ const App: React.FC = () => {
             return;
         }
 
-        const isEnglish = subjectId === SubjectName.English;
-        const examLabel = isEnglish ? 'Exam (1)' : 'امتحان (1)';
+        const examLabel = 'امتحان (1)';
         const fullLessonTitle = `${examInfo.title} - ${examLabel}`;
         const key = `${subjectId}_${fullLessonTitle}`;
         const existingProgress = userProgress.examProgresses?.[key];
@@ -2029,6 +2174,8 @@ const App: React.FC = () => {
     };
 
     const startQuizWithQuestions = (title: string, questions: Question[]) => {
+        setActiveChallenge(null);
+        setActiveChallengeParticipantId('');
         setCurrentLessonTitle(title);
         setCurrentQuiz(questions);
         setCurrentQuestionIndex(0);
@@ -2073,8 +2220,7 @@ const App: React.FC = () => {
 
     const handleViewSessionResult = useCallback((subjectId: SubjectName, sessionName: string, providedResult?: QuizResult) => {
         let baseTitle = "";
-        const isEnglish = subjectId === SubjectName.English;
-        const examLabel = isEnglish ? 'Exam (1)' : 'امتحان (1)';
+        const examLabel = 'امتحان (1)';
 
         if (sessionName === 'دورة 2008') {
             const exam = SESSION_2008_EXAMS.find(e => e.subject === subjectId);
@@ -2087,7 +2233,7 @@ const App: React.FC = () => {
         }
 
         const fullLessonTitle = `${baseTitle} - ${examLabel}`;
-        const mockExamTitle = isEnglish ? 'Mock Exam' : 'امتحان تجريبي';
+        const mockExamTitle = 'امتحان تجريبي';
 
         // Use provided result or find the best one
         const result = providedResult || userProgress.quizResults
@@ -2225,8 +2371,7 @@ const App: React.FC = () => {
                 }
 
                 if (baseTitle) {
-                    const isEnglish = false;
-                    const examLabel = isEnglish ? 'Exam (1)' : 'امتحان (1)';
+                    const examLabel = 'امتحان (1)';
                     const lessonTitle = `${baseTitle} - ${examLabel}`;
                     
                     // Filter out the results
@@ -2235,7 +2380,7 @@ const App: React.FC = () => {
                     );
 
                     // Also check for legacy titles
-                    const mockExamTitle = isEnglish ? 'Mock Exam' : 'امتحان تجريبي';
+                    const mockExamTitle = 'امتحان تجريبي';
                     if (sessionName === 'الدورة التجريبية') {
                         newResults = newResults.filter(r => 
                             !(r.subjectId === subjectId && r.lessonTitle === mockExamTitle)
@@ -2409,10 +2554,13 @@ const App: React.FC = () => {
                                     goToHome();
                                 }
                             }}
-                            onBackToIndexLabel={viewHistory.includes(View.SessionSubjects) ? (isEnglish ? 'Back to Session' : 'العودة للدورة') : undefined}
+                            onBackToIndexLabel={viewHistory.includes(View.SessionSubjects) ? 'العودة للدورة' : undefined}
                             isQuestionFavorite={isQuestionFavorite}
                             toggleFavoriteQuestion={toggleFavoriteQuestion}
                             isFavoriteDisabled={!!sessionTitle}
+                            activeChallenge={activeChallenge}
+                            onChallengeFriends={handleChallengeFriendsFromResults}
+                            onViewChallengeRoom={() => navigateTo(View.FriendChallenge)}
                         />
                     ) : (
                         <QuizPage 
@@ -2425,13 +2573,14 @@ const App: React.FC = () => {
                             handleFinish={handleFinish} 
                             timer={timer} 
                             formatTimer={formatTimer} 
-                            isEnglish={isEnglish}
+                            isEnglish={false}
                             onBack={goBack}
                             selectedSubject={selectedSubject}
                             currentLessonTitle={currentLessonTitle}
                             isQuestionFavorite={isQuestionFavorite}
                             toggleFavoriteQuestion={toggleFavoriteQuestion}
-                            isFavoriteDisabled={!!sessionTitle}
+                            isFavoriteDisabled={!!sessionTitle || !!activeChallenge}
+                            isChallenge={!!activeChallenge}
                         />
                     );
                 }
@@ -2510,7 +2659,21 @@ const App: React.FC = () => {
                                 if (subject) setSelectedSubject(subject);
                                 navigateTo(view, title);
                             }}
+                            onBack={goBack}
+                        />
+                    );
+                case View.FriendChallenge:
+                    return (
+                        <FriendChallengePage 
                             onBack={goToHome}
+                            onViewHome={goToHome}
+                            userProgress={userProgress}
+                            initialChallengeCode={activeChallengeCode}
+                            initialChallenge={activeChallenge}
+                            userEmail={user?.email || undefined}
+                            userName={user?.displayName || userProgress?.studentProfile?.name}
+                            startChallengeQuiz={startChallengeQuiz}
+                            lastUserAnswers={userAnswers as (string | undefined)[]}
                         />
                     );
                 default: 
@@ -2548,7 +2711,7 @@ const App: React.FC = () => {
     };
 
     return (
-        <div className={`min-h-screen bg-app-bg ${isJordanHistory ? 'theme-jordan' : ''} ${isIslamicEducation ? 'theme-islamic' : ''} ${isArabic ? 'theme-arabic' : ''} ${isEnglish ? 'theme-english' : ''}`}>
+        <div className={`min-h-screen bg-app-bg ${isJordanHistory ? 'theme-jordan' : ''} ${isIslamicEducation ? 'theme-islamic' : ''} ${isArabic ? 'theme-arabic' : ''}`}>
             
             {/* Background Fetching Indicator Removed */}
 
@@ -2584,14 +2747,14 @@ const App: React.FC = () => {
                 )}
             </AnimatePresence>
 
-            {user && ![View.Welcome, View.Landing, View.Quiz, View.SubjectIndex, View.Results, View.SessionSubjects, View.Favorites, View.SessionsList, View.Library].includes(currentView) && (
+            {user && ![View.Welcome, View.Landing, View.Quiz, View.SubjectIndex, View.Results, View.SessionSubjects, View.Favorites, View.SessionsList, View.Library, View.FriendChallenge].includes(currentView) && (
                 <button 
                     onClick={goBack}
                     className={`fixed top-4 z-[9999] p-3 bg-white border border-slate-900 rounded-full shadow-lg text-slate-600 hover:text-primary transition-all active:scale-95 
-                        ${((isEnglish || currentView === View.SessionSubjects || currentView === View.Favorites || currentView === View.Progress || currentView === View.PdfViewer || currentView === View.Announcements) && currentView !== View.MoEResults) ? 'left-4' : 'right-4'}`}
-                    title={(isEnglish && currentView !== View.MoEResults) ? "Back" : "رجوع"}
+                        ${((currentView === View.SessionSubjects || currentView === View.Favorites || currentView === View.Progress || currentView === View.PdfViewer || currentView === View.Announcements) && currentView !== View.MoEResults) ? 'left-4' : 'right-4'}`}
+                    title="رجوع"
                 >
-                    {((isEnglish || currentView === View.SessionSubjects || currentView === View.Favorites || currentView === View.Progress || currentView === View.PdfViewer || currentView === View.Announcements) && currentView !== View.MoEResults) ? <ChevronLeftIcon className="w-6 h-6" strokeWidth={3} /> : <ChevronRightIcon className="w-6 h-6" strokeWidth={3} />}
+                    {((currentView === View.SessionSubjects || currentView === View.Favorites || currentView === View.Progress || currentView === View.PdfViewer || currentView === View.Announcements) && currentView !== View.MoEResults) ? <ChevronLeftIcon className="w-6 h-6" strokeWidth={3} /> : <ChevronRightIcon className="w-6 h-6" strokeWidth={3} />}
                 </button>
             )}
 

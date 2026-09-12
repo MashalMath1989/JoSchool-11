@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { 
     X, 
@@ -11,7 +11,8 @@ import {
     Image as ImageIcon,
     Loader2,
     Maximize2,
-    Pencil
+    Pencil,
+    ExternalLink
 } from 'lucide-react';
 import { LessonResource } from './types';
 import { cleanTitleText } from './services/resourceService';
@@ -38,6 +39,50 @@ export const ResourceViewerModal: React.FC<ResourceViewerModalProps> = ({
     const [isEditFileNameOpen, setIsEditFileNameOpen] = useState<boolean>(false);
     const [editableFileName, setEditableFileName] = useState<string>('');
     const lastTapTimeRef = useRef<number>(0);
+    const videoContainerRef = useRef<HTMLDivElement>(null);
+    const isFullScreenInHistoryRef = useRef<boolean>(false);
+
+    const handleEnterFullScreen = useCallback(() => {
+        setIsFullScreen(true);
+        try {
+            const currentState = window.history.state || {};
+            if (!currentState.isResourceFullScreen) {
+                window.history.pushState({ ...currentState, isResourceFullScreen: true }, '');
+                isFullScreenInHistoryRef.current = true;
+            }
+        } catch (e) {
+            console.warn("pushState error:", e);
+        }
+    }, []);
+
+    const handleExitFullScreen = useCallback(() => {
+        setIsFullScreen(false);
+        if (isFullScreenInHistoryRef.current || window.history.state?.isResourceFullScreen) {
+            isFullScreenInHistoryRef.current = false;
+            try {
+                window.history.back();
+            } catch (e) {
+                console.warn("history back error:", e);
+            }
+        }
+    }, []);
+
+    useEffect(() => {
+        const handlePopState = (e: PopStateEvent) => {
+            const state = e.state || {};
+            if (!state.isResourceFullScreen && isFullScreen) {
+                isFullScreenInHistoryRef.current = false;
+                setIsFullScreen(false);
+            } else if (state.isResourceFullScreen) {
+                isFullScreenInHistoryRef.current = true;
+            }
+        };
+
+        window.addEventListener('popstate', handlePopState);
+        return () => {
+            window.removeEventListener('popstate', handlePopState);
+        };
+    }, [isFullScreen]);
 
     useEffect(() => {
         if (!isFullScreen) {
@@ -53,7 +98,9 @@ export const ResourceViewerModal: React.FC<ResourceViewerModalProps> = ({
             ? 'فيديو شرح الدرس' 
             : resource.type === 'pdf' 
                 ? 'ملخص PDF' 
-                : 'ملخص مصور';
+                : resource.type === 'link'
+                    ? 'رابط خارجي'
+                    : 'ملخص مصور';
 
     // Helper to format YouTube embed URL
     const getEmbedVideoUrl = (url: string) => {
@@ -193,7 +240,7 @@ export const ResourceViewerModal: React.FC<ResourceViewerModalProps> = ({
     };
 
     const handleToggleVideoLandscapeFullScreen = async () => {
-        setIsFullScreen(true);
+        handleEnterFullScreen();
 
         setTimeout(async () => {
             try {
@@ -224,7 +271,7 @@ export const ResourceViewerModal: React.FC<ResourceViewerModalProps> = ({
     };
 
     const handleExitVideoLandscapeFullScreen = async () => {
-        setIsFullScreen(false);
+        handleExitFullScreen();
 
         try {
             if (window.screen && window.screen.orientation && typeof (window.screen.orientation as any).unlock === 'function') {
@@ -265,6 +312,7 @@ export const ResourceViewerModal: React.FC<ResourceViewerModalProps> = ({
                                 {resource.type === 'video' && <PlayCircle className="w-5 h-5 text-red-500" />}
                                 {resource.type === 'pdf' && <FileText className="w-5 h-5 text-rose-400" />}
                                 {resource.type === 'image' && <ImageIcon className="w-5 h-5 text-emerald-400" />}
+                                {resource.type === 'link' && <ExternalLink className="w-5 h-5 text-sky-400" />}
                             </div>
                             <div className="flex flex-col text-right truncate">
                                 <div className="flex items-center gap-2">
@@ -304,10 +352,28 @@ export const ResourceViewerModal: React.FC<ResourceViewerModalProps> = ({
                                 </div>
                             )}
 
+                            {/* External Link Button for PDF and Link */}
+                            {(resource.type === 'pdf' || resource.type === 'link') && (
+                                <a
+                                    href={resource.url}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    className={`p-2 rounded-xl flex items-center gap-1.5 text-xs font-bold transition-all active:scale-95 shadow-sm cursor-pointer ${
+                                        resource.type === 'link' 
+                                            ? 'bg-sky-600 hover:bg-sky-500 text-white' 
+                                            : 'bg-slate-800 hover:bg-slate-700 text-white border border-slate-700/50'
+                                    }`}
+                                    title="فتح الرابط في متصفح جوجل"
+                                >
+                                    <ExternalLink className={`w-4 h-4 ${resource.type === 'link' ? 'text-white' : 'text-sky-400'}`} />
+                                    <span className="hidden sm:inline">فتح الرابط</span>
+                                </a>
+                            )}
+
                             {/* Fullscreen Button for Image & PDF */}
                             {(resource.type === 'image' || resource.type === 'pdf') && (
                                 <button
-                                    onClick={() => setIsFullScreen(true)}
+                                    onClick={handleEnterFullScreen}
                                     className="p-2 bg-slate-800 hover:bg-slate-700 text-white rounded-xl flex items-center gap-1.5 text-xs font-bold transition-all active:scale-95 border border-slate-700/50 shadow-sm cursor-pointer"
                                     title="عرض الشاشة كاملة"
                                 >
@@ -343,7 +409,7 @@ export const ResourceViewerModal: React.FC<ResourceViewerModalProps> = ({
                     {/* Content Container */}
                     <div className="flex-1 bg-slate-100 relative overflow-auto flex items-center justify-center p-2 sm:p-4">
                         {resource.type === 'video' && (
-                            <div className="w-full h-full max-h-[78vh] flex items-center justify-center bg-black rounded-xl overflow-hidden shadow-inner border border-slate-800">
+                            <div ref={videoContainerRef} className="w-full h-full max-h-[78vh] flex items-center justify-center bg-black rounded-xl overflow-hidden shadow-inner border border-slate-800">
                                 <iframe
                                     src={getEmbedVideoUrl(resource.url)}
                                     className="w-full h-full border-none rounded-xl"
@@ -365,6 +431,28 @@ export const ResourceViewerModal: React.FC<ResourceViewerModalProps> = ({
                             </div>
                         )}
 
+                        {resource.type === 'link' && (
+                            <div className="w-full h-full flex flex-col items-center justify-center p-6 text-center bg-white rounded-xl border border-slate-200 shadow-sm max-w-lg mx-auto my-auto">
+                                <div className="w-20 h-20 rounded-2xl bg-sky-50 border-2 border-sky-200 flex items-center justify-center text-sky-600 mb-5 shadow-sm">
+                                    <ExternalLink className="w-10 h-10" />
+                                </div>
+                                <h3 className="text-xl font-black text-slate-800 mb-2">{title}</h3>
+                                {lessonTitle && <p className="text-sm text-slate-400 font-bold mb-4">{lessonTitle}</p>}
+                                <p className="text-xs text-slate-600 font-bold mb-6 leading-relaxed max-w-sm">
+                                    هذا المصدر عبارة عن رابط خارجي، اضغط على الزر أدناه لفتحه في متصفح جوجل.
+                                </p>
+                                <a
+                                    href={resource.url}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    className="px-6 py-3 bg-sky-600 hover:bg-sky-500 text-white rounded-xl font-black text-sm flex items-center gap-2 shadow-md hover:shadow-lg transition-all active:scale-95 cursor-pointer"
+                                >
+                                    <ExternalLink className="w-4 h-4" />
+                                    <span>فتح الرابط في متصفح جوجل</span>
+                                </a>
+                            </div>
+                        )}
+
                         {resource.type === 'image' && (
                             <div className="w-full h-full flex flex-col items-center justify-start overflow-auto p-2">
                                 {/* Mobile Zoom & Fullscreen Controls */}
@@ -374,7 +462,7 @@ export const ResourceViewerModal: React.FC<ResourceViewerModalProps> = ({
                                     <button onClick={handleZoomIn} className="p-1 hover:bg-slate-700 rounded" title="تكبير"><ZoomIn className="w-4 h-4" /></button>
                                     <button onClick={handleResetZoom} className="p-1 hover:bg-slate-700 rounded" title="إعادة ضبط"><RotateCcw className="w-4 h-4" /></button>
                                     <div className="w-[1px] h-4 bg-slate-700 mx-0.5" />
-                                    <button onClick={() => setIsFullScreen(true)} className="p-1 text-emerald-400 hover:bg-slate-700 rounded" title="شاشة كاملة"><Maximize2 className="w-4 h-4" /></button>
+                                    <button onClick={handleEnterFullScreen} className="p-1 text-emerald-400 hover:bg-slate-700 rounded" title="شاشة كاملة"><Maximize2 className="w-4 h-4" /></button>
                                 </div>
                                 <div className="flex-1 flex items-center justify-center w-full min-h-0">
                                     <img
@@ -382,7 +470,7 @@ export const ResourceViewerModal: React.FC<ResourceViewerModalProps> = ({
                                         alt={title}
                                         style={{ transform: `scale(${zoomLevel / 100})`, transformOrigin: 'top center' }}
                                         className="max-w-full max-h-[72vh] object-contain rounded-lg shadow-md transition-transform duration-200 cursor-pointer"
-                                        onClick={() => setIsFullScreen(true)}
+                                        onClick={handleEnterFullScreen}
                                         title="انقر للعرض بالشاشة الكاملة"
                                         referrerPolicy="no-referrer"
                                     />
@@ -405,6 +493,16 @@ export const ResourceViewerModal: React.FC<ResourceViewerModalProps> = ({
                                 <span className="font-black text-xs sm:text-sm truncate">{title}</span>
                             </div>
                             <div className="flex items-center gap-2 pointer-events-auto">
+                                <a
+                                    href={resource.url}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    className="p-2.5 bg-slate-900/90 hover:bg-slate-800 text-white rounded-full backdrop-blur-md border border-white/20 shadow-2xl transition-all active:scale-95 flex items-center gap-1.5 text-xs font-black"
+                                    title="فتح الرابط في نافذة جديدة"
+                                >
+                                    <ExternalLink className="w-4 h-4 text-sky-400" />
+                                    <span className="hidden sm:inline">فتح الرابط</span>
+                                </a>
                                 <button
                                     onClick={handleInitiateDownload}
                                     disabled={isDownloading}
@@ -414,8 +512,8 @@ export const ResourceViewerModal: React.FC<ResourceViewerModalProps> = ({
                                     {isDownloading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Download className="w-4 h-4" />}
                                     <span className="hidden sm:inline">{isDownloading ? 'جاري التحميل...' : 'تحميل PDF'}</span>
                                 </button>
-                                <button
-                                    onClick={() => setIsFullScreen(false)}
+                                 <button
+                                    onClick={handleExitFullScreen}
                                     className="p-2.5 bg-slate-900/90 hover:bg-rose-600 text-white rounded-full backdrop-blur-md border border-white/20 shadow-2xl transition-all active:scale-95 flex items-center gap-1.5 text-xs font-black"
                                     title="إغلاق الشاشة الكاملة"
                                 >
@@ -441,14 +539,14 @@ export const ResourceViewerModal: React.FC<ResourceViewerModalProps> = ({
                 {isFullScreen && resource.type === 'image' && (
                     <div 
                         className="fixed inset-0 z-[200] bg-black/95 flex flex-col items-center justify-center p-2 sm:p-4 select-none animate-fast-fade"
-                        onClick={() => setIsFullScreen(false)}
+                        onClick={handleExitFullScreen}
                         dir="rtl"
                     >
                         {/* Floating Exit Fullscreen Button */}
                         <button
                             onClick={(e) => {
                                 e.stopPropagation();
-                                setIsFullScreen(false);
+                                handleExitFullScreen();
                             }}
                             className="fixed top-4 left-4 z-[220] p-2.5 bg-slate-900/80 hover:bg-rose-600 text-white rounded-full backdrop-blur-md border border-white/20 shadow-2xl transition-all active:scale-95 flex items-center justify-center gap-1.5"
                             title="إغلاق الشاشة الكاملة"
@@ -465,7 +563,7 @@ export const ResourceViewerModal: React.FC<ResourceViewerModalProps> = ({
                         {/* Pure Fullscreen Image Canvas with Overflow Panning */}
                         <div 
                             className="w-full h-full flex items-center justify-center overflow-auto p-2"
-                            onClick={() => setIsFullScreen(false)}
+                            onClick={handleExitFullScreen}
                         >
                             <img
                                 src={resource.url}

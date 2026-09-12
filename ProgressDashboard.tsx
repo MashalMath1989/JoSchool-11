@@ -235,15 +235,13 @@ const ProgressDashboard: React.FC<ProgressDashboardProps> = ({
                 const perm = Notification.permission;
                 if (perm === 'granted') {
                     new Notification('تذكير الدراسة اليومي 🎓', {
-                        body: message,
-                        referrerPolicy: 'no-referrer'
+                        body: message
                     });
                 } else if (perm !== 'denied') {
                     const permission = await Notification.requestPermission();
                     if (permission === 'granted') {
                         new Notification('تذكير الدراسة اليومي 🎓', {
-                            body: message,
-                            referrerPolicy: 'no-referrer'
+                            body: message
                         });
                     }
                 }

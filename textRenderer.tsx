@@ -11,8 +11,8 @@ interface ScalableMathProps {
  * مكون يقوم بتصيير معادلة رياضية ويصغر حجمها تلقائياً فقط إذا تجاوزت عرض الحاوية الأب
  */
 const ScalableMath: React.FC<ScalableMathProps> = ({ html, isBlock = false }) => {
-    const containerRef = useRef<HTMLDivElement>(null);
-    const innerRef = useRef<HTMLDivElement>(null);
+    const containerRef = useRef<HTMLSpanElement>(null);
+    const innerRef = useRef<HTMLSpanElement>(null);
     const [fontSize, setFontSize] = useState<string>('1.12em');
 
     useEffect(() => {
@@ -104,10 +104,10 @@ const ScalableMath: React.FC<ScalableMathProps> = ({ html, isBlock = false }) =>
     }, [html, isBlock]);
 
     return (
-        <div 
+        <span 
             ref={containerRef} 
             dir="ltr"
-            className={`overflow-visible ${isBlock ? 'my-2 w-full text-center' : 'inline-block mx-1'}`}
+            className={`overflow-visible ${isBlock ? 'block my-2 w-full text-center' : 'inline-block mx-1'}`}
             style={{ 
                 display: isBlock ? 'block' : 'inline-block',
                 direction: 'ltr',
@@ -115,7 +115,7 @@ const ScalableMath: React.FC<ScalableMathProps> = ({ html, isBlock = false }) =>
                 textAlign: isBlock ? 'center' : 'left'
             }}
         >
-            <div
+            <span
                 ref={innerRef}
                 dir="ltr"
                 className="inline-block ltr-math align-middle whitespace-nowrap px-1"
@@ -124,11 +124,12 @@ const ScalableMath: React.FC<ScalableMathProps> = ({ html, isBlock = false }) =>
                     whiteSpace: 'nowrap',
                     direction: 'ltr',
                     unicodeBidi: 'isolate',
-                    textAlign: 'left'
+                    textAlign: 'left',
+                    display: isBlock ? 'block' : 'inline-block'
                 }}
                 dangerouslySetInnerHTML={{ __html: html }}
             />
-        </div>
+        </span>
     );
 };
 

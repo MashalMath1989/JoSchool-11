@@ -1,10 +1,10 @@
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { ClockIcon, CheckIcon, XIcon, ArrowLeftIcon, ChevronRightIcon, ChevronLeftIcon, BookmarkIcon, BookmarkOutlineIcon, ShareIcon, FlagIcon, ChevronDownIcon, BookOpenIcon, DownloadIcon } from './data/Icons';
+import { ClockIcon, CheckIcon, XIcon, ArrowLeftIcon, ChevronRightIcon, ChevronLeftIcon, BookmarkIcon, BookmarkOutlineIcon, ShareIcon, FlagIcon, ChevronDownIcon, BookOpenIcon } from './data/Icons';
 import { Question, Subject, SubjectName, UserProgress } from './types';
 import { MathRenderer, renderTextWithUnderline } from './textRenderer';
 import TrigGraph from './TrigGraph';
-import { shareQuestionDirectly, isMathSubject } from './shareUtils';
+import { shareQuestionDirectly, isMathSubject, checkIsChoiceCorrect } from './shareUtils';
 
 interface QuizPageProps {
     currentQuiz: Question[];
@@ -23,6 +23,7 @@ interface QuizPageProps {
     isQuestionFavorite: (questionText: string) => boolean;
     toggleFavoriteQuestion: (question: Question, subjectId: string, lessonTitle: string) => void;
     isFavoriteDisabled?: boolean;
+    isChallenge?: boolean;
 }
 
 const QuizPage: React.FC<QuizPageProps> = React.memo(({
@@ -41,7 +42,8 @@ const QuizPage: React.FC<QuizPageProps> = React.memo(({
     currentLessonTitle,
     isQuestionFavorite,
     toggleFavoriteQuestion,
-    isFavoriteDisabled
+    isFavoriteDisabled,
+    isChallenge = false
 }) => {
     const quizLength = currentQuiz?.length || 0;
     const safeIndex = (quizLength > 0)
@@ -49,7 +51,10 @@ const QuizPage: React.FC<QuizPageProps> = React.memo(({
         : 0;
 
     const q = currentQuiz && currentQuiz[safeIndex];
-    const isMath = selectedSubject?.id === SubjectName.Math;
+    const isMath = selectedSubject?.id === SubjectName.Math || 
+                   isMathSubject(selectedSubject?.id, q) || 
+                   isMathSubject(currentLessonTitle, q) ||
+                   (currentQuiz && currentQuiz.some(item => isMathSubject('', item)));
     const isLtr = isEnglish || isMath;
     const isArabicSubject = selectedSubject?.id === SubjectName.JordanHistory || 
                             selectedSubject?.id === SubjectName.IslamicEducation || 
@@ -77,33 +82,6 @@ const QuizPage: React.FC<QuizPageProps> = React.memo(({
             return () => clearTimeout(timer);
         }
     }, [q, onBack]);
-
-    const checkIsChoiceCorrect = (question: Question, choice: string) => {
-        if (!choice || !question.correct_answer) return false;
-        
-        const trimmedChoice = choice.trim();
-        const trimmedCorrect = String(question.correct_answer).trim();
-        
-        // 1. Direct match
-        if (trimmedChoice === trimmedCorrect) return true;
-        
-        // 2. Match by letter (أ, ب, ج, د or A, B, C, D)
-        const arabicLetters = ['أ', 'ب', 'ج', 'د'];
-        const englishLetters = ['A', 'B', 'C', 'D'];
-        const lowerEnglishLetters = ['a', 'b', 'c', 'd'];
-        
-        let letterIndex = arabicLetters.indexOf(trimmedCorrect);
-        if (letterIndex === -1) letterIndex = englishLetters.indexOf(trimmedCorrect.toUpperCase());
-        if (letterIndex === -1) letterIndex = lowerEnglishLetters.indexOf(trimmedCorrect.toLowerCase());
-        
-        if (letterIndex !== -1 && question.choices[letterIndex]?.trim() === trimmedChoice) return true;
-        
-        // 3. Match by index (0, 1, 2, 3)
-        const numericIndex = parseInt(trimmedCorrect);
-        if (!isNaN(numericIndex) && question.choices[numericIndex]?.trim() === trimmedChoice) return true;
-        
-        return false;
-    };
 
     if (!q) return (
         <div className="flex flex-col items-center justify-center min-h-[60vh] p-6 text-center" dir={isEnglish ? 'ltr' : 'rtl'}>
@@ -152,7 +130,14 @@ const QuizPage: React.FC<QuizPageProps> = React.memo(({
                     </div>
                 </div>
                 <div className={`flex flex-col ${isEnglish ? 'items-end' : 'items-start'}`}>
-                    <span className="text-[9px] font-bold text-text-sub uppercase tracking-widest">{isEnglish ? 'Current Question' : 'السؤال الحالي'}</span>
+                    <div className="flex items-center gap-1.5">
+                        <span className="text-[9px] font-bold text-text-sub uppercase tracking-widest">{isEnglish ? 'Current Question' : 'السؤال الحالي'}</span>
+                        {isChallenge && (
+                            <span className="px-1.5 py-0.5 rounded bg-amber-400 text-slate-950 font-black text-[9px] border border-slate-900 shadow-2xs">
+                                ⚔️ تحدي
+                            </span>
+                        )}
+                    </div>
                     <span className="text-sm font-black text-text-main leading-tight">{safeIndex + 1} <span className="text-text-sub/30">/ {quizLength}</span></span>
                 </div>
             </div>
@@ -187,9 +172,9 @@ const QuizPage: React.FC<QuizPageProps> = React.memo(({
                             isEnglish: isEnglish
                         })}
                         className="p-2 rounded-lg bg-slate-100 text-slate-400 hover:bg-slate-200 transition-colors border border-slate-900"
-                        title={isMathSubject(selectedSubject?.id, q) ? "تصدير بطاقة السؤال كملف PDF" : "مشاركة السؤال كنص"}
+                        title="مشاركة السؤال"
                     >
-                        {isMathSubject(selectedSubject?.id, q) ? <DownloadIcon className="w-4 h-4 text-emerald-600" /> : <ShareIcon className="w-4 h-4" />}
+                        <ShareIcon className="w-4 h-4" />
                     </button>
                     <button 
                         className="p-2 rounded-lg bg-slate-100 text-slate-400 hover:bg-slate-200 transition-colors border border-slate-900"
@@ -214,70 +199,76 @@ const QuizPage: React.FC<QuizPageProps> = React.memo(({
                 )}
 
                 <div className={`grid gap-3 relative z-10 ${(q as any).options && (q as any).options.some((opt: any) => opt.graph) ? 'grid-cols-1 sm:grid-cols-2' : 'grid-cols-1 space-y-1'}`}>
-                    {q.choices && Array.isArray(q.choices) && q.choices.map((choice, idx) => {
-                        const isSelected = userAnswers[currentQuestionIndex] === choice;
-                        const hasAnswered = isMath && userAnswers[currentQuestionIndex] !== undefined && userAnswers[currentQuestionIndex] !== null;
+                    {(() => {
+                        const currentChoices = (q.choices && Array.isArray(q.choices) && q.choices.length > 0)
+                            ? q.choices
+                            : ((q as any).options && Array.isArray((q as any).options) ? (q as any).options.map((opt: any) => opt.label) : []);
                         
-                        let btnClass: string;
-                        let badgeClass: string;
-                        let isChoiceCorrect = false;
+                        return currentChoices.map((choice: string, idx: number) => {
+                            const isSelected = userAnswers[currentQuestionIndex] === choice;
+                            const hasAnswered = !isChallenge && isMath && userAnswers[currentQuestionIndex] !== undefined && userAnswers[currentQuestionIndex] !== null;
+                            
+                            let btnClass: string;
+                            let badgeClass: string;
+                            let isChoiceCorrect = false;
 
-                        if (isMath && hasAnswered) {
-                            isChoiceCorrect = checkIsChoiceCorrect(q, choice);
-                            if (isChoiceCorrect) {
-                                btnClass = "bg-emerald-50 border-2 border-emerald-500 text-emerald-900 shadow-sm cursor-default";
-                                badgeClass = "bg-emerald-600 text-white border-emerald-600";
-                            } else if (isSelected) {
-                                btnClass = "bg-rose-50 border-2 border-rose-500 text-rose-900 shadow-sm cursor-default";
-                                badgeClass = "bg-rose-600 text-white border-rose-600";
+                            if (isMath && hasAnswered) {
+                                isChoiceCorrect = checkIsChoiceCorrect(q, choice, idx);
+                                if (isChoiceCorrect) {
+                                    btnClass = "bg-emerald-50 border-2 border-emerald-500 text-emerald-900 shadow-sm cursor-default";
+                                    badgeClass = "bg-emerald-600 text-white border-emerald-600";
+                                } else if (isSelected) {
+                                    btnClass = "bg-rose-50 border-2 border-rose-500 text-rose-900 shadow-sm cursor-default";
+                                    badgeClass = "bg-rose-600 text-white border-rose-600";
+                                } else {
+                                    btnClass = "bg-slate-50/50 border-slate-200 text-slate-400 opacity-60 cursor-default";
+                                    badgeClass = "bg-slate-100 text-slate-400 border-slate-200";
+                                }
                             } else {
-                                btnClass = "bg-slate-50/50 border-slate-200 text-slate-400 opacity-60 cursor-default";
-                                badgeClass = "bg-slate-100 text-slate-400 border-slate-200";
+                                btnClass = isSelected 
+                                    ? "bg-primary border-slate-900 text-white shadow-xl scale-[1.02] cursor-pointer" 
+                                    : "bg-app-bg/50 border-slate-900 text-text-main hover:bg-white hover:border-slate-900 hover:shadow-md cursor-pointer";
+                                badgeClass = isSelected 
+                                    ? "bg-white text-primary border-white" 
+                                    : "bg-white text-text-sub border-primary/10 group-hover:border-primary/30";
                             }
-                        } else {
-                            btnClass = isSelected 
-                                ? "bg-primary border-slate-900 text-white shadow-xl scale-[1.02] cursor-pointer" 
-                                : "bg-app-bg/50 border-slate-900 text-text-main hover:bg-white hover:border-slate-900 hover:shadow-md cursor-pointer";
-                            badgeClass = isSelected 
-                                ? "bg-white text-primary border-white" 
-                                : "bg-white text-text-sub border-primary/10 group-hover:border-primary/30";
-                        }
 
-                        const option = (q as any).options && (q as any).options[idx];
-                        const optionGraph = option && option.graph;
+                            const option = (q as any).options && (q as any).options[idx];
+                            const optionGraph = option && option.graph;
 
-                        return (
-                            <button
-                                key={idx}
-                                onClick={() => {
-                                    if (isMath && hasAnswered) return;
-                                    handleAnswer(choice);
-                                }}
-                                dir={isLtr ? 'ltr' : 'rtl'}
-                                className={`w-full p-4 rounded-lg font-black text-base transition-all duration-300 border flex items-center gap-4 group ${isLtr ? 'text-left font-sans' : 'text-right font-naskh'} ${btnClass}`}
-                            >
-                                <div className={`w-8 h-8 rounded-md flex items-center justify-center shrink-0 border-2 transition-colors ${badgeClass}`}>
-                                    {optionLabels[idx] || ['A', 'B', 'C', 'D'][idx]}
-                                </div>
-                                {optionGraph ? (
-                                    <div className="flex-1 flex justify-center items-center h-[105px] max-w-[160px] mx-auto py-1">
-                                        <TrigGraph graphData={optionGraph} isOption={true} />
+                            return (
+                                <button
+                                    key={idx}
+                                    onClick={() => {
+                                        if (!isChallenge && isMath && hasAnswered) return;
+                                        handleAnswer(choice);
+                                    }}
+                                    dir={isLtr ? 'ltr' : 'rtl'}
+                                    className={`w-full p-4 rounded-lg font-black text-base transition-all duration-300 border flex items-center gap-4 group ${isLtr ? 'text-left font-sans' : 'text-right font-naskh'} ${btnClass}`}
+                                >
+                                    <div className={`w-8 h-8 rounded-md flex items-center justify-center shrink-0 border-2 transition-colors ${badgeClass}`}>
+                                        {optionLabels[idx] || ['A', 'B', 'C', 'D'][idx]}
                                     </div>
-                                ) : (
-                                    <div className="flex-1 min-w-0 w-full"><MathRenderer text={choice} /></div>
-                                )}
-                                {isMath && hasAnswered && (
-                                    <div className={`shrink-0 ${isLtr ? 'ml-auto' : 'mr-auto'}`}>
-                                        {isChoiceCorrect ? (
-                                            <CheckIcon className="w-6 h-6 text-emerald-600 font-bold" />
-                                        ) : isSelected ? (
-                                            <XIcon className="w-6 h-6 text-rose-600 font-bold" />
-                                        ) : null}
-                                    </div>
-                                )}
-                            </button>
-                        );
-                    })}
+                                    {optionGraph ? (
+                                        <div className="flex-1 flex justify-center items-center h-[105px] max-w-[160px] mx-auto py-1">
+                                            <TrigGraph graphData={optionGraph} isOption={true} />
+                                        </div>
+                                    ) : (
+                                        <div className="flex-1 min-w-0 w-full"><MathRenderer text={choice} /></div>
+                                    )}
+                                    {!isChallenge && isMath && hasAnswered && (
+                                        <div className={`shrink-0 ${isLtr ? 'ml-auto' : 'mr-auto'}`}>
+                                            {isChoiceCorrect ? (
+                                                <CheckIcon className="w-6 h-6 text-emerald-600 font-bold" />
+                                            ) : isSelected ? (
+                                                <XIcon className="w-6 h-6 text-rose-600 font-bold" />
+                                            ) : null}
+                                        </div>
+                                    )}
+                                </button>
+                            );
+                        });
+                    })()}
                 </div>
             </div>
 
@@ -297,27 +288,29 @@ const QuizPage: React.FC<QuizPageProps> = React.memo(({
                             {isEnglish ? 'Previous' : 'السابق'}
                         </button>
 
-                        {/* الشرح (Explanation Button) */}
-                        <button
-                            onClick={() => {
-                                if (userAnswers[currentQuestionIndex]) {
-                                    setShowExplanation(prev => !prev);
-                                }
-                            }}
-                            disabled={!userAnswers[currentQuestionIndex]}
-                            className={`w-16 h-16 rounded-full shrink-0 flex flex-col items-center justify-center transition-all duration-300 border-2 ${
-                                userAnswers[currentQuestionIndex]
-                                    ? 'bg-emerald-50 hover:bg-emerald-100 border-emerald-500 text-emerald-800 cursor-pointer shadow-md active:scale-95'
-                                    : 'bg-slate-100 text-slate-400 border-slate-200 cursor-not-allowed opacity-60'
-                            }`}
-                        >
-                            <span className="text-[12px] font-black leading-none mb-1">الشرح</span>
-                            <ChevronDownIcon 
-                                className={`w-4 h-4 transition-transform duration-300 ${
-                                    showExplanation ? 'rotate-180 text-emerald-600' : 'text-slate-400'
-                                }`} 
-                            />
-                        </button>
+                        {/* الشرح (Explanation Button) - مخفي تماماً أثناء التحدي */}
+                        {!isChallenge && (
+                            <button
+                                onClick={() => {
+                                    if (userAnswers[currentQuestionIndex]) {
+                                        setShowExplanation(prev => !prev);
+                                    }
+                                }}
+                                disabled={!userAnswers[currentQuestionIndex]}
+                                className={`w-16 h-16 rounded-full shrink-0 flex flex-col items-center justify-center transition-all duration-300 border-2 ${
+                                    userAnswers[currentQuestionIndex]
+                                        ? 'bg-emerald-50 hover:bg-emerald-100 border-emerald-500 text-emerald-800 cursor-pointer shadow-md active:scale-95'
+                                        : 'bg-slate-100 text-slate-400 border-slate-200 cursor-not-allowed opacity-60'
+                                }`}
+                            >
+                                <span className="text-[12px] font-black leading-none mb-1">الشرح</span>
+                                <ChevronDownIcon 
+                                    className={`w-4 h-4 transition-transform duration-300 ${
+                                        showExplanation ? 'rotate-180 text-emerald-600' : 'text-slate-400'
+                                    }`} 
+                                />
+                            </button>
+                        )}
 
                         {/* التالي (Next) */}
                         <button
@@ -354,7 +347,7 @@ const QuizPage: React.FC<QuizPageProps> = React.memo(({
             </div>
 
             {/* Explanation collapsible card */}
-            {isMath && explanationText && (
+            {!isChallenge && isMath && explanationText && (
                 <AnimatePresence>
                     {showExplanation && (
                         <motion.div

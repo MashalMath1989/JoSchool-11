@@ -1,10 +1,10 @@
 import React from 'react';
-import { BookmarkIcon, ShareIcon, FlagIcon, ChevronLeftIcon, ChevronRightIcon, TrashIcon, CheckCircleIcon, XIcon, CheckIcon, ChevronDownIcon, BookOpenIcon, DownloadIcon } from './data/Icons';
+import { BookmarkIcon, ShareIcon, FlagIcon, ChevronLeftIcon, ChevronRightIcon, TrashIcon, CheckCircleIcon, XIcon, CheckIcon, ChevronDownIcon, BookOpenIcon } from './data/Icons';
 import { FavoriteQuestion, Subject, UserProgress, SubjectName, Question } from './types';
 import { MathRenderer, renderTextWithUnderline } from './textRenderer';
 import { motion, AnimatePresence } from 'framer-motion';
 import TrigGraph from './TrigGraph';
-import { shareQuestionDirectly, isMathSubject } from './shareUtils';
+import { shareQuestionDirectly } from './shareUtils';
 import { subjectsData } from './data';
 
 interface FavoriteQuestionsPageProps {
@@ -217,14 +217,14 @@ const FavoriteQuestionsPage: React.FC<FavoriteQuestionsPageProps> = ({
                                                 question: q,
                                                 subjectName: q.subjectId,
                                                 lessonTitle: q.lessonTitle,
-                                                isEnglish: q.subjectId === SubjectName.English,
+                                                isEnglish: false,
                                             });
                                         }}
                                         className="p-2 rounded-lg bg-slate-100 text-slate-400 hover:bg-slate-200 transition-colors border border-slate-900"
-                                        title={isMathSubject(q.subjectId, q) ? "تصدير بطاقة السؤال كملف PDF" : "مشاركة السؤال كنص"}
+                                        title="مشاركة السؤال"
                                         disabled={isBulkMode}
                                     >
-                                        {isMathSubject(q.subjectId, q) ? <DownloadIcon className="w-4 h-4 text-emerald-600" /> : <ShareIcon className="w-4 h-4" />}
+                                        <ShareIcon className="w-4 h-4" />
                                     </button>
                                 </div>
                             </div>

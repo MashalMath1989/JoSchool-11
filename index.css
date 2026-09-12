@@ -1,2 +1,11 @@
 /* Global styles */
 /* Tailwind is loaded via CDN in index.html */
+
+#start-challenge-button {
+  transition: transform 0.08s ease-out, background-color 0.08s ease-out;
+}
+
+#start-challenge-button:active {
+  background-color: #1e293b !important;
+  transform: scale(0.93) !important;
+}

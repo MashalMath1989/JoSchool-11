@@ -44,6 +44,44 @@ export function isMathSubject(subjectName?: string | any, question?: Question): 
   return false;
 }
 
+export function checkIsChoiceCorrect(question: Question, choice: string, choiceIndex?: number): boolean {
+  if (!choice || !question.correct_answer) return false;
+
+  const trimmedChoice = choice.trim();
+  const trimmedCorrect = String(question.correct_answer).trim();
+
+  // 1. Direct match
+  if (trimmedChoice === trimmedCorrect) return true;
+  if (trimmedChoice.toLowerCase() === trimmedCorrect.toLowerCase()) return true;
+
+  const choicesList = (question.choices && question.choices.length > 0)
+    ? question.choices
+    : (question.options ? question.options.map((opt: any) => opt.label) : []);
+
+  // 2. Match by letter (أ, ب, ج, د or A, B, C, D or a, b, c, d)
+  const arabicLetters = ['أ', 'ب', 'ج', 'د'];
+  const englishLetters = ['A', 'B', 'C', 'D'];
+  const lowerEnglishLetters = ['a', 'b', 'c', 'd'];
+
+  let letterIndex = arabicLetters.indexOf(trimmedCorrect);
+  if (letterIndex === -1) letterIndex = englishLetters.indexOf(trimmedCorrect.toUpperCase());
+  if (letterIndex === -1) letterIndex = lowerEnglishLetters.indexOf(trimmedCorrect.toLowerCase());
+
+  if (letterIndex !== -1) {
+    if (choiceIndex !== undefined && choiceIndex === letterIndex) return true;
+    if (choicesList[letterIndex]?.trim() === trimmedChoice) return true;
+  }
+
+  // 3. Match by numeric index (0, 1, 2, 3)
+  const numericIndex = parseInt(trimmedCorrect, 10);
+  if (!isNaN(numericIndex)) {
+    if (choiceIndex !== undefined && choiceIndex === numericIndex) return true;
+    if (choicesList[numericIndex]?.trim() === trimmedChoice) return true;
+  }
+
+  return false;
+}
+
 export function formatQuestionText(
   question: Question,
   subjectName?: string,

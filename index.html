@@ -20,7 +20,7 @@
     <script src="https://cdn.tailwindcss.com"></script>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700&family=Noto+Naskh+Arabic:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Amiri+Quran&family=Amiri:ital,wght@0,400;0,700;1,400&family=Noto+Naskh+Arabic:wght@400;500;600;700&family=Poppins:wght@400;500;600;700&display=swap" rel="stylesheet">
     <style>
       :root {
         --color-primary: #0ea5e9;
@@ -64,16 +64,6 @@
         --color-text-secondary: #6F6F6F;
       }
 
-      .theme-english {
-        --color-primary: #8BC34A;
-        --color-secondary: #66BB6A;
-        --color-accent: #C5E86C;
-        --color-accent-rgb: 197, 232, 108;
-        --color-background: #F6FBF7;
-        --color-text-primary: #1E1E1E;
-        --color-text-secondary: #6F6F6F;
-      }
-
       body {
         font-family: var(--font-body);
         background-color: var(--color-background);
@@ -85,6 +75,7 @@
       }
       .font-naskh { font-family: var(--font-body); }
       .font-sans { font-family: var(--font-heading); }
+      .font-quran { font-family: 'Amiri Quran', 'Amiri', 'Noto Naskh Arabic', serif; }
       
       .ltr-math {
         direction: ltr !important;
@@ -117,6 +108,13 @@
       }
       .transition-smooth {
         animation: fast-fade 0.1s ease-out forwards;
+      }
+      #start-challenge-button {
+        transition: transform 0.08s ease-out, background-color 0.08s ease-out;
+      }
+      #start-challenge-button:active {
+        background-color: #1e293b !important;
+        transform: scale(0.93) !important;
       }
     </style>
     <script>
