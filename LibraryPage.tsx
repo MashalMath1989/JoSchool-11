@@ -9,6 +9,7 @@ import {
     PlayCircle, 
     ExternalLink,
     Download,
+    Share2,
     CheckCircle2
 } from 'lucide-react';
 import { 
@@ -67,6 +68,45 @@ const CATEGORIES_LIST = [
     { label: "أوراق عمل", icon: "📑" },
     { label: "البطاقات", icon: "🎴" },
 ];
+
+interface LibraryItemCoverProps {
+    item: ValidLibraryItem;
+}
+
+// عرض صورة الغلاف إذا توفرت في حقل thumbnail أو العرض الافتراضي كأيقونة
+const LibraryItemCover: React.FC<LibraryItemCoverProps> = ({ item }) => {
+    const [imgFailed, setImgFailed] = useState(false);
+    const isPdf = item.type === 'pdf';
+    const isImage = item.type === 'image';
+    const isVideo = item.type === 'video';
+    const hasThumbnail = Boolean(item.thumbnail && item.thumbnail.trim() && !imgFailed);
+
+    if (hasThumbnail) {
+        return (
+            <div
+                className="relative w-14 sm:w-16 h-20 sm:h-22 rounded-lg overflow-hidden border border-black shrink-0 shadow-xs bg-slate-100 block p-0 group-hover:scale-[1.02] transition-transform text-right"
+            >
+                <img
+                    src={item.thumbnail}
+                    alt={`غلاف ${item.title}`}
+                    className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+                    referrerPolicy="no-referrer"
+                    loading="lazy"
+                    onError={() => setImgFailed(true)}
+                />
+            </div>
+        );
+    }
+
+    return (
+        <div className="w-10 h-10 rounded-xl border border-slate-900 flex items-center justify-center shrink-0 shadow-[1.5px_1.5px_0px_0px_rgba(0,0,0,1)] transition-colors bg-slate-100 group-hover:bg-yellow-100">
+            {isPdf && <FileText className="w-5 h-5 text-rose-600" />}
+            {isImage && <ImageIcon className="w-5 h-5 text-emerald-600" />}
+            {isVideo && <PlayCircle className="w-5 h-5 text-sky-600" />}
+            {!isPdf && !isImage && !isVideo && <ExternalLink className="w-5 h-5 text-sky-600" />}
+        </div>
+    );
+};
 
 const LibraryPage: React.FC<LibraryPageProps> = ({
     subjectsData = [],
@@ -207,6 +247,47 @@ const LibraryPage: React.FC<LibraryPageProps> = ({
             }
         } catch (e) {
             console.warn("pushState error:", e);
+        }
+    };
+
+    // مشاركة رابط وتفاصيل الملف عبر مشاركة النظام أو النسخ
+    const handleShareFile = async (item: ValidLibraryItem) => {
+        if (!item.fileUrl) return;
+
+        const shareTitle = item.title;
+        const shareText = `📚 ${item.title}\nالمادة: ${item.subject} (${item.semester})\nالتصنيف: ${item.category}\nتطبيق JoSchool11`;
+
+        if (typeof navigator !== 'undefined' && navigator.share) {
+            try {
+                await navigator.share({
+                    title: shareTitle,
+                    text: shareText,
+                    url: item.fileUrl,
+                });
+                return;
+            } catch (err: any) {
+                if (err?.name === 'AbortError') return;
+                console.warn('Native share failed or canceled, copying link:', err);
+            }
+        }
+
+        // في حال عدم توفر Web Share API أو الإلغاء، يتم نسخ الرابط للحافظة
+        try {
+            if (navigator.clipboard?.writeText) {
+                await navigator.clipboard.writeText(`${shareText}\n${item.fileUrl}`);
+            } else {
+                const textArea = document.createElement('textarea');
+                textArea.value = `${shareText}\n${item.fileUrl}`;
+                document.body.appendChild(textArea);
+                textArea.select();
+                document.execCommand('copy');
+                document.body.removeChild(textArea);
+            }
+            setSyncNotification(`تم نسخ رابط "${item.title}" للمشاركة بنجاح 📋`);
+            setTimeout(() => setSyncNotification(null), 3500);
+        } catch {
+            setSyncNotification(`تم نسخ الرابط: ${item.fileUrl}`);
+            setTimeout(() => setSyncNotification(null), 3500);
         }
     };
 
@@ -454,23 +535,27 @@ const LibraryPage: React.FC<LibraryPageProps> = ({
                             return (
                                 <div
                                     key={`${item.id}-${index}`}
-                                    className="bg-white p-4 rounded-xl border-2 border-slate-900 shadow-[2px_2px_0px_0px_rgba(0,0,0,1)] hover:shadow-[4px_4px_0px_0px_rgba(0,0,0,1)] transition-all flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-right group"
+                                    onClick={() => handleOpenFile(item)}
+                                    role="button"
+                                    tabIndex={0}
+                                    onKeyDown={(e) => {
+                                        if (e.key === 'Enter' || e.key === ' ') {
+                                            e.preventDefault();
+                                            handleOpenFile(item);
+                                        }
+                                    }}
+                                    className="bg-white p-3.5 sm:p-4 rounded-xl border-2 border-slate-900 shadow-[2px_2px_0px_0px_rgba(0,0,0,1)] hover:shadow-[4px_4px_0px_0px_rgba(0,0,0,1)] hover:border-slate-950 active:translate-x-[1px] active:translate-y-[1px] active:shadow-none transition-all flex flex-row items-center justify-between gap-3 sm:gap-4 text-right group cursor-pointer select-none"
                                 >
-                                    <div className="flex items-start sm:items-center gap-3">
-                                        {/* أيقونة نوع الملف */}
-                                        <div className="w-10 h-10 rounded-xl border border-slate-900 flex items-center justify-center shrink-0 shadow-2xs transition-colors bg-slate-100 group-hover:bg-yellow-100">
-                                            {isPdf && <FileText className="w-5 h-5 text-rose-600" />}
-                                            {isImage && <ImageIcon className="w-5 h-5 text-emerald-600" />}
-                                            {isVideo && <PlayCircle className="w-5 h-5 text-sky-600" />}
-                                            {!isPdf && !isImage && !isVideo && <ExternalLink className="w-5 h-5 text-sky-600" />}
-                                        </div>
+                                    <div className="flex items-center gap-3 sm:gap-3.5 flex-1 min-w-0">
+                                        {/* صورة الغلاف إذا توفرت في حقل thumbnail أو الأيقونة الافتراضية */}
+                                        <LibraryItemCover item={item} />
 
                                         {/* تفاصيل الملف */}
-                                        <div className="space-y-1">
-                                            <h5 className="font-black text-slate-900 text-xs sm:text-sm leading-snug">
+                                        <div className="space-y-1.5 flex-1 min-w-0">
+                                            <h5 className="font-black text-slate-900 text-xs sm:text-sm leading-snug group-hover:text-sky-700 transition-colors">
                                                 {item.title}
                                             </h5>
-                                            <div className="flex items-center flex-wrap gap-2 text-[10px]">
+                                            <div className="flex items-center flex-wrap gap-1.5 text-[10px]">
                                                 <span className="bg-sky-100 text-sky-900 font-extrabold px-2 py-0.5 rounded-md border border-sky-200">
                                                     {item.subject}
                                                 </span>
@@ -487,41 +572,33 @@ const LibraryPage: React.FC<LibraryPageProps> = ({
                                         </div>
                                     </div>
 
-                                    {/* أزرار الإجراء: معاينة وتحميل الملف */}
-                                    <div className="flex items-center gap-2 self-end sm:self-center">
-                                        <button
-                                            onClick={() => handleOpenFile(item)}
-                                            className="py-2.5 px-4 bg-slate-900 hover:bg-slate-800 text-white rounded-xl font-black text-xs flex items-center justify-center gap-2 shadow-[2px_2px_0px_0px_rgba(0,0,0,0.25)] active:translate-x-[1px] active:translate-y-[1px] active:shadow-none transition-all cursor-pointer"
-                                        >
-                                            {isPdf ? (
-                                                <>
-                                                    <FileText className="w-4 h-4 text-rose-400" />
-                                                    <span>معاينة الملف (PDF)</span>
-                                                </>
-                                            ) : isImage ? (
-                                                <>
-                                                    <ImageIcon className="w-4 h-4 text-emerald-400" />
-                                                    <span>عرض الصورة</span>
-                                                </>
-                                            ) : (
-                                                <>
-                                                    <ExternalLink className="w-4 h-4 text-yellow-400" />
-                                                    <span>فتح المحتوى</span>
-                                                </>
-                                            )}
-                                        </button>
-
-                                        {/* زر تنزيل مباشر */}
+                                    {/* أزرار الإجراء: التحميل والمشاركة أسفل بعضهما */}
+                                    <div className="flex flex-col items-center gap-1.5 shrink-0">
+                                        {/* زر تنزيل الملف */}
                                         <a
                                             href={item.fileUrl}
                                             download={`${item.title}.pdf`}
                                             target="_blank"
                                             rel="noopener noreferrer"
-                                            className="p-2.5 bg-slate-100 hover:bg-slate-200 text-slate-800 rounded-xl border border-slate-300 font-bold text-xs flex items-center justify-center transition-colors cursor-pointer"
-                                            title="تحميل الملف مباشرة"
+                                            onClick={(e) => e.stopPropagation()}
+                                            className="w-8 h-8 sm:w-9 sm:h-9 bg-slate-100 hover:bg-slate-200 text-slate-800 rounded-lg border border-slate-300 font-bold flex items-center justify-center transition-colors cursor-pointer shadow-2xs hover:border-slate-900 active:scale-95"
+                                            title="تحميل الملف"
                                         >
-                                            <Download className="w-4 h-4" />
+                                            <Download className="w-4 h-4 text-slate-700" />
                                         </a>
+
+                                        {/* زر مشاركة الملف أسفل زر التحميل */}
+                                        <button
+                                            type="button"
+                                            onClick={(e) => {
+                                                e.stopPropagation();
+                                                handleShareFile(item);
+                                            }}
+                                            className="w-8 h-8 sm:w-9 sm:h-9 bg-slate-100 hover:bg-sky-50 hover:text-sky-700 text-slate-700 rounded-lg border border-slate-300 font-bold flex items-center justify-center transition-colors cursor-pointer shadow-2xs hover:border-slate-900 active:scale-95"
+                                            title="مشاركة الملف"
+                                        >
+                                            <Share2 className="w-4 h-4" />
+                                        </button>
                                     </div>
                                 </div>
                             );
@@ -542,6 +619,14 @@ const LibraryPage: React.FC<LibraryPageProps> = ({
                     </div>
                 )}
             </div>
+
+            {/* إشعار عائم لتأكيد المشاركة أو التحديث */}
+            {syncNotification && (
+                <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 px-4 py-2.5 bg-slate-900 text-white border-2 border-yellow-400 rounded-2xl font-black text-xs sm:text-sm flex items-center gap-2 shadow-[0_8px_30px_rgb(0,0,0,0.35)] animate-fade-in pointer-events-none">
+                    <CheckCircle2 className="w-4 h-4 text-yellow-400 shrink-0" />
+                    <span>{syncNotification}</span>
+                </div>
+            )}
 
             {/* نافذة معاينة وعرض الملف (نفس نافذة عرض مصادر الفصل) */}
             {activeResourceModal && (

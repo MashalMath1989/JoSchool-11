@@ -29,6 +29,7 @@ import WelcomePage from './WelcomePage';
 import FriendChallengePage from './FriendChallengePage';
 import { FriendChallenge } from './types';
 import { createChallenge, submitChallengeResult } from './services/challengeService';
+import { fetchRemoteResources, fetchRemoteMathBasics } from './services/resourceService';
 
 // روابط امتحانات مادة تاريخ الأردن - الفصل الأول
 const HISTORY_U1_EXAMS = [
@@ -1052,6 +1053,11 @@ const App: React.FC = () => {
         // Start background data fetch with a small delay to prioritize app startup
         const timeout = setTimeout(() => {
             fetchExams();
+            // Pre-warm chapter resources in background with zero UI impact
+            fetchRemoteResources(SubjectName.Math, Semester.First).catch(() => {});
+            fetchRemoteResources(SubjectName.JordanHistory, Semester.First).catch(() => {});
+            fetchRemoteResources(SubjectName.Arabic, Semester.First).catch(() => {});
+            fetchRemoteMathBasics().catch(() => {});
         }, 1500);
         
         return () => clearTimeout(timeout);
@@ -1067,11 +1073,14 @@ const App: React.FC = () => {
         }
     }, []);
 
-    // مراقبة تغيير المادة المختارة لتسريع تحميل اختباراتها إذا لم تكن محملة
+    // مراقبة تغيير المادة المختارة لتسريع تحميل اختباراتها ومصادرها إذا لم تكن محملة
     useEffect(() => {
         let isCancelled = false;
 
         if (selectedSubject) {
+            // Instantly prefetch/refresh selected subject's chapter resources in background
+            fetchRemoteResources(selectedSubject.id as SubjectName, selectedSubject.semester).catch(() => {});
+
             const subjectExams = getExamsForSubject(selectedSubject.id as SubjectName);
             
             const fetchSelectedSubjectExams = async () => {

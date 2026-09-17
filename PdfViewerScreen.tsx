@@ -14,14 +14,34 @@ const PdfViewerScreen: React.FC<PdfViewerScreenProps> = ({
 }) => {
     if (!selectedSubject) return null;
 
+    const getTextbookPreviewUrl = (url?: string) => {
+        if (!url) return '';
+        const trimmed = url.trim();
+        if (trimmed.includes('drive.google.com')) {
+            let fileId = '';
+            if (trimmed.includes('/file/d/')) {
+                fileId = trimmed.split('/file/d/')[1]?.split('/')[0]?.split('?')[0] || '';
+            } else if (trimmed.includes('id=')) {
+                const match = trimmed.match(/[?&]id=([^&]+)/);
+                if (match && match[1]) fileId = match[1];
+            }
+            if (fileId) {
+                return `https://drive.google.com/file/d/${fileId}/preview`;
+            }
+        }
+        if (trimmed.includes('/preview')) return trimmed;
+        return `https://docs.google.com/viewer?url=${encodeURIComponent(trimmed)}&embedded=true`;
+    };
+
     return (
         <div className="fixed inset-0 z-50 bg-white flex flex-col pt-2">
             <div className="flex-1 relative bg-app-bg">
                 {selectedSubject.textbookUrl ? (
                     <iframe
-                        src={`${selectedSubject.textbookUrl}#toolbar=0&navpanes=0&scrollbar=0`}
+                        src={getTextbookPreviewUrl(selectedSubject.textbookUrl)}
                         className="w-full h-full border-none"
                         title="Textbook Viewer"
+                        allow="autoplay"
                     />
                 ) : (
                     <div className="flex flex-col items-center justify-center h-full p-10 text-center">

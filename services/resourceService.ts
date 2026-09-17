@@ -1,4 +1,4 @@
-import { LessonResource, Unit, SubjectName } from '../types';
+import { LessonResource, Unit, SubjectName, Semester } from '../types';
 
 export interface ResourceJsonLesson {
     lessonId: string;
@@ -18,8 +18,60 @@ export interface ResourceJsonUnit {
     unitId: string;
     unitTitle: string;
     resources?: LessonResource[];
-    lessons: ResourceJsonLesson[];
+    lessons?: ResourceJsonLesson[];
 }
+
+export const INITIAL_ARABIC_RESOURCES: ResourceJsonUnit[] = [
+    {
+        unitId: "unit1",
+        unitTitle: "مِنَ القِيَمِ الإِنْسَانِيَّةِ فِي القُرْآنِ الكَرِيمِ",
+        resources: [
+            {
+                resourceTitle: "دوسية الوحدة الأولى",
+                type: "pdf",
+                url: "https://raw.githubusercontent.com/MashalMath/Pdf_Library/main/Arabic11_S1_U1_Dosya2.pdf"
+            },
+            { resourceTitle: "", type: "video", url: "" },
+            { resourceTitle: "", type: "image", url: "" }
+        ]
+    },
+    {
+        unitId: "unit2",
+        unitTitle: "فِي حُبِّ الوَطَنِ",
+        resources: [
+            { resourceTitle: "", type: "video", url: "" },
+            { resourceTitle: "ملخص الوحدة", type: "pdf", url: "" },
+            { resourceTitle: "", type: "image", url: "" }
+        ]
+    },
+    {
+        unitId: "unit3",
+        unitTitle: "أَمْرَاضُ العَصْرِ",
+        resources: [
+            { resourceTitle: "", type: "video", url: "" },
+            { resourceTitle: "ملخص الوحدة", type: "pdf", url: "" },
+            { resourceTitle: "", type: "image", url: "" }
+        ]
+    },
+    {
+        unitId: "unit4",
+        unitTitle: "الإِعْلَامُ الرَّقْمِيُّ",
+        resources: [
+            { resourceTitle: "", type: "video", url: "" },
+            { resourceTitle: "ملخص الوحدة", type: "pdf", url: "" },
+            { resourceTitle: "", type: "image", url: "" }
+        ]
+    },
+    {
+        unitId: "unit5",
+        unitTitle: "مِنَ الأَدَبِ الوَاقِعِيِّ",
+        resources: [
+            { resourceTitle: "", type: "video", url: "" },
+            { resourceTitle: "ملخص الوحدة", type: "pdf", url: "" },
+            { resourceTitle: "", type: "image", url: "" }
+        ]
+    }
+];
 
 export const INITIAL_JORDAN_HISTORY_RESOURCES: ResourceJsonUnit[] = [
     {
@@ -433,90 +485,251 @@ export function loadCachedMathBasics(): MathBasicsItem[] {
     return INITIAL_MATH_BASICS_RESOURCES;
 }
 
+export function decodeBase64Utf8(base64: string): string {
+    const clean = base64.replace(/\s/g, '');
+    const binary = atob(clean);
+    const bytes = new Uint8Array(binary.length);
+    for (let i = 0; i < binary.length; i++) {
+        bytes[i] = binary.charCodeAt(i);
+    }
+    return new TextDecoder('utf-8').decode(bytes);
+}
+
 export async function fetchRemoteMathBasics(): Promise<MathBasicsItem[]> {
-    const urls = [
-        "https://raw.githubusercontent.com/MashalMath/joschool-11-arabic-exams/JoSchool112010/MathBasicsStructureSources11_S1.json",
-        "https://raw.githubusercontent.com/MashalMath/joschool-11-arabic-exams/main/MathBasicsStructureSources11_S1.json",
-        "https://api.github.com/repos/MashalMath/joschool-11-arabic-exams/contents/MathBasicsStructureSources11_S1.json?ref=JoSchool112010"
-    ];
+    const filename = "MathBasicsStructureSources11_S1.json";
+    const timestamp = Date.now();
+    const rnd = Math.random().toString(36).slice(2, 8);
+    const apiUrl = `https://api.github.com/repos/MashalMath/joschool-11-arabic-exams/contents/${filename}?ref=JoSchool112010&t=${timestamp}&_r=${rnd}`;
+    const rawUrl = `https://raw.githubusercontent.com/MashalMath/joschool-11-arabic-exams/JoSchool112010/${filename}?t=${timestamp}&_r=${rnd}`;
+    const fallbackRawUrl = `https://raw.githubusercontent.com/MashalMath/joschool-11-arabic-exams/main/${filename}?t=${timestamp}&_r=${rnd}`;
 
-    for (const url of urls) {
-        try {
-            const isApi = url.includes("api.github.com");
-            const headers: Record<string, string> = {};
-            if (isApi) {
-                headers['Accept'] = 'application/vnd.github.v3.raw';
+    const parseMathBasics = (data: any): MathBasicsItem[] => {
+        if (!data) return [];
+        let items: MathBasicsItem[] = [];
+        if (Array.isArray(data) && data.length > 0) {
+            if (data[0].foundation && Array.isArray(data[0].foundation)) {
+                items = data[0].foundation;
+            } else if (data[0].videoId) {
+                items = data;
             }
-            const cacheBuster = (url.includes('?') ? '&' : '?') + `t=${Date.now()}`;
-            const response = await fetch(`${url}${cacheBuster}`, { headers });
-            if (!response.ok) continue;
+        } else if (data && data.foundation && Array.isArray(data.foundation)) {
+            items = data.foundation;
+        }
+        return items;
+    };
 
-            const text = await response.text();
-            const data = JSON.parse(text);
-
-            let items: MathBasicsItem[] = [];
-            if (Array.isArray(data) && data.length > 0) {
-                if (data[0].foundation && Array.isArray(data[0].foundation)) {
-                    items = data[0].foundation;
-                } else if (data[0].videoId) {
-                    items = data;
+    // 1. Fetch live GitHub API (zero CDN delay) and Raw concurrently
+    try {
+        const pApi = (async () => {
+            try {
+                const res = await fetch(apiUrl);
+                if (!res.ok) return null;
+                const jsonMeta = await res.json();
+                if (jsonMeta && typeof jsonMeta.content === 'string' && jsonMeta.encoding === 'base64') {
+                    const text = decodeBase64Utf8(jsonMeta.content);
+                    const parsed = cleanAndRepairJson<any>(text);
+                    const items = parseMathBasics(parsed);
+                    if (items.length > 0) return items;
                 }
-            } else if (data && data.foundation && Array.isArray(data.foundation)) {
-                items = data.foundation;
+            } catch (_e) {
+                // Ignore API fetch error
             }
+            return null;
+        })();
 
-            if (items && items.length > 0) {
-                localStorage.setItem(MATH_BASICS_CACHE_KEY, JSON.stringify(items));
+        const pRaw = (async () => {
+            try {
+                const res = await fetch(rawUrl);
+                if (!res.ok) return null;
+                const text = await res.text();
+                const parsed = cleanAndRepairJson<any>(text);
+                const items = parseMathBasics(parsed);
+                if (items.length > 0) return items;
+            } catch (_e) {
+                // Ignore raw fetch error
+            }
+            return null;
+        })();
+
+        const results = await Promise.allSettled([pApi, pRaw]);
+        for (const r of results) {
+            if (r.status === 'fulfilled' && r.value && r.value.length > 0) {
+                try {
+                    localStorage.setItem(MATH_BASICS_CACHE_KEY, JSON.stringify(r.value));
+                } catch (_e) {
+                    // Ignore storage quota error
+                }
+                return r.value;
+            }
+        }
+    } catch (e) {
+        console.warn("Error fetching math basics:", e);
+    }
+
+    // 2. Try fallback URL
+    try {
+        const res = await fetch(fallbackRawUrl);
+        if (res.ok) {
+            const text = await res.text();
+            const parsed = cleanAndRepairJson<any>(text);
+            const items = parseMathBasics(parsed);
+            if (items.length > 0) {
+                try {
+                    localStorage.setItem(MATH_BASICS_CACHE_KEY, JSON.stringify(items));
+                } catch (_e) {
+                    // Ignore storage quota error
+                }
                 return items;
             }
-        } catch (e) {
-            console.warn(`Error fetching math basics from ${url}:`, e);
         }
+    } catch (_e) {
+        // Fallback failed
     }
+
     return loadCachedMathBasics();
 }
 
-const JORDAN_HISTORY_RESOURCE_GITHUB_URLS = [
-    "https://raw.githubusercontent.com/MashalMath/joschool-11-arabic-exams/JoSchool112010/HistoryStructureSources11_S1.json",
-    "https://raw.githubusercontent.com/MashalMath/joschool-11-arabic-exams/main/HistoryStructureSources11_S1.json",
-    "https://api.github.com/repos/MashalMath/joschool-11-arabic-exams/contents/HistoryStructureSources11_S1.json?ref=JoSchool112010",
-    "https://api.github.com/repos/MashalMath/Pdf_Library/contents/History11_s1_resources.json",
-    "https://api.github.com/repos/MashalMath/Pdf_Library/contents/History11_s1.json",
-    "https://api.github.com/repos/MashalMath/joschool-11-arabic-exams/contents/History11_s1_resources.json?ref=JoSchool112010",
-    "https://raw.githubusercontent.com/MashalMath/Pdf_Library/main/History11_s1_resources.json",
-    "https://raw.githubusercontent.com/MashalMath/Pdf_Library/main/History11_s1.json",
-    "https://raw.githubusercontent.com/MashalMath/joschool-11-arabic-exams/main/History11_s1_resources.json",
-    "https://raw.githubusercontent.com/MashalMath/joschool-11-arabic-exams/JoSchool112010/History11_s1_resources.json"
-];
+export const LOCAL_STORAGE_KEY_HISTORY = "jordan_history_resources_v1";
+export const LOCAL_STORAGE_KEY_MATH = "math_resources_v1";
 
-const MATH_RESOURCE_GITHUB_URLS = [
-    "https://raw.githubusercontent.com/MashalMath/joschool-11-arabic-exams/JoSchool112010/MathStructureSources11_S1.json",
-    "https://raw.githubusercontent.com/MashalMath/joschool-11-arabic-exams/main/MathStructureSources11_S1.json",
-    "https://api.github.com/repos/MashalMath/joschool-11-arabic-exams/contents/MathStructureSources11_S1.json?ref=JoSchool112010",
-    "https://api.github.com/repos/MashalMath/joschool-11-arabic-exams/contents/Math11_s1_resources.json?ref=JoSchool112010",
-    "https://api.github.com/repos/MashalMath/Pdf_Library/contents/MathStructureSources11_S1.json",
-    "https://api.github.com/repos/MashalMath/Pdf_Library/contents/Math11_s1_resources.json",
-    "https://raw.githubusercontent.com/MashalMath/joschool-11-arabic-exams/JoSchool112010/Math11_s1_resources.json",
-    "https://raw.githubusercontent.com/MashalMath/Pdf_Library/main/MathStructureSources11_S1.json",
-    "https://raw.githubusercontent.com/MashalMath/Pdf_Library/main/Math11_s1_resources.json",
-    "https://raw.githubusercontent.com/MashalMath/joschool-11-arabic-exams/main/Math11_s1_resources.json"
-];
-
-const LOCAL_STORAGE_KEY_HISTORY = "jordan_history_resources_v1";
-const LOCAL_STORAGE_KEY_MATH = "math_resources_v1";
-
-function getLocalStorageKey(subject?: string): string {
+export function getLocalStorageKey(subject?: string, semester?: string): string {
+    const semSuffix = (semester === Semester.Second) ? 's2' : 's1';
     if (subject === SubjectName.Math) {
-        return LOCAL_STORAGE_KEY_MATH;
+        return `math_resources_${semSuffix}_v2`;
     }
-    return LOCAL_STORAGE_KEY_HISTORY;
+    if (subject === SubjectName.JordanHistory) {
+        return `jordan_history_resources_${semSuffix}_v2`;
+    }
+    if (subject === SubjectName.IslamicEducation) {
+        return `islamic_resources_${semSuffix}_v2`;
+    }
+    if (subject === SubjectName.Arabic) {
+        return `arabic_resources_${semSuffix}_v2`;
+    }
+    return `resources_${subject || 'unknown'}_${semSuffix}_v2`;
 }
 
-function getResourceUrls(subject?: string): string[] {
+export function getResourceFilenames(subject?: string, semester?: string): string[] {
+    const semSuffix = (semester === Semester.Second) ? 'S2' : 'S1';
+    const semSuffixLower = (semester === Semester.Second) ? 's2' : 's1';
+
     if (subject === SubjectName.Math) {
-        return MATH_RESOURCE_GITHUB_URLS;
+        return [
+            `MathStructureSources11_${semSuffix}.json`,
+            `Math11_${semSuffixLower}_resources.json`,
+            ...(semester === Semester.Second ? ['MathStructureSources11_S1.json', 'Math11_s1_resources.json'] : [])
+        ];
     }
-    return JORDAN_HISTORY_RESOURCE_GITHUB_URLS;
+    if (subject === SubjectName.JordanHistory) {
+        return [
+            `HistoryStructureSources11_${semSuffix}.json`,
+            `History11_${semSuffixLower}_resources.json`,
+            `History11_${semSuffixLower}.json`,
+            ...(semester === Semester.Second ? ['HistoryStructureSources11_S1.json', 'History11_s1_resources.json'] : [])
+        ];
+    }
+    if (subject === SubjectName.IslamicEducation) {
+        return [
+            `IslamicStructureSources11_${semSuffix}.json`,
+            `Islamic11_${semSuffixLower}_resources.json`
+        ];
+    }
+    if (subject === SubjectName.Arabic) {
+        return [
+            `Arabic11_${semSuffix}_Sources.json`,
+            `ArabicStructureSources11_${semSuffix}.json`,
+            `Arabic11_${semSuffixLower}_resources.json`
+        ];
+    }
+    return [
+        `HistoryStructureSources11_${semSuffix}.json`
+    ];
+}
+
+export interface ResourceEndpoint {
+    url: string;
+    isGitHubApi: boolean;
+}
+
+export function getEndpointsForFilename(filename: string): ResourceEndpoint[] {
+    return [
+        // 1. Live GitHub Contents API (direct git tree access, zero CDN cache delay)
+        {
+            url: `https://api.github.com/repos/MashalMath/joschool-11-arabic-exams/contents/${filename}?ref=JoSchool112010`,
+            isGitHubApi: true
+        },
+        // 2. Direct Raw GitHub URL (with query cache buster, clean headers to avoid CORS preflight)
+        {
+            url: `https://raw.githubusercontent.com/MashalMath/joschool-11-arabic-exams/JoSchool112010/${filename}`,
+            isGitHubApi: false
+        },
+        // 3. Main branch Raw GitHub
+        {
+            url: `https://raw.githubusercontent.com/MashalMath/joschool-11-arabic-exams/main/${filename}`,
+            isGitHubApi: false
+        },
+        // 4. Secondary fallback repo
+        {
+            url: `https://raw.githubusercontent.com/MashalMath/Pdf_Library/main/${filename}`,
+            isGitHubApi: false
+        }
+    ];
+}
+
+export function getResourceUrls(subject?: string, semester?: string): string[] {
+    const filenames = getResourceFilenames(subject, semester);
+    return filenames.flatMap(f => getEndpointsForFilename(f).map(e => e.url));
+}
+
+export function extractUnitsFromRawData(data: any): ResourceJsonUnit[] {
+    if (!data) return [];
+    let units: ResourceJsonUnit[] = [];
+    if (Array.isArray(data) && data.length > 0) {
+        if (data[0].units && Array.isArray(data[0].units)) {
+            units = data[0].units;
+        } else if (data[0].unitId || data[0].lessons) {
+            units = data;
+        }
+    } else if (data && data.units && Array.isArray(data.units)) {
+        units = data.units;
+    }
+    return units;
+}
+
+async function fetchEndpointData(endpoint: ResourceEndpoint): Promise<ResourceJsonUnit[] | null> {
+    const timestamp = Date.now();
+    const rnd = Math.random().toString(36).slice(2, 8);
+    const fullUrl = `${endpoint.url}${endpoint.url.includes('?') ? '&' : '?'}t=${timestamp}&_r=${rnd}`;
+
+    try {
+        if (endpoint.isGitHubApi) {
+            const response = await fetch(fullUrl);
+            if (!response.ok) return null;
+            const jsonMeta = await response.json();
+            if (jsonMeta && typeof jsonMeta.content === 'string' && jsonMeta.encoding === 'base64') {
+                const text = decodeBase64Utf8(jsonMeta.content);
+                const parsed = cleanAndRepairJson<any>(text);
+                const units = extractUnitsFromRawData(parsed);
+                if (units && units.length > 0) {
+                    return units;
+                }
+            }
+            return null;
+        } else {
+            // Raw GitHub: DO NOT pass custom headers or cache: 'no-store' to prevent CORS preflight OPTIONS rejection
+            const response = await fetch(fullUrl);
+            if (!response.ok) return null;
+            const text = await response.text();
+            const parsed = cleanAndRepairJson<any>(text);
+            const units = extractUnitsFromRawData(parsed);
+            if (units && units.length > 0) {
+                return units;
+            }
+            return null;
+        }
+    } catch {
+        return null;
+    }
 }
 
 export function normalizeResource(r: LessonResource): LessonResource {
@@ -691,7 +904,7 @@ export function cleanAndRepairJson<T = any>(rawText: string): T | null {
     return null;
 }
 
-function countValidResourcesInUnits(units: ResourceJsonUnit[]): number {
+export function countValidResourcesInUnits(units: ResourceJsonUnit[]): number {
     if (!units || !Array.isArray(units)) return 0;
     let count = 0;
     for (const u of units) {
@@ -709,27 +922,22 @@ function countValidResourcesInUnits(units: ResourceJsonUnit[]): number {
     return count;
 }
 
-export function loadCachedResources(subject?: string): ResourceJsonUnit[] {
-    const defaultData = subject === SubjectName.Math ? INITIAL_MATH_RESOURCES : INITIAL_JORDAN_HISTORY_RESOURCES;
+export function loadCachedResources(subject?: string, semester?: string): ResourceJsonUnit[] {
+    const defaultData = subject === SubjectName.Math 
+        ? INITIAL_MATH_RESOURCES 
+        : (subject === SubjectName.Arabic ? INITIAL_ARABIC_RESOURCES : INITIAL_JORDAN_HISTORY_RESOURCES);
     try {
-        const key = getLocalStorageKey(subject);
-        const cached = localStorage.getItem(key);
+        const key = getLocalStorageKey(subject, semester);
+        const legacyKey = subject === SubjectName.Math ? LOCAL_STORAGE_KEY_MATH : LOCAL_STORAGE_KEY_HISTORY;
+        const cached = localStorage.getItem(key) || localStorage.getItem(legacyKey);
         if (cached) {
             const parsed = cleanAndRepairJson<any>(cached);
-            let units: ResourceJsonUnit[] = [];
-            if (Array.isArray(parsed) && parsed.length > 0) {
-                if (parsed[0].units && Array.isArray(parsed[0].units)) {
-                    units = parsed[0].units;
-                } else if (parsed[0].unitId || parsed[0].lessons) {
-                    units = parsed;
-                }
-            } else if (parsed && parsed.units && Array.isArray(parsed.units)) {
-                units = parsed.units;
-            }
-
+            const units = extractUnitsFromRawData(parsed);
             if (units.length > 0) {
                 const cachedValidCount = countValidResourcesInUnits(units);
-                const defaultValidCount = countValidResourcesInUnits(defaultData);
+                const defaultValidCount = ((subject === SubjectName.Math || subject === SubjectName.Arabic) && (!semester || semester === Semester.First))
+                    ? countValidResourcesInUnits(defaultData)
+                    : 0;
                 if (cachedValidCount >= defaultValidCount) {
                     return units;
                 }
@@ -741,53 +949,60 @@ export function loadCachedResources(subject?: string): ResourceJsonUnit[] {
     return defaultData;
 }
 
-export async function fetchRemoteResources(subject?: string): Promise<ResourceJsonUnit[]> {
-    const urls = getResourceUrls(subject);
-    const key = getLocalStorageKey(subject);
+export async function fetchRemoteResources(subject?: string, semester?: string): Promise<ResourceJsonUnit[]> {
+    const filenames = getResourceFilenames(subject, semester);
+    const key = getLocalStorageKey(subject, semester);
 
-    for (const url of urls) {
+    for (const filename of filenames) {
+        const endpoints = getEndpointsForFilename(filename);
+
+        // 1. Concurrently query GitHub API (direct Git tree, zero CDN cache delay) and Raw GitHub
         try {
-            const isApi = url.includes("api.github.com");
-            const headers: Record<string, string> = {};
-            if (isApi) {
-                headers['Accept'] = 'application/vnd.github.v3.raw';
-            }
+            const pApi = fetchEndpointData(endpoints[0]);
+            const pRaw = fetchEndpointData(endpoints[1]);
 
-            const cacheBuster = (url.includes('?') ? '&' : '?') + `t=${Date.now()}`;
-            const response = await fetch(`${url}${cacheBuster}`, { 
-                headers,
-                cache: 'no-store'
-            });
-            if (!response.ok) continue;
-            const text = await response.text();
+            const results = await Promise.allSettled([pApi, pRaw]);
             
-            const data = cleanAndRepairJson<any>(text);
-            if (!data) continue;
-            
-            let units: ResourceJsonUnit[] = [];
-            if (Array.isArray(data) && data.length > 0) {
-                if (data[0].units && Array.isArray(data[0].units)) {
-                    units = data[0].units;
-                } else if (data[0].unitId || data[0].lessons) {
-                    units = data;
+            let bestUnits: ResourceJsonUnit[] | null = null;
+            let bestCount = -1;
+
+            for (const r of results) {
+                if (r.status === 'fulfilled' && r.value && r.value.length > 0) {
+                    const count = countValidResourcesInUnits(r.value);
+                    if (count > bestCount) {
+                        bestCount = count;
+                        bestUnits = r.value;
+                    }
                 }
-            } else if (data && data.units && Array.isArray(data.units)) {
-                units = data.units;
             }
 
-            if (units.length > 0) {
+            if (bestUnits && bestUnits.length > 0) {
+                try {
+                    localStorage.setItem(key, JSON.stringify(bestUnits));
+                } catch {
+                    // quota
+                }
+                return bestUnits;
+            }
+        } catch {
+            // Proceed to fallback endpoints
+        }
+
+        // 2. Try remaining fallback endpoints
+        for (let i = 2; i < endpoints.length; i++) {
+            const units = await fetchEndpointData(endpoints[i]);
+            if (units && units.length > 0) {
                 try {
                     localStorage.setItem(key, JSON.stringify(units));
-                } catch (e) {
-                    // Ignore storage quota errors
+                } catch (_e) {
+                    // Ignore storage quota error
                 }
                 return units;
             }
-        } catch (err) {
-            console.warn(`Error parsing resources from ${url}:`, err);
         }
     }
-    return loadCachedResources(subject);
+
+    return loadCachedResources(subject, semester);
 }
 
 export async function fetchRemoteHistoryResources(): Promise<ResourceJsonUnit[]> {
@@ -797,10 +1012,16 @@ export async function fetchRemoteHistoryResources(): Promise<ResourceJsonUnit[]>
 function cleanString(str: string): string {
     if (!str) return '';
     return str
+        .replace(/[\u064B-\u065F\u0670]/g, '') // remove Arabic tashkeel (diacritics)
+        .replace(/[إأآٱ]/g, 'ا')
+        .replace(/ة/g, 'ه')
+        .replace(/ى/g, 'ي')
         .replace(/—|–|-/g, ' ')
-        .replace(/صفحة\s*\d+/g, '')
-        .replace(/الدرس\s*(الأول|الثاني|الثالث|الرابع|الخامس|السادس|السابع|الثامن|التاسع|العاشر):?/g, '')
-        .replace(/الوحدة\s*(الأولى|الثانية|الثالثة|الرابعة|الخامسة|السادسة|السابعة|الثامنة):?/g, '')
+        .replace(/صفحه\s*\d+/gi, '')
+        .replace(/صفحة\s*\d+/gi, '')
+        .replace(/الدرس\s*(الاول|الأول|الثاني|الثالث|الرابع|الخامس|السادس|السابع|الثامن|التاسع|العاشر):?/gi, '')
+        .replace(/الوحده\s*(الاولى|الثانيه|الثالثه|الرابعه|الخامسه|السادسه|السابعه|الثامنه):?/gi, '')
+        .replace(/الوحدة\s*(الأولى|الثانية|الثالثة|الرابعة|الخامسة|السادسة|السابعة|الثامنة):?/gi, '')
         .replace(/\(.*\)/g, '')
         .replace(/\s+/g, ' ')
         .trim();

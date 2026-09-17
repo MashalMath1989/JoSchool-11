@@ -1,10 +1,10 @@
 import React from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { PlayCircle, FileText, Image as ImageIcon, X, ExternalLink } from 'lucide-react';
+import { PlayCircle, FileText, Image as ImageIcon, X, ExternalLink, RefreshCw, Sparkles } from 'lucide-react';
 import { BookOpenIcon, ChevronDownIcon, StarIcon, BookmarkIcon, RefreshIcon, ChevronLeftIcon, ChevronRightIcon, ArrowLeftIcon, ArrowRightIcon, CheckCircleIcon, Loader2 } from './data/Icons';
 import { Subject, Unit, Lesson, View, SubjectName, Semester, LessonResource } from './types';
 import { isSubjectLoaded, getLessonChunksCount, isLessonLoaded } from './services/quizService';
-import { loadCachedResources, fetchRemoteResources, fetchRemoteHistoryResources, getResourcesForLesson, getResourcesForUnit, generatePdfDownloadFileName, ResourceJsonUnit, MathBasicsItem, loadCachedMathBasics, fetchRemoteMathBasics, getYoutubeThumbnailUrl, fetchYoutubeVideoTitle } from './services/resourceService';
+import { loadCachedResources, fetchRemoteResources, fetchRemoteHistoryResources, getResourcesForLesson, getResourcesForUnit, generatePdfDownloadFileName, ResourceJsonUnit, MathBasicsItem, loadCachedMathBasics, fetchRemoteMathBasics, getYoutubeThumbnailUrl, fetchYoutubeVideoTitle, countValidResourcesInUnits } from './services/resourceService';
 import { ResourceViewerModal } from './ResourceViewerModal';
 
 interface SubjectIndexPageProps {
@@ -42,7 +42,9 @@ const SubjectIndexPage: React.FC<SubjectIndexPageProps> = React.memo(({
     onBack,
     examsUpdatedTrigger
 }) => {
-    const [resourcesData, setResourcesData] = React.useState<ResourceJsonUnit[]>(() => loadCachedResources(selectedSubject?.id));
+    const [resourcesData, setResourcesData] = React.useState<ResourceJsonUnit[]>(() => loadCachedResources(selectedSubject?.id, selectedSubject?.semester));
+    const [isSyncingResources, setIsSyncingResources] = React.useState<boolean>(false);
+    const [syncNotification, setSyncNotification] = React.useState<string | null>(null);
     const [activeResource, setActiveResource] = React.useState<{ resource: LessonResource; lessonTitle: string; downloadFileName?: string } | null>(null);
     const [isSyncingResource, setIsSyncingResource] = React.useState<boolean>(false);
     const [showMathBasicsView, setShowMathBasicsView] = React.useState<boolean>(false);
@@ -159,59 +161,72 @@ const SubjectIndexPage: React.FC<SubjectIndexPageProps> = React.memo(({
         };
     }, []);
 
-    React.useEffect(() => {
-        if (selectedSubject?.id === SubjectName.Math && selectedSubject?.semester === Semester.First) {
-            setMathBasicsItems(loadCachedMathBasics());
-            fetchRemoteMathBasics().then(items => {
-                if (items && items.length > 0) {
-                    setMathBasicsItems(items);
+    const syncResources = React.useCallback(async (isManual = false) => {
+        if (!selectedSubject) return;
+        if (isManual) setIsSyncingResources(true);
+        try {
+            const updated = await fetchRemoteResources(selectedSubject.id, selectedSubject.semester);
+            if (updated && updated.length > 0) {
+                setResourcesData(updated);
+                if (isManual) {
+                    const count = countValidResourcesInUnits(updated);
+                    setSyncNotification(`تم فحص وتحديث مصادر الفصل فورياً (${count} مصدر متوفر)`);
+                    setTimeout(() => setSyncNotification(null), 4000);
                 }
-            }).catch(err => {
-                console.warn("Math basics fetch error:", err);
-            });
+            }
+            if (selectedSubject.id === SubjectName.Math && selectedSubject.semester === Semester.First) {
+                const mathItems = await fetchRemoteMathBasics();
+                if (mathItems && mathItems.length > 0) {
+                    setMathBasicsItems(mathItems);
+                }
+            }
+        } catch (err) {
+            console.warn("Silent resource sync failed:", err);
+        } finally {
+            if (isManual) {
+                setIsSyncingResources(false);
+            }
         }
     }, [selectedSubject]);
 
     React.useEffect(() => {
-        let isMounted = true;
-        const isSupportedSubject = (selectedSubject?.id === SubjectName.JordanHistory || selectedSubject?.id === SubjectName.Math) && selectedSubject?.semester !== Semester.Second;
-        if (!isSupportedSubject) {
-            setResourcesData([]);
-            return;
+        if (!selectedSubject) return;
+
+        // 1. Instantly load locally cached data (0ms delay)
+        setResourcesData(loadCachedResources(selectedSubject.id, selectedSubject.semester));
+        if (selectedSubject.id === SubjectName.Math && selectedSubject.semester === Semester.First) {
+            setMathBasicsItems(loadCachedMathBasics());
         }
 
-        const syncResources = () => {
-            fetchRemoteResources(selectedSubject.id).then(updated => {
-                if (isMounted && updated && updated.length > 0) {
-                    setResourcesData(updated);
-                }
-            }).catch(err => {
-                console.warn("Silent resource sync failed:", err);
-            });
-        };
+        // 2. Immediate background fetch to check for new links added to JSON
+        syncResources(false);
 
-        setResourcesData(loadCachedResources(selectedSubject.id));
-        syncResources();
+        // 3. Fast continuous polling every 15 seconds (matching LibraryPage)
+        // so newly added resource links in GitHub JSON appear immediately
+        const intervalId = setInterval(() => {
+            syncResources(false);
+        }, 15000);
 
+        // 4. Instant re-check on tab focus / window visibility
         const handleVisibilityChange = () => {
             if (document.visibilityState === 'visible') {
-                syncResources();
+                syncResources(false);
             }
         };
 
         const handleFocus = () => {
-            syncResources();
+            syncResources(false);
         };
 
         document.addEventListener('visibilitychange', handleVisibilityChange);
         window.addEventListener('focus', handleFocus);
 
         return () => {
-            isMounted = false;
+            clearInterval(intervalId);
             document.removeEventListener('visibilitychange', handleVisibilityChange);
             window.removeEventListener('focus', handleFocus);
         };
-    }, [selectedSubject]);
+    }, [selectedSubject, syncResources, examsUpdatedTrigger]);
 
     const handleResourceClick = async (
         unitTitle: string,
@@ -261,7 +276,7 @@ const SubjectIndexPage: React.FC<SubjectIndexPageProps> = React.memo(({
 
         try {
             // Re-fetch latest live JSON from GitHub (with timestamp cache-buster)
-            const freshUnits = await fetchRemoteResources(selectedSubject?.id);
+            const freshUnits = await fetchRemoteResources(selectedSubject?.id, selectedSubject?.semester);
             if (freshUnits && freshUnits.length > 0) {
                 setResourcesData(freshUnits);
                 const freshResources = !isUnitResource 
@@ -681,24 +696,36 @@ const SubjectIndexPage: React.FC<SubjectIndexPageProps> = React.memo(({
                                  <span className="text-xs font-black text-primary/80">{selectedSubject.semester}</span>
                              </div>
 
-                             {selectedSubject.id === SubjectName.Math && selectedSubject.semester === Semester.First && (
-                                  <button
-                                      onClick={openMathBasicsView}
-                                      className="w-11 h-11 sm:w-13 sm:h-13 bg-gradient-to-b from-red-600 to-rose-600 hover:from-red-700 hover:to-rose-700 text-white font-black rounded-xl border-2 border-slate-900 shadow-[3px_3px_0px_0px_rgba(0,0,0,1)] active:translate-x-[1px] active:translate-y-[1px] active:shadow-none transition-all cursor-pointer shrink-0 flex flex-col items-center justify-center text-[11px] sm:text-xs leading-none p-1 text-center"
-                                      title="حصص التأسيس"
-                                  >
-                                      <span>حصص</span>
-                                      <span className="mt-0.5">التأسيس</span>
-                                  </button>
-                             )}
+                             <div className="flex items-center gap-1.5 shrink-0">
+                                 {/* Realtime Manual Refresh Button */}
+                                 <button
+                                     onClick={() => syncResources(true)}
+                                     disabled={isSyncingResources}
+                                     className="w-10 h-10 sm:w-13 sm:h-13 bg-white hover:bg-slate-50 text-slate-800 rounded-lg border-2 border-slate-900 shadow-[3px_3px_0px_0px_rgba(0,0,0,1)] active:translate-x-[2px] active:translate-y-[2px] active:shadow-none transition-all flex items-center justify-center cursor-pointer group disabled:opacity-60 shrink-0"
+                                     title="تحديث مصادر الفصل والتحقق من الملفات الجديدة فورياً"
+                                 >
+                                     <RefreshCw className={`w-4 h-4 sm:w-6 sm:h-6 text-slate-800 group-hover:text-primary transition-colors ${isSyncingResources ? 'animate-spin text-primary' : ''}`} />
+                                 </button>
 
-                             <button 
-                                onClick={onBack}
-                                className="w-10 h-10 sm:w-13 sm:h-13 shadow-[3px_3px_0px_0px_rgba(0,0,0,1)] bg-white border-2 border-slate-900 rounded-lg text-slate-800 hover:bg-slate-50 transition-all active:translate-x-[2px] active:translate-y-[2px] active:shadow-none shrink-0 flex items-center justify-center group"
-                                title="رجوع"
-                             >
-                                <ArrowRightIcon className="w-5 h-5 sm:w-7 sm:h-7 group-hover:scale-110 transition-transform" strokeWidth={3} />
-                             </button>
+                                 {selectedSubject.id === SubjectName.Math && selectedSubject.semester === Semester.First && (
+                                      <button
+                                          onClick={openMathBasicsView}
+                                          className="w-11 h-11 sm:w-13 sm:h-13 bg-gradient-to-b from-red-600 to-rose-600 hover:from-red-700 hover:to-rose-700 text-white font-black rounded-xl border-2 border-slate-900 shadow-[3px_3px_0px_0px_rgba(0,0,0,1)] active:translate-x-[1px] active:translate-y-[1px] active:shadow-none transition-all cursor-pointer shrink-0 flex flex-col items-center justify-center text-[11px] sm:text-xs leading-none p-1 text-center"
+                                          title="حصص التأسيس"
+                                      >
+                                          <span>حصص</span>
+                                          <span className="mt-0.5">التأسيس</span>
+                                      </button>
+                                 )}
+
+                                 <button 
+                                    onClick={onBack}
+                                    className="w-10 h-10 sm:w-13 sm:h-13 shadow-[3px_3px_0px_0px_rgba(0,0,0,1)] bg-white border-2 border-slate-900 rounded-lg text-slate-800 hover:bg-slate-50 transition-all active:translate-x-[2px] active:translate-y-[2px] active:shadow-none shrink-0 flex items-center justify-center group"
+                                    title="رجوع"
+                                 >
+                                    <ArrowRightIcon className="w-5 h-5 sm:w-7 sm:h-7 group-hover:scale-110 transition-transform" strokeWidth={3} />
+                                 </button>
+                             </div>
                         </div>
                         <p className="text-slate-400/80 font-bold text-xs mt-1">تصفح الوحدات والدروس</p>
                     </div>
@@ -914,7 +941,7 @@ const SubjectIndexPage: React.FC<SubjectIndexPageProps> = React.memo(({
 
                                                                                 {/* Lesson Resources Grid (RTL Organized Compact Grid) */}
                                                                                 {(() => {
-                                                                                    const isSupportedSubject = (selectedSubject?.id === SubjectName.JordanHistory || selectedSubject?.id === SubjectName.Math) && selectedSubject?.semester !== Semester.Second;
+                                                                                    const isSupportedSubject = (selectedSubject?.id === SubjectName.JordanHistory || selectedSubject?.id === SubjectName.Math || selectedSubject?.id === SubjectName.Arabic) && selectedSubject?.semester !== Semester.Second;
 
                                                                                     const lessonResources = isSupportedSubject ? getResourcesForLesson(
                                                                                         unit.title,
@@ -999,7 +1026,7 @@ const SubjectIndexPage: React.FC<SubjectIndexPageProps> = React.memo(({
                                                                                                             }
                                                                                                             handleResourceClick(unit.title, lesson.title, uIdx, lIdx, rIdx, normalizedRes);
                                                                                                         }}
-                                                                                                        className="w-full flex items-center gap-1.5 px-2 py-1.5 rounded-lg border border-slate-900 bg-white hover:bg-slate-50 active:scale-95 transition-all shadow-2xs text-slate-800 font-bold text-xs group cursor-pointer"
+                                                                                                        className="w-full flex items-center justify-start gap-1.5 px-2 py-1.5 rounded-lg border border-slate-900 bg-white hover:bg-slate-50 active:scale-[0.98] transition-all shadow-2xs text-slate-800 font-bold text-xs group cursor-pointer"
                                                                                                     >
                                                                                                         <div className="w-4 h-4 rounded flex items-center justify-center shrink-0">
                                                                                                             {isLink && <ExternalLink className="w-3.5 h-3.5 text-sky-600 group-hover:scale-110 transition-transform" />}
@@ -1043,7 +1070,11 @@ const SubjectIndexPage: React.FC<SubjectIndexPageProps> = React.memo(({
 
                                             {/* Unit Resources Section (RTL Grid Layout) */}
                                             {(() => {
-                                                const isSupportedSubject = (selectedSubject?.id === SubjectName.JordanHistory || selectedSubject?.id === SubjectName.Math) && selectedSubject?.semester === Semester.First;
+                                                const isSupportedSubject = (
+                                                    selectedSubject?.id === SubjectName.JordanHistory || 
+                                                    selectedSubject?.id === SubjectName.Math || 
+                                                    selectedSubject?.id === SubjectName.Arabic
+                                                ) && selectedSubject?.semester === Semester.First;
                                                 if (!isSupportedSubject) {
                                                     return null;
                                                 }
@@ -1104,7 +1135,7 @@ const SubjectIndexPage: React.FC<SubjectIndexPageProps> = React.memo(({
                                                                         ? 'رابط خارجي' 
                                                                         : 'خريطة ذهنية للوحدة';
 
-                                                            return (
+                                                             return (
                                                                 <button
                                                                     key={rIdx}
                                                                     onClick={() => {
@@ -1116,7 +1147,7 @@ const SubjectIndexPage: React.FC<SubjectIndexPageProps> = React.memo(({
                                                                         }
                                                                         handleResourceClick(unit.title, resTitle, uIdx, -1, rIdx, normalizedRes, unit);
                                                                     }}
-                                                                    className="w-full flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border border-slate-900 bg-white hover:bg-slate-50 active:scale-95 transition-all shadow-2xs text-slate-800 font-bold text-xs group cursor-pointer"
+                                                                    className="w-full flex items-center justify-start gap-1.5 px-2.5 py-1.5 rounded-lg border border-slate-900 bg-white hover:bg-slate-50 active:scale-[0.98] transition-all shadow-2xs text-slate-800 font-bold text-xs group cursor-pointer"
                                                                 >
                                                                     <div className="w-4 h-4 rounded flex items-center justify-center shrink-0">
                                                                         {isLink && <ExternalLink className="w-3.5 h-3.5 text-sky-600 group-hover:scale-110 transition-transform" />}
@@ -1147,6 +1178,13 @@ const SubjectIndexPage: React.FC<SubjectIndexPageProps> = React.memo(({
                     isSyncing={isSyncingResource}
                     onClose={closeResourceModal}
                 />
+            )}
+
+            {syncNotification && (
+                <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 bg-slate-900 text-white font-black text-xs sm:text-sm px-5 py-3 rounded-full shadow-2xl border-2 border-primary flex items-center gap-2 animate-bounce">
+                    <Sparkles className="w-4 h-4 text-primary shrink-0" />
+                    <span>{syncNotification}</span>
+                </div>
             )}
         </div>
     );

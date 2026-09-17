@@ -2,7 +2,7 @@
 // URL: https://raw.githubusercontent.com/MashalMath/joschool-11-arabic-exams/JoSchool112010/Math11_Library.json
 
 export const LIBRARY_JSON_URL = 'https://raw.githubusercontent.com/MashalMath/joschool-11-arabic-exams/JoSchool112010/Math11_Library.json';
-export const LIBRARY_CACHE_KEY = 'math11_library_remote_cache_v3';
+export const LIBRARY_CACHE_KEY = 'math11_library_remote_cache_v4';
 
 export interface RawLibraryItem {
     id?: number | string;
@@ -42,7 +42,7 @@ export const DEFAULT_LIBRARY_DATA: RawLibraryGroup[] = [
         "title": "كتاب الطالب (رياضيات) - (2026/2027) ف1",
         "type": "pdf",
         "fileUrl": "https://raw.githubusercontent.com/MashalMath/Pdf_Library/main/Math11_S1_StudentBook.pdf",
-        "thumbnail": ""
+        "thumbnail": "https://raw.githubusercontent.com/MashalMath/Pdf_Library/main/Math11_S1_Cover.png"
       }
     ]
   },
@@ -60,14 +60,66 @@ export const DEFAULT_LIBRARY_DATA: RawLibraryGroup[] = [
     ]
   },
   {
+    "subject": "الرياضيات",
+    "semester": "الفصل الأول",
+    "category": "الكتب المدرسية",
+    "items": [
+      {
+        "title": "حلول كتاب الطالب (رياضيات) - (2026/2027) ف1",
+        "type": "pdf",
+        "fileUrl": "https://raw.githubusercontent.com/MashalMath/Pdf_Library/main/Math11_S1_StudentSolutions.pdf",
+        "thumbnail": ""
+      }
+    ]
+  },
+  {
+    "subject": "الرياضيات",
+    "semester": "الفصل الأول",
+    "category": "الكتب المدرسية",
+    "items": [
+      {
+        "title": "حلول كتاب التمارين (رياضيات) - (2026/2027) ف1",
+        "type": "pdf",
+        "fileUrl": "https://raw.githubusercontent.com/MashalMath/Pdf_Library/main/Math11_S1_WorkbookSolutions.pdf",
+        "thumbnail": ""
+      }
+    ]
+  },
+  {
+    "subject": "الرياضيات",
+    "semester": "الفصل الأول",
+    "category": "الدوسيات",
+    "items": [
+      {
+        "title": "دوسية الوحدة الأولى (الاقترانات والمقادير الجبرية",
+        "type": "pdf",
+        "fileUrl": "https://raw.githubusercontent.com/MashalMath/Pdf_Library/main/Math11_Unit1_Dosya.pdf",
+        "thumbnail": ""
+      }
+    ]
+  },
+  {
+    "subject": "الرياضيات",
+    "semester": "الفصل الأول",
+    "category": "الدوسيات",
+    "items": [
+      {
+        "title": "دوسية التأسيس (رياضيات) ـ الصف الحادي عشر الأكاديمي",
+        "type": "pdf",
+        "fileUrl": "https://raw.githubusercontent.com/MashalMath/Pdf_Library/main/Math11_Basics1_compressed.pdf",
+        "thumbnail": ""
+      }
+    ]
+  },
+  {
     "subject": "تاريخ الأردن",
     "semester": "الفصل الأول",
     "category": "ملخصات",
     "items": [
       {
-        "title": "ملخص تاريخ الأردن - فصل أول",
+        "title": "ملخص الوحدة الأولى (الأردن في العصور القديمة)",
         "type": "pdf",
-        "fileUrl": "",
+        "fileUrl": "https://raw.githubusercontent.com/MashalMath/Pdf_Library/main/History11_s1_unit1_SUM.pdf",
         "thumbnail": ""
       }
     ]
@@ -174,6 +226,7 @@ export function regexExtractLibraryItems(text: string): ValidLibraryItem[] {
 
         const titleMatch = block.match(/"title"\s*:\s*"([^"]+)"/i);
         const typeMatch = block.match(/"type"\s*:\s*"([^"]+)"/i);
+        const thumbnailMatch = block.match(/"(?:thumbnail|thumbnailUrl|coverImage|cover)"\s*:\s*"([^"]+)"/i);
         const subjectMatch = block.match(/"subject"\s*:\s*"([^"]+)"/i);
         const semesterMatch = block.match(/"semester"\s*:\s*"([^"]+)"/i);
         const categoryMatch = block.match(/"category"\s*:\s*"([^"]+)"/i);
@@ -196,7 +249,7 @@ export function regexExtractLibraryItems(text: string): ValidLibraryItem[] {
             title: rawTitle,
             type: inferResourceType(typeMatch ? typeMatch[1] : undefined, rawUrl),
             fileUrl: rawUrl,
-            thumbnail: '',
+            thumbnail: thumbnailMatch ? thumbnailMatch[1].trim() : '',
             subject: curSub,
             semester: curSem,
             category: curCat,
@@ -549,7 +602,7 @@ export function extractValidLibraryItems(
                             title: cleanTitle,
                             type: inferResourceType(node.type, cleanUrl),
                             fileUrl: cleanUrl,
-                            thumbnail: (node.thumbnail || '').trim(),
+                            thumbnail: (node.thumbnail || node.thumbnailUrl || node.coverImage || node.cover || '').trim(),
                             subject: curSub || 'الرياضيات',
                             semester: curSem || 'الفصل الأول',
                             category: curCat || 'الكتب المدرسية',

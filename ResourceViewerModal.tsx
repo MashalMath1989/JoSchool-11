@@ -148,20 +148,19 @@ export const ResourceViewerModal: React.FC<ResourceViewerModalProps> = ({
                 }
             }
 
-            if (trimmed.includes('docs.google.com/gview') || trimmed.includes('/preview')) {
+            if (trimmed.includes('/preview')) {
                 return trimmed;
             }
 
-            if (trimmed.toLowerCase().includes('.pdf') || trimmed.includes('raw.githubusercontent.com') || trimmed.includes('firebasestorage')) {
-                return `https://docs.google.com/gview?url=${encodeURIComponent(trimmed)}&embedded=true`;
-            }
+            // Route all direct PDF files through Google Docs Viewer for instant cloud-rendered preview
+            return `https://docs.google.com/viewer?url=${encodeURIComponent(trimmed)}&embedded=true`;
         } catch (e) {
             console.warn('Error formatting PDF preview URL:', e);
         }
         return url;
     };
 
-    // Helper to format Google Drive download URL when user explicitly clicks Download button
+    // Helper to format download URL when user explicitly clicks Download button
     const getDownloadUrl = (url: string) => {
         if (!url) return '';
         try {
@@ -178,8 +177,15 @@ export const ResourceViewerModal: React.FC<ResourceViewerModalProps> = ({
                     return `https://drive.google.com/uc?export=download&id=${fileId}`;
                 }
             }
+            if (trimmed.includes('raw.githubusercontent.com/')) {
+                const match = trimmed.match(/raw\.githubusercontent\.com\/([^/]+)\/([^/]+)\/([^/]+)\/(.+)/);
+                if (match) {
+                    const [, owner, repo, branch, path] = match;
+                    return `https://cdn.statically.io/gh/${owner}/${repo}@${branch}/${path}`;
+                }
+            }
         } catch (e) {
-            // Fallback
+            // ignore
         }
         return url;
     };
@@ -421,12 +427,13 @@ export const ResourceViewerModal: React.FC<ResourceViewerModalProps> = ({
                         )}
 
                         {resource.type === 'pdf' && (
-                            <div className="w-full h-full flex flex-col bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden relative">
+                            <div className="w-full h-full flex flex-col bg-white rounded-xl shadow-sm border border-slate-300 overflow-hidden relative">
                                 <iframe
                                     src={getPdfPreviewUrl(resource.url)}
-                                    className="w-full h-full border-none"
+                                    className="w-full h-full border-none rounded-xl"
                                     title={title}
                                     allow="autoplay"
+                                    loading="eager"
                                 />
                             </div>
                         )}
@@ -512,7 +519,7 @@ export const ResourceViewerModal: React.FC<ResourceViewerModalProps> = ({
                                     {isDownloading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Download className="w-4 h-4" />}
                                     <span className="hidden sm:inline">{isDownloading ? 'جاري التحميل...' : 'تحميل PDF'}</span>
                                 </button>
-                                 <button
+                                <button
                                     onClick={handleExitFullScreen}
                                     className="p-2.5 bg-slate-900/90 hover:bg-rose-600 text-white rounded-full backdrop-blur-md border border-white/20 shadow-2xl transition-all active:scale-95 flex items-center gap-1.5 text-xs font-black"
                                     title="إغلاق الشاشة الكاملة"
@@ -530,6 +537,7 @@ export const ResourceViewerModal: React.FC<ResourceViewerModalProps> = ({
                                 className="w-full h-full border-none rounded-xl bg-white"
                                 title={title}
                                 allow="autoplay"
+                                loading="eager"
                             />
                         </div>
                     </div>
