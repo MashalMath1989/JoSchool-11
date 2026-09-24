@@ -1,4 +1,4 @@
-import { doc, getDoc, setDoc, updateDoc, onSnapshot } from 'firebase/firestore';
+import { doc, getDoc, setDoc, updateDoc, onSnapshot, collection, addDoc, serverTimestamp } from 'firebase/firestore';
 import { db, auth } from '../firebase';
 import { UserProgress } from '../types';
 
@@ -106,3 +106,58 @@ export const subscribeToUserProgress = (userId: string, callback: (progress: Use
     handleFirestoreError(error, OperationType.GET, path);
   });
 };
+
+export interface QuestionReportData {
+  subject?: string;
+  unitTitle?: string;
+  examTitle?: string;
+  questionNumber?: number;
+  questionText: string;
+  choices?: string[];
+  correctAnswer?: string;
+  explanation?: string;
+  studentReport: string;
+  studentEmail?: string;
+  studentUid?: string;
+}
+
+export const submitQuestionReport = async (report: QuestionReportData): Promise<boolean> => {
+  const path = 'questionReports';
+  try {
+    const cleanData: Record<string, any> = {
+      questionText: report.questionText || '',
+      studentReport: report.studentReport.trim(),
+      status: 'new',
+      createdAt: serverTimestamp()
+    };
+
+    if (report.subject) cleanData.subject = report.subject;
+    if (report.unitTitle) cleanData.unitTitle = report.unitTitle;
+    if (report.examTitle) cleanData.examTitle = report.examTitle;
+    if (typeof report.questionNumber === 'number') cleanData.questionNumber = report.questionNumber;
+    if (Array.isArray(report.choices) && report.choices.length > 0) cleanData.choices = report.choices;
+    if (report.correctAnswer) cleanData.correctAnswer = report.correctAnswer;
+    if (report.explanation) cleanData.explanation = report.explanation;
+
+    const currentUser = auth.currentUser;
+    if (currentUser?.email) {
+      cleanData.studentEmail = currentUser.email;
+    } else if (report.studentEmail) {
+      cleanData.studentEmail = report.studentEmail;
+    }
+
+    if (currentUser?.uid) {
+      cleanData.studentUid = currentUser.uid;
+    } else if (report.studentUid) {
+      cleanData.studentUid = report.studentUid;
+    }
+
+    const reportsCol = collection(db, path);
+    await addDoc(reportsCol, cleanData);
+    return true;
+  } catch (error) {
+    handleFirestoreError(error, OperationType.CREATE, path);
+    throw error;
+  }
+};
+

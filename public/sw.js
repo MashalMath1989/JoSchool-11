@@ -1,4 +1,4 @@
-const CACHE_NAME = 'joschool11-v3';
+const CACHE_NAME = 'joschool11-v5';
 const PRECACHE_ASSETS = [
   '/',
   '/index.html',

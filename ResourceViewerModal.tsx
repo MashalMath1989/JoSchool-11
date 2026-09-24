@@ -15,7 +15,9 @@ import {
     ExternalLink
 } from 'lucide-react';
 import { LessonResource } from './types';
-import { cleanTitleText } from './services/resourceService';
+import { cleanTitleText, extractYoutubeVideoId } from './services/resourceService';
+import { DownloadConfirmModal } from './DownloadConfirmModal';
+import { getGoogleViewerUrl } from './viewerUtils';
 
 interface ResourceViewerModalProps {
     resource: LessonResource | null;
@@ -57,6 +59,7 @@ export const ResourceViewerModal: React.FC<ResourceViewerModalProps> = ({
 
     const handleExitFullScreen = useCallback(() => {
         setIsFullScreen(false);
+        setFullScreenZoom(1);
         if (isFullScreenInHistoryRef.current || window.history.state?.isResourceFullScreen) {
             isFullScreenInHistoryRef.current = false;
             try {
@@ -73,6 +76,7 @@ export const ResourceViewerModal: React.FC<ResourceViewerModalProps> = ({
             if (!state.isResourceFullScreen && isFullScreen) {
                 isFullScreenInHistoryRef.current = false;
                 setIsFullScreen(false);
+                setFullScreenZoom(1);
             } else if (state.isResourceFullScreen) {
                 isFullScreenInHistoryRef.current = true;
             }
@@ -84,11 +88,18 @@ export const ResourceViewerModal: React.FC<ResourceViewerModalProps> = ({
         };
     }, [isFullScreen]);
 
+    // Handle PDF loading state for immediate visual feedback
+    const [loadedPdfUrl, setLoadedPdfUrl] = useState<string | null>(null);
+    const currentPdfUrl = resource?.type === 'pdf' ? (resource.url || '') : '';
+    const isPdfLoading = currentPdfUrl !== '' && loadedPdfUrl !== currentPdfUrl;
+
     useEffect(() => {
-        if (!isFullScreen) {
-            setFullScreenZoom(1);
-        }
-    }, [isFullScreen]);
+        if (!currentPdfUrl) return;
+        const timer = setTimeout(() => {
+            setLoadedPdfUrl(currentPdfUrl);
+        }, 3000);
+        return () => clearTimeout(timer);
+    }, [currentPdfUrl]);
 
     if (!resource) return null;
 
@@ -106,23 +117,9 @@ export const ResourceViewerModal: React.FC<ResourceViewerModalProps> = ({
     const getEmbedVideoUrl = (url: string) => {
         if (!url) return '';
         try {
-            const trimmed = url.trim();
-            if (trimmed.includes('youtube.com/shorts/')) {
-                const id = trimmed.split('youtube.com/shorts/')[1]?.split('?')[0];
-                if (id) return `https://www.youtube.com/embed/${id}?autoplay=1&rel=0&playsinline=1`;
-            }
-            if (trimmed.includes('youtube.com/watch')) {
-                const urlParams = new URLSearchParams(new URL(trimmed).search);
-                const v = urlParams.get('v');
-                if (v) return `https://www.youtube.com/embed/${v}?autoplay=1&rel=0&playsinline=1`;
-            } else if (trimmed.includes('youtu.be/')) {
-                const id = trimmed.split('youtu.be/')[1]?.split('?')[0];
-                if (id) return `https://www.youtube.com/embed/${id}?autoplay=1&rel=0&playsinline=1`;
-            } else if (trimmed.includes('youtube.com/embed/')) {
-                if (!trimmed.includes('autoplay=')) {
-                    return `${trimmed}${trimmed.includes('?') ? '&' : '?'}autoplay=1&rel=0&playsinline=1`;
-                }
-                return trimmed;
+            const videoId = extractYoutubeVideoId(url);
+            if (videoId) {
+                return `https://www.youtube.com/embed/${videoId}?autoplay=1&rel=0&playsinline=1`;
             }
         } catch (e) {
             // Return raw url
@@ -130,64 +127,9 @@ export const ResourceViewerModal: React.FC<ResourceViewerModalProps> = ({
         return url;
     };
 
-    // Helper to format PDF URL so it renders inline in preview mode without triggering automatic file download
+    // Helper to format PDF URL so it renders inline in preview mode via Google Viewer for immediate display
     const getPdfPreviewUrl = (url: string) => {
-        if (!url) return '';
-        try {
-            const trimmed = url.trim();
-            if (trimmed.includes('drive.google.com')) {
-                let fileId = '';
-                if (trimmed.includes('/file/d/')) {
-                    fileId = trimmed.split('/file/d/')[1]?.split('/')[0]?.split('?')[0] || '';
-                } else if (trimmed.includes('id=')) {
-                    const match = trimmed.match(/[?&]id=([^&]+)/);
-                    if (match && match[1]) fileId = match[1];
-                }
-                if (fileId) {
-                    return `https://drive.google.com/file/d/${fileId}/preview`;
-                }
-            }
-
-            if (trimmed.includes('/preview')) {
-                return trimmed;
-            }
-
-            // Route all direct PDF files through Google Docs Viewer for instant cloud-rendered preview
-            return `https://docs.google.com/viewer?url=${encodeURIComponent(trimmed)}&embedded=true`;
-        } catch (e) {
-            console.warn('Error formatting PDF preview URL:', e);
-        }
-        return url;
-    };
-
-    // Helper to format download URL when user explicitly clicks Download button
-    const getDownloadUrl = (url: string) => {
-        if (!url) return '';
-        try {
-            const trimmed = url.trim();
-            if (trimmed.includes('drive.google.com')) {
-                let fileId = '';
-                if (trimmed.includes('/file/d/')) {
-                    fileId = trimmed.split('/file/d/')[1]?.split('/')[0]?.split('?')[0] || '';
-                } else if (trimmed.includes('id=')) {
-                    const match = trimmed.match(/[?&]id=([^&]+)/);
-                    if (match && match[1]) fileId = match[1];
-                }
-                if (fileId) {
-                    return `https://drive.google.com/uc?export=download&id=${fileId}`;
-                }
-            }
-            if (trimmed.includes('raw.githubusercontent.com/')) {
-                const match = trimmed.match(/raw\.githubusercontent\.com\/([^/]+)\/([^/]+)\/([^/]+)\/(.+)/);
-                if (match) {
-                    const [, owner, repo, branch, path] = match;
-                    return `https://cdn.statically.io/gh/${owner}/${repo}@${branch}/${path}`;
-                }
-            }
-        } catch (e) {
-            // ignore
-        }
-        return url;
+        return getGoogleViewerUrl(url, true);
     };
 
     const handleZoomIn = () => setZoomLevel(prev => Math.min(prev + 25, 300));
@@ -195,54 +137,15 @@ export const ResourceViewerModal: React.FC<ResourceViewerModalProps> = ({
     const handleResetZoom = () => setZoomLevel(100);
 
     const handleInitiateDownload = () => {
+        if (!resource?.url) return;
         const fileExt = resource.type === 'pdf' ? 'pdf' : resource.type === 'video' ? 'mp4' : 'png';
         let defaultName = downloadFileName;
         if (!defaultName) {
-            const cleanTitle = cleanTitleText(resource.resourceTitle || title || 'resource').replace(/[/\\?%*:|"<>]/g, '').trim();
-            defaultName = `ملخص_${cleanTitle}.${fileExt}`;
+            const cleanTitle = cleanTitleText(resource.resourceTitle || title || 'ملف_تعليمي').replace(/[/\\?%*:|"<>]/g, '').trim();
+            defaultName = `${cleanTitle}.${fileExt}`;
         }
         setEditableFileName(defaultName);
         setIsEditFileNameOpen(true);
-    };
-
-    const handleConfirmDownload = async () => {
-        if (!resource?.url) return;
-        setIsEditFileNameOpen(false);
-        setIsDownloading(true);
-
-        const targetUrl = getDownloadUrl(resource.url);
-        const fileExt = resource.type === 'pdf' ? 'pdf' : resource.type === 'video' ? 'mp4' : 'png';
-        
-        let finalFileName = editableFileName.trim();
-        if (!finalFileName) {
-            finalFileName = downloadFileName || `ملخص_${Date.now()}.${fileExt}`;
-        }
-
-        if (!finalFileName.toLowerCase().endsWith(`.${fileExt}`)) {
-            finalFileName = `${finalFileName}.${fileExt}`;
-        }
-
-        finalFileName = finalFileName.replace(/[/\\?%*:|"<>]/g, '').trim();
-
-        try {
-            const response = await fetch(targetUrl);
-            if (!response.ok) throw new Error('Network response was not ok');
-            const blob = await response.blob();
-            const blobUrl = URL.createObjectURL(blob);
-
-            const a = document.createElement('a');
-            a.href = blobUrl;
-            a.download = finalFileName;
-            document.body.appendChild(a);
-            a.click();
-            document.body.removeChild(a);
-            setTimeout(() => URL.revokeObjectURL(blobUrl), 1000);
-        } catch (error) {
-            console.warn('Direct download failed, opening download URL in new tab fallback:', error);
-            window.open(targetUrl, '_blank');
-        } finally {
-            setIsDownloading(false);
-        }
     };
 
     const handleToggleVideoLandscapeFullScreen = async () => {
@@ -358,20 +261,16 @@ export const ResourceViewerModal: React.FC<ResourceViewerModalProps> = ({
                                 </div>
                             )}
 
-                            {/* External Link Button for PDF and Link */}
-                            {(resource.type === 'pdf' || resource.type === 'link') && (
+                            {/* External Link Button for Link only */}
+                            {resource.type === 'link' && (
                                 <a
                                     href={resource.url}
                                     target="_blank"
                                     rel="noopener noreferrer"
-                                    className={`p-2 rounded-xl flex items-center gap-1.5 text-xs font-bold transition-all active:scale-95 shadow-sm cursor-pointer ${
-                                        resource.type === 'link' 
-                                            ? 'bg-sky-600 hover:bg-sky-500 text-white' 
-                                            : 'bg-slate-800 hover:bg-slate-700 text-white border border-slate-700/50'
-                                    }`}
-                                    title="فتح الرابط في متصفح جوجل"
+                                    className="p-2 bg-sky-600 hover:bg-sky-500 text-white rounded-xl flex items-center gap-1.5 text-xs font-bold transition-all active:scale-95 shadow-sm cursor-pointer"
+                                    title="فتح الرابط"
                                 >
-                                    <ExternalLink className={`w-4 h-4 ${resource.type === 'link' ? 'text-white' : 'text-sky-400'}`} />
+                                    <ExternalLink className="w-4 h-4 text-white" />
                                     <span className="hidden sm:inline">فتح الرابط</span>
                                 </a>
                             )}
@@ -428,12 +327,21 @@ export const ResourceViewerModal: React.FC<ResourceViewerModalProps> = ({
 
                         {resource.type === 'pdf' && (
                             <div className="w-full h-full flex flex-col bg-white rounded-xl shadow-sm border border-slate-300 overflow-hidden relative">
+                                {isPdfLoading && (
+                                    <div className="absolute inset-0 z-10 flex flex-col items-center justify-center bg-slate-50">
+                                        <div className="w-9 h-9 border-3 border-sky-500 border-t-transparent rounded-full animate-spin mb-3"></div>
+                                        <p className="text-xs font-black text-slate-700">جاري فتح المستند فوراً عبر Google...</p>
+                                        <span className="text-[11px] font-bold text-slate-400 mt-1">عرض سحابي مباشر عالي السرعة</span>
+                                    </div>
+                                )}
                                 <iframe
                                     src={getPdfPreviewUrl(resource.url)}
                                     className="w-full h-full border-none rounded-xl"
                                     title={title}
                                     allow="autoplay"
                                     loading="eager"
+                                    sandbox="allow-scripts allow-same-origin allow-forms allow-popups allow-popups-to-escape-sandbox"
+                                    onLoad={() => setLoadedPdfUrl(currentPdfUrl)}
                                 />
                             </div>
                         )}
@@ -500,16 +408,6 @@ export const ResourceViewerModal: React.FC<ResourceViewerModalProps> = ({
                                 <span className="font-black text-xs sm:text-sm truncate">{title}</span>
                             </div>
                             <div className="flex items-center gap-2 pointer-events-auto">
-                                <a
-                                    href={resource.url}
-                                    target="_blank"
-                                    rel="noopener noreferrer"
-                                    className="p-2.5 bg-slate-900/90 hover:bg-slate-800 text-white rounded-full backdrop-blur-md border border-white/20 shadow-2xl transition-all active:scale-95 flex items-center gap-1.5 text-xs font-black"
-                                    title="فتح الرابط في نافذة جديدة"
-                                >
-                                    <ExternalLink className="w-4 h-4 text-sky-400" />
-                                    <span className="hidden sm:inline">فتح الرابط</span>
-                                </a>
                                 <button
                                     onClick={handleInitiateDownload}
                                     disabled={isDownloading}
@@ -538,6 +436,7 @@ export const ResourceViewerModal: React.FC<ResourceViewerModalProps> = ({
                                 title={title}
                                 allow="autoplay"
                                 loading="eager"
+                                sandbox="allow-scripts allow-same-origin allow-forms allow-popups allow-popups-to-escape-sandbox"
                             />
                         </div>
                     </div>
@@ -602,67 +501,17 @@ export const ResourceViewerModal: React.FC<ResourceViewerModalProps> = ({
                     </div>
                 )}
 
-                {/* Edit Filename Modal before download */}
-                {isEditFileNameOpen && (
-                    <div className="fixed inset-0 z-[300] flex items-center justify-center p-4 bg-slate-950/75 backdrop-blur-sm animate-fast-fade" dir="rtl">
-                        <motion.div
-                            initial={{ opacity: 0, scale: 0.9, y: 10 }}
-                            animate={{ opacity: 1, scale: 1, y: 0 }}
-                            exit={{ opacity: 0, scale: 0.9, y: 10 }}
-                            className="bg-white w-full max-w-md rounded-2xl shadow-2xl overflow-hidden border border-slate-200 p-5 flex flex-col gap-4 text-right"
-                        >
-                            <div className="flex items-center justify-between border-b border-slate-100 pb-3">
-                                <div className="flex items-center gap-2.5">
-                                    <div className="w-10 h-10 rounded-xl bg-emerald-100 text-emerald-700 flex items-center justify-center shrink-0 font-bold shadow-sm">
-                                        <Pencil className="w-5 h-5" />
-                                    </div>
-                                    <div>
-                                        <h4 className="font-black text-slate-900 text-base">تعديل اسم الملف قبل التحميل</h4>
-                                        <p className="text-xs text-slate-500 font-medium">يمكنك تغيير الاسم أو حفظه بالاسم الافتراضي</p>
-                                    </div>
-                                </div>
-                                <button
-                                    onClick={() => setIsEditFileNameOpen(false)}
-                                    className="p-1.5 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-lg transition-colors"
-                                >
-                                    <X className="w-5 h-5" />
-                                </button>
-                            </div>
-
-                            <div className="flex flex-col gap-1.5">
-                                <label className="text-xs font-bold text-slate-700">اسم الملف عند الحفظ:</label>
-                                <input
-                                    type="text"
-                                    value={editableFileName}
-                                    onChange={(e) => setEditableFileName(e.target.value)}
-                                    onKeyDown={(e) => {
-                                        if (e.key === 'Enter') {
-                                            handleConfirmDownload();
-                                        }
-                                    }}
-                                    autoFocus
-                                    className="w-full px-3.5 py-2.5 bg-slate-50 border-2 border-slate-300 focus:border-emerald-600 focus:bg-white rounded-xl font-bold text-slate-900 text-sm outline-none transition-all shadow-inner"
-                                    placeholder="أدخل اسم الملف..."
-                                />
-                            </div>
-
-                            <div className="flex items-center justify-end gap-2 pt-2 border-t border-slate-100">
-                                <button
-                                    onClick={() => setIsEditFileNameOpen(false)}
-                                    className="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl font-bold text-xs transition-colors"
-                                >
-                                    إلغاء
-                                </button>
-                                <button
-                                    onClick={handleConfirmDownload}
-                                    className="px-5 py-2 bg-emerald-600 hover:bg-emerald-500 active:scale-95 text-white rounded-xl font-black text-xs transition-all shadow-md flex items-center gap-1.5"
-                                >
-                                    <Download className="w-4 h-4" />
-                                    تأكيد التحميل
-                                </button>
-                            </div>
-                        </motion.div>
-                    </div>
+                {/* Edit Filename & High-Speed Download Modal */}
+                {resource && (
+                    <DownloadConfirmModal
+                        isOpen={isEditFileNameOpen}
+                        onClose={() => setIsEditFileNameOpen(false)}
+                        initialFileName={editableFileName || downloadFileName || ''}
+                        fileUrl={resource.url}
+                        fileType={resource.type}
+                        itemTitle={cleanTitleText(resource.resourceTitle || title || '')}
+                        subjectName={lessonTitle || title}
+                    />
                 )}
             </div>
         </AnimatePresence>

@@ -41,6 +41,7 @@ import { MathRenderer } from './textRenderer';
 import { TrigGraph } from './TrigGraph';
 import { isMathSubject, checkIsChoiceCorrect } from './shareUtils';
 import { fetchExamQuestions } from './data/jsonParser';
+import { ChallengeMiniLeaderboard } from './ChallengeMiniLeaderboard';
 
 interface FriendChallengePageProps {
     onBack: () => void;
@@ -574,7 +575,7 @@ export const FriendChallengePage: React.FC<FriendChallengePageProps> = ({
                                         id="start-challenge-button"
                                         type="button"
                                         onClick={handleStartChallengeQuiz}
-                                        className="px-5 py-2.5 bg-slate-950 hover:bg-slate-900 active:bg-slate-800 active:scale-95 text-amber-300 rounded-xl font-black text-xs sm:text-sm border border-slate-800 shadow-sm flex items-center gap-2 shrink-0 cursor-pointer transition-all duration-75 touch-manipulation select-none"
+                                        className="soft-pulse px-5 py-2.5 bg-slate-950 hover:bg-slate-900 active:bg-slate-800 active:scale-95 text-amber-300 rounded-xl font-black text-xs sm:text-sm border border-slate-800 shadow-sm flex items-center gap-2 shrink-0 cursor-pointer transition-all duration-75 touch-manipulation select-none"
                                     >
                                         <Play className="w-4 h-4 fill-amber-300" />
                                         <span>بدء الاختبار</span>
@@ -617,6 +618,22 @@ export const FriendChallengePage: React.FC<FriendChallengePageProps> = ({
                                     </div>
                                 </div>
                             )}
+
+                            {/* Mini Leaderboard Podium */}
+                            <ChallengeMiniLeaderboard
+                                participants={participants}
+                                totalQuestions={currentChallenge.totalQuestions}
+                                currentUserId={defaultUserId}
+                                currentUserName={defaultName}
+                                onSelectParticipant={(participantId) => {
+                                    if (hasCompleted) {
+                                        setSelectedParticipantId(participantId);
+                                        setShowQuestionsReview(true);
+                                    }
+                                }}
+                                hasCompleted={hasCompleted}
+                                onStartChallenge={handleStartChallengeQuiz}
+                            />
 
                             {/* LIVE RESULTS & COMPARISON LEADERBOARD */}
                             <div className="bg-white rounded-2xl p-4 sm:p-5 border-2 border-slate-900 shadow-md">
@@ -757,7 +774,7 @@ export const FriendChallengePage: React.FC<FriendChallengePageProps> = ({
                                     <button
                                         type="button"
                                         onClick={handleStartChallengeQuiz}
-                                        className="px-6 py-3 bg-slate-950 hover:bg-slate-900 active:scale-95 text-amber-300 rounded-xl font-black text-xs sm:text-sm border border-slate-800 shadow-md inline-flex items-center gap-2 cursor-pointer transition-transform touch-manipulation"
+                                        className="soft-pulse px-6 py-3 bg-slate-950 hover:bg-slate-900 active:scale-95 text-amber-300 rounded-xl font-black text-xs sm:text-sm border border-slate-800 shadow-md inline-flex items-center gap-2 cursor-pointer transition-transform touch-manipulation"
                                     >
                                         <Play className="w-4 h-4 fill-amber-300" />
                                         <span>ابدأ امتحان التحدي الآن</span>

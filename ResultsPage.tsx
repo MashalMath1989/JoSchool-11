@@ -1,13 +1,16 @@
-import React, { useEffect, useRef, useState } from 'react';
-import { motion } from 'framer-motion';
+import React, { useEffect, useRef, useState, useMemo } from 'react';
+import { motion, AnimatePresence } from 'framer-motion';
 import html2pdf from 'html2pdf.js';
 import { auth } from './firebase';
 import { StarIcon, XIcon, CheckIcon, BookmarkIcon, BookmarkOutlineIcon, ShareIcon, FlagIcon, DownloadIcon, ChevronLeftIcon, ChevronRightIcon, ChevronDownIcon, BookOpenIcon } from './data/Icons';
-import { Question, Subject, SubjectName, UserProgress, QuizResult, FriendChallenge } from './types';
+import { Target, Lightbulb, AlertTriangle, ArrowDown, ExternalLink, Sparkles, GraduationCap, CheckCircle2, ChevronUp, ChevronDown } from 'lucide-react';
+import { Question, Subject, SubjectName, UserProgress, QuizResult, FriendChallenge, Unit, Semester } from './types';
+import { subjectIndexData } from './data';
 import { MathRenderer, renderTextWithUnderline } from './textRenderer';
 import { shareQuestionDirectly, isMathSubject, checkIsChoiceCorrect } from './shareUtils';
 import TrigGraph from './TrigGraph';
 import { KATEX_CSS } from './katexCss';
+import { ReportQuestionModal } from './ReportQuestionModal';
 
 interface ResultsPageProps {
     userAnswers: (string | undefined)[];
@@ -102,6 +105,7 @@ const ResultsPage: React.FC<ResultsPageProps> = ({
     const [showExportDialog, setShowExportDialog] = useState(false);
     const [expandedExplanations, setExpandedExplanations] = useState<Record<number, boolean>>({});
     const [reviewMode, setReviewMode] = useState<'all' | 'correct' | 'incorrect'>('all');
+    const [reportedQuestionData, setReportedQuestionData] = useState<{ question: Question; number: number } | null>(null);
 
     const toggleExplanation = (idx: number) => {
         setExpandedExplanations(prev => ({
@@ -109,6 +113,257 @@ const ResultsPage: React.FC<ResultsPageProps> = ({
             [idx]: !prev[idx]
         }));
     };
+
+    const [expandedWeaknessId, setExpandedWeaknessId] = useState<string | null>(null);
+    const [isWeaknessSectionOpen, setIsWeaknessSectionOpen] = useState(false);
+
+    const toggleWeaknessExpand = (id: string) => {
+        setExpandedWeaknessId(prev => prev === id ? null : id);
+    };
+
+    const scrollToQuestion = (index: number) => {
+        setReviewMode('all');
+        setTimeout(() => {
+            const el = document.getElementById(`review-question-${index}`);
+            if (el) {
+                el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                el.classList.add('ring-4', 'ring-primary/40');
+                setTimeout(() => {
+                    el.classList.remove('ring-4', 'ring-primary/40');
+                }, 2500);
+            } else {
+                const reviewSec = document.getElementById('review-section');
+                if (reviewSec) {
+                    reviewSec.scrollIntoView({ behavior: 'smooth' });
+                }
+            }
+        }, 100);
+    };
+
+    const weaknessAnalysis = useMemo(() => {
+        if (!currentQuiz || currentQuiz.length === 0) return { items: [], totalMistakes: 0, overallMasteryRate: 100 };
+        
+        const totalQ = currentQuiz.length;
+        const totalMistakes = incorrectIndexes.length;
+        const overallMasteryRate = Math.round(((totalQ - totalMistakes) / totalQ) * 100);
+
+        if (totalMistakes === 0) {
+            return { items: [], totalMistakes: 0, overallMasteryRate: 100 };
+        }
+
+        // 1. Gather all potential units/lessons from subjectIndexData for the subject
+        const subjectId = selectedSubject?.id || (isMath ? SubjectName.Math : undefined);
+        const semester = selectedSubject?.semester;
+        
+        let subjectUnits: Unit[] = [];
+        if (subjectId) {
+            const firstSemUnits = subjectIndexData[subjectId] || [];
+            const secondSemUnits = subjectIndexData[`${subjectId}-${Semester.Second}`] || [];
+            if (semester === Semester.Second) {
+                subjectUnits = [...secondSemUnits, ...firstSemUnits];
+            } else {
+                subjectUnits = [...firstSemUnits, ...secondSemUnits];
+            }
+        }
+
+        // 2. Helper to resolve a question to a lesson and unit
+        const resolveQuestionToLesson = (q: Question) => {
+            // A. Try matching by page number in subjectUnits
+            const pageText = `${q.page || ''} ${q.source_text || ''}`;
+            const pageMatch = pageText.match(/(?:صفحة|ص|page)?\s*[:.]?\s*(\d+)/i);
+            const pageNum = pageMatch ? parseInt(pageMatch[1], 10) : null;
+
+            if (pageNum !== null && subjectUnits.length > 0) {
+                const flatLessons: { unitTitle: string; lessonTitle: string; page: number }[] = [];
+                subjectUnits.forEach(u => {
+                    u.lessons.forEach(l => {
+                        flatLessons.push({ unitTitle: u.title, lessonTitle: l.title, page: l.page });
+                    });
+                });
+                flatLessons.sort((a, b) => a.page - b.page);
+                let candidate: { unitTitle: string; lessonTitle: string; page: number } | null = null;
+                for (let i = 0; i < flatLessons.length; i++) {
+                    if (flatLessons[i].page <= pageNum) {
+                        candidate = flatLessons[i];
+                    } else {
+                        break;
+                    }
+                }
+                if (candidate) {
+                    return {
+                        lessonTitle: candidate.lessonTitle,
+                        unitTitle: candidate.unitTitle,
+                        page: pageNum
+                    };
+                }
+            }
+
+            // B. Check if question has explicit topic
+            if (q.topic && q.topic.trim()) {
+                return {
+                    lessonTitle: q.topic.trim(),
+                    unitTitle: currentUnitTitle || undefined,
+                    page: pageNum || undefined
+                };
+            }
+
+            // C. If currentLessonTitle is a specific lesson
+            const isExamTitleGeneral = isSessionExam || 
+                currentLessonTitle.includes('امتحان شامل') || 
+                currentLessonTitle.includes('امتحان تجريبي') ||
+                currentLessonTitle.includes('شامل');
+
+            if (!isExamTitleGeneral && currentLessonTitle) {
+                return {
+                    lessonTitle: currentLessonTitle,
+                    unitTitle: currentUnitTitle || undefined,
+                    page: pageNum || undefined
+                };
+            }
+
+            // D. Try keyword matching against subject lessons
+            if (subjectUnits.length > 0) {
+                const qContent = `${q.question} ${q.source_text || ''} ${q.explanation || ''}`;
+                for (const u of subjectUnits) {
+                    for (const l of u.lessons) {
+                        const cleanTitle = l.title.replace(/الدرس\s+\S+:|الوحدة\s+\S+:|–\s*صفحة\s*\d+|—\s*صفحة\s*\d+/g, '').trim();
+                        const words = cleanTitle.split(/\s+/).filter(w => w.length > 3);
+                        const matchCount = words.filter(w => qContent.includes(w)).length;
+                        if (matchCount >= 2 || (words.length === 1 && matchCount === 1)) {
+                            return {
+                                lessonTitle: l.title,
+                                unitTitle: u.title,
+                                page: l.page
+                            };
+                        }
+                    }
+                }
+            }
+
+            // E. Fallback
+            return {
+                lessonTitle: currentLessonTitle || selectedSubject?.id || 'المفاهيم الأساسية للاختبار',
+                unitTitle: currentUnitTitle || undefined,
+                page: pageNum || undefined
+            };
+        };
+
+        // 3. Map all questions to their topics/lessons to know total counts per topic
+        const topicTotals: Record<string, number> = {};
+        currentQuiz.forEach(q => {
+            const resolved = resolveQuestionToLesson(q);
+            const key = resolved.lessonTitle;
+            topicTotals[key] = (topicTotals[key] || 0) + 1;
+        });
+
+        // 4. Group incorrect questions
+        const groups: Record<string, {
+            lessonTitle: string;
+            unitTitle?: string;
+            pages: Set<number>;
+            questionIndices: number[];
+            questionNumbers: number[];
+            topics: Set<string>;
+        }> = {};
+
+        incorrectIndexes.forEach(idx => {
+            const q = currentQuiz[idx];
+            const resolved = resolveQuestionToLesson(q);
+            const key = resolved.lessonTitle;
+
+            if (!groups[key]) {
+                groups[key] = {
+                    lessonTitle: resolved.lessonTitle,
+                    unitTitle: resolved.unitTitle,
+                    pages: new Set<number>(),
+                    questionIndices: [],
+                    questionNumbers: [],
+                    topics: new Set<string>()
+                };
+            }
+
+            groups[key].questionIndices.push(idx);
+            groups[key].questionNumbers.push(idx + 1);
+            if (resolved.page) {
+                groups[key].pages.add(resolved.page);
+            }
+            if (q.topic) {
+                groups[key].topics.add(q.topic);
+            }
+        });
+
+        // 5. Build weakness items with tailored recommendations
+        const items = Object.values(groups).map((group, gIdx) => {
+            const errorCount = group.questionIndices.length;
+            const totalInTopic = topicTotals[group.lessonTitle] || errorCount;
+            const errorRate = Math.round((errorCount / totalInTopic) * 100);
+            const severity: 'high' | 'medium' = (errorCount >= 2 || errorRate >= 50) ? 'high' : 'medium';
+
+            const sortedPages = Array.from(group.pages).sort((a, b) => a - b);
+            let pageRange = '';
+            if (sortedPages.length === 1) {
+                pageRange = `صفحة ${sortedPages[0]}`;
+            } else if (sortedPages.length > 1) {
+                pageRange = `الصفحات (${sortedPages.join('، ')})`;
+            }
+
+            const recommendations: string[] = [];
+            const isSubjectMath = selectedSubject?.id === SubjectName.Math || isMath;
+            const isSubjectIslamic = selectedSubject?.id === SubjectName.IslamicEducation;
+            const isSubjectHistory = selectedSubject?.id === SubjectName.JordanHistory;
+            const isSubjectArabic = selectedSubject?.id === SubjectName.Arabic;
+
+            if (isSubjectMath) {
+                if (severity === 'high') {
+                    recommendations.push('إعادة قراءة أمثلة الكتاب المحلولة لهذا الدرس وتدوين القوانين والمتطابقات المستخدمة.');
+                    recommendations.push('إعادة حل المسائل الخاطئة خطوة بخطوة بالورقة والقلم والتأكد من صحة العمليات الحسابية والإشارات.');
+                } else {
+                    recommendations.push('حل تمارين وتدريبات إضافية لتثبيت خطوات الحل والتعود على أنماط أسئلة الوزارة.');
+                }
+            } else if (isSubjectIslamic) {
+                recommendations.push('مراجعة نصوص الآيات الكريمة والأحاديث النبوية ودلالات الأحكام الشرعية المذكورة في هذا الدرس.');
+                if (severity === 'high') {
+                    recommendations.push('التركيز على المفاهيم والمصطلحات والضوابط الشرعية والشروط الواردة في صفحات الدرس.');
+                }
+            } else if (isSubjectHistory) {
+                recommendations.push('مراجعة التسلسل الزمني للأحداث والمحطات التاريخية والقرارات والبنود في صفحات الكتاب المحددة.');
+                recommendations.push('تلخيص النقاط الرئيسية في مخطط سهمي لربط أسباب الأحداث التاريخية بنتائجها بدقة.');
+            } else if (isSubjectArabic) {
+                recommendations.push('مراجعة القواعد النحوية والصرفية وضبط أواخر الكلمات وحالات الإعراب في نصوص الوحدة.');
+                recommendations.push('الانتباه لمعاني المفردات السياقية والصور الفنية والأساليب البلاغية الواردة بالدرس.');
+            } else {
+                recommendations.push('مراجعة محتوى الدرس في الكتاب المدرسي وقراءة الشروحات التفصيلية للأسئلة الخاطئة.');
+                recommendations.push('إعادة المحاولة في الاختبار بعد مراجعة الدرس لقياس مدى التحسن وتثبيت المعلومة.');
+            }
+
+            return {
+                id: `weakness-${gIdx}`,
+                lessonTitle: group.lessonTitle,
+                unitTitle: group.unitTitle,
+                suggestedPageRange: pageRange,
+                errorCount,
+                totalQuestionsInTopic: totalInTopic,
+                errorPercentage: errorRate,
+                questionIndices: group.questionIndices,
+                questionNumbers: group.questionNumbers,
+                severity,
+                recommendations,
+                sampleTopics: Array.from(group.topics)
+            };
+        });
+
+        items.sort((a, b) => {
+            if (a.severity === 'high' && b.severity !== 'high') return -1;
+            if (b.severity === 'high' && a.severity !== 'high') return 1;
+            return b.errorCount - a.errorCount;
+        });
+
+        return {
+            items,
+            totalMistakes,
+            overallMasteryRate
+        };
+    }, [currentQuiz, incorrectIndexes, selectedSubject, isMath, currentLessonTitle, currentUnitTitle, isSessionExam]);
 
     const exportToPDF = (mode: 'mobile' | 'print') => {
         const element = mode === 'mobile' ? pdfRef.current : printPdfRef.current;
@@ -372,6 +627,361 @@ const ResultsPage: React.FC<ResultsPageProps> = ({
                 </div>
             </div>
 
+            {/* قسم تحليل نقاط الضعف واقتراح مراجعة الدروس المتعلقة */}
+            <div id="weakness-analysis-section" className="bg-white rounded-2xl shadow-xl border-2 border-slate-900 mb-10 text-right overflow-hidden transition-all" dir="rtl">
+                {/* رأس القسم القابل للنقر للطي والفتح */}
+                <div 
+                    role="button"
+                    tabIndex={0}
+                    onClick={() => setIsWeaknessSectionOpen(prev => !prev)}
+                    onKeyDown={(e) => {
+                        if (e.key === 'Enter' || e.key === ' ') {
+                            e.preventDefault();
+                            setIsWeaknessSectionOpen(prev => !prev);
+                        }
+                    }}
+                    className={`p-5 sm:p-6 flex flex-col sm:flex-row sm:items-center justify-between gap-4 cursor-pointer select-none transition-colors hover:bg-slate-50/80 active:bg-slate-100/70 ${isWeaknessSectionOpen ? 'border-b border-slate-200 bg-slate-50/40' : ''}`}
+                    aria-expanded={isWeaknessSectionOpen}
+                >
+                    <div className="flex items-center gap-3 sm:gap-4 flex-1 min-w-0">
+                        <div className="w-12 h-12 rounded-xl bg-amber-500/10 text-amber-600 border border-amber-500/20 flex items-center justify-center shrink-0 shadow-xs">
+                            <Target className="w-6 h-6 stroke-[2.5]" />
+                        </div>
+                        <div className="flex-1 min-w-0">
+                            <div className="flex flex-wrap items-center gap-2 mb-1">
+                                <h3 className="text-base sm:text-lg font-black text-slate-900">تشخيص الأداء وتحليل نقاط الضعف</h3>
+                                <span className="px-2.5 py-0.5 rounded-full text-[10px] font-black bg-primary/10 text-primary border border-primary/20">
+                                    توجيه مخصص
+                                </span>
+                                {weaknessAnalysis.totalMistakes > 0 ? (
+                                    <span className="px-2.5 py-0.5 rounded-full text-[10px] font-black bg-red-50 text-red-700 border border-red-200">
+                                        {weaknessAnalysis.totalMistakes} {weaknessAnalysis.totalMistakes === 1 ? 'خطأ بحاجة لمراجعة' : 'أخطاء بحاجة لمراجعة'}
+                                    </span>
+                                ) : (
+                                    <span className="px-2.5 py-0.5 rounded-full text-[10px] font-black bg-emerald-50 text-emerald-700 border border-emerald-200">
+                                        إتقان تام 100%
+                                    </span>
+                                )}
+                            </div>
+                            <p className="text-xs text-slate-500 font-bold leading-relaxed">
+                                تحليل دقيق للأخطاء المرتكبة وربطها بالدروس والصفحات الموصى بمراجعتها في الكتاب المدرسي
+                            </p>
+                        </div>
+                    </div>
+
+                    <div className="flex items-center gap-2 shrink-0 self-end sm:self-auto">
+                        <div className="px-3.5 py-2 bg-slate-100 hover:bg-slate-200 text-slate-800 rounded-xl text-xs font-black border border-slate-900 flex items-center gap-2 transition-all shadow-xs">
+                            <span>{isWeaknessSectionOpen ? 'إخفاء التفاصيل' : 'فتح التفاصيل والتشخيص'}</span>
+                            <ChevronDown className={`w-4 h-4 transition-transform duration-300 text-slate-700 ${isWeaknessSectionOpen ? 'rotate-180 text-primary' : ''}`} />
+                        </div>
+                    </div>
+                </div>
+
+                {/* تفاصيل تشخيص الأداء المنسدلة */}
+                <AnimatePresence initial={false}>
+                    {isWeaknessSectionOpen && (
+                        <motion.div
+                            key="weakness-details-content"
+                            initial={{ height: 0, opacity: 0 }}
+                            animate={{ height: 'auto', opacity: 1 }}
+                            exit={{ height: 0, opacity: 0 }}
+                            transition={{ duration: 0.28, ease: 'easeInOut' }}
+                            className="overflow-hidden"
+                        >
+                            <div className="p-6 sm:p-8">
+                                {weaknessAnalysis.totalMistakes > 0 && (
+                                    <div className="flex flex-wrap items-center justify-between gap-3 mb-6 p-3 bg-red-50/80 rounded-xl border border-red-200">
+                                        <div className="text-xs font-bold text-red-900">
+                                            يرجى مراجعة النقاط والدروس أدناه لتفادي تكرار الأخطاء في الاختبارات القادمة.
+                                        </div>
+                                        <button
+                                            type="button"
+                                            onClick={(e) => {
+                                                e.stopPropagation();
+                                                setReviewMode('incorrect');
+                                                const reviewSec = document.getElementById('review-section');
+                                                if (reviewSec) reviewSec.scrollIntoView({ behavior: 'smooth' });
+                                            }}
+                                            className="px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-lg text-xs font-black transition-colors flex items-center gap-1.5 active:scale-95 cursor-pointer shadow-xs"
+                                        >
+                                            <ArrowDown className="w-3.5 h-3.5" />
+                                            <span>مراجعة الأسئلة الخاطئة ({weaknessAnalysis.totalMistakes})</span>
+                                        </button>
+                                    </div>
+                                )}
+
+                                {/* المحتوى */}
+                                {weaknessAnalysis.totalMistakes === 0 ? (
+                                    <div className="py-8 px-4 text-center">
+                                        <div className="w-16 h-16 rounded-2xl bg-emerald-100 border border-emerald-300 text-emerald-700 flex items-center justify-center mx-auto mb-4 text-3xl shadow-sm">
+                                            <Sparkles className="w-8 h-8 text-emerald-600" />
+                                        </div>
+                                        <h4 className="text-base sm:text-lg font-black text-emerald-700 mb-2">إتقان تام وممتاز! لا توجد أي نقاط ضعف</h4>
+                                        <p className="text-xs text-slate-600 font-bold max-w-md mx-auto mb-6 leading-relaxed">
+                                            أحسنت صنعاً! لقد أجبت على جميع الأسئلة ({totalQuestions} من {totalQuestions}) بشكل صحيح دون ارتكاب أي أخطاء مفاهيمية. مستواك متقدم جداً وجاهز للاختبارات القادمة.
+                                        </p>
+                                        <div className="flex flex-wrap items-center justify-center gap-3">
+                                            <button
+                                                onClick={onBackToIndex}
+                                                className="px-5 py-2.5 bg-primary text-white rounded-lg text-xs font-black hover:brightness-110 active:scale-95 transition-all shadow-md flex items-center gap-2 cursor-pointer"
+                                            >
+                                                <GraduationCap className="w-4 h-4" />
+                                                <span>الانتقال للدرس التالي في الفهرس</span>
+                                            </button>
+                                            {onChallengeFriends && (
+                                                <button
+                                                    onClick={onChallengeFriends}
+                                                    className="px-5 py-2.5 bg-amber-400 text-slate-950 rounded-lg text-xs font-black hover:bg-amber-300 active:scale-95 transition-all shadow-md flex items-center gap-1.5 cursor-pointer"
+                                                >
+                                                    <span>⚔️ تحدَّ أصدقاءك في هذا الاختبار</span>
+                                                </button>
+                                            )}
+                                        </div>
+                                    </div>
+                                ) : (
+                                    <div>
+                                        {/* بطاقات الإحصاءات السريعة */}
+                                        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-6">
+                                            <div className="bg-slate-50 border border-slate-900 rounded-xl p-3.5 text-center">
+                                                <span className="text-[10px] font-bold text-slate-500 block mb-1">معدل الإتقان العام</span>
+                                                <div className="text-xl font-black text-slate-900 flex items-center justify-center gap-1">
+                                                    <span>{weaknessAnalysis.overallMasteryRate}%</span>
+                                                </div>
+                                                <div className="w-full bg-slate-200 h-1.5 rounded-full mt-2 overflow-hidden">
+                                                    <div 
+                                                        className={`h-full rounded-full ${weaknessAnalysis.overallMasteryRate >= 75 ? 'bg-emerald-500' : weaknessAnalysis.overallMasteryRate >= 50 ? 'bg-amber-500' : 'bg-red-500'}`}
+                                                        style={{ width: `${weaknessAnalysis.overallMasteryRate}%` }}
+                                                    />
+                                                </div>
+                                            </div>
+
+                                            <div className="bg-slate-50 border border-slate-900 rounded-xl p-3.5 text-center">
+                                                <span className="text-[10px] font-bold text-slate-500 block mb-1">الأسئلة الخاطئة</span>
+                                                <div className="text-xl font-black text-red-600">
+                                                    {weaknessAnalysis.totalMistakes} <span className="text-xs font-bold text-slate-400">/ {totalQuestions}</span>
+                                                </div>
+                                                <span className="text-[10px] font-bold text-slate-500 mt-1 block">
+                                                    {Math.round((weaknessAnalysis.totalMistakes / totalQuestions) * 100)}% من الاختبار
+                                                </span>
+                                            </div>
+
+                                            <div className="bg-slate-50 border border-slate-900 rounded-xl p-3.5 text-center">
+                                                <span className="text-[10px] font-bold text-slate-500 block mb-1">الدروس المستهدفة</span>
+                                                <div className="text-xl font-black text-primary">
+                                                    {weaknessAnalysis.items.length}
+                                                </div>
+                                                <span className="text-[10px] font-bold text-slate-500 mt-1 block">
+                                                    محاور بحاجة لمراجعة
+                                                </span>
+                                            </div>
+
+                                            <div className="bg-slate-50 border border-slate-900 rounded-xl p-3.5 text-center">
+                                                <span className="text-[10px] font-bold text-slate-500 block mb-1">أولوية عاجلة</span>
+                                                <div className="text-xl font-black text-amber-600">
+                                                    {weaknessAnalysis.items.filter(i => i.severity === 'high').length}
+                                                </div>
+                                                <span className="text-[10px] font-bold text-slate-500 mt-1 block">
+                                                    دروس ذات تكرار خطأ
+                                                </span>
+                                            </div>
+                                        </div>
+
+                                        {/* تنبيه خطة المراجعة */}
+                                        <div className="mb-6 p-4 rounded-xl bg-amber-50 border border-amber-300 text-amber-950 flex items-start gap-3">
+                                            <Lightbulb className="w-5 h-5 text-amber-600 shrink-0 mt-0.5" />
+                                            <div className="text-xs leading-relaxed font-bold">
+                                                <span className="font-black text-amber-900">خطة المراجعة الذكية: </span>
+                                                قمنا بتصنيف نقاط الضعف حسب الأولوية بناءً على نسبة الأخطاء المرتكبة. يُنصح بمراجعة الدروس ذات الأولوية العاجلة أولاً من صفحات الكتاب المدرسي المحددة، ثم إعادة اختبار نفسك لتثبيت الفهم.
+                                            </div>
+                                        </div>
+
+                                        {/* قائمة بطاقات نقاط الضعف والدروس المقترحة */}
+                                        <div className="space-y-4">
+                                            {weaknessAnalysis.items.map((item) => {
+                                                const isExpanded = expandedWeaknessId === item.id;
+                                                const isHighSeverity = item.severity === 'high';
+
+                                                return (
+                                                    <div
+                                                        key={item.id}
+                                                        className={`rounded-xl border-2 transition-all overflow-hidden ${isHighSeverity ? 'border-slate-900 bg-red-50/20' : 'border-slate-900 bg-white'}`}
+                                                    >
+                                                        <div className="p-4 sm:p-5">
+                                                            {/* السطر العلوي: علامات الأولوية والتصنيف */}
+                                                            <div className="flex flex-wrap items-center justify-between gap-2 mb-3">
+                                                                <div className="flex items-center gap-2">
+                                                                    <span className={`px-2.5 py-1 rounded-md text-[11px] font-black border flex items-center gap-1 ${isHighSeverity ? 'bg-red-500 text-white border-red-600' : 'bg-amber-100 text-amber-900 border-amber-300'}`}>
+                                                                        {isHighSeverity ? <AlertTriangle className="w-3.5 h-3.5" /> : <BookOpenIcon className="w-3.5 h-3.5" />}
+                                                                        <span>{isHighSeverity ? 'أولوية مراجعة عاجلة' : 'بحاجة لتعزيز وحل تمارين'}</span>
+                                                                    </span>
+
+                                                                    {item.unitTitle && (
+                                                                        <span className="text-[10px] font-bold text-slate-500 bg-slate-100 px-2 py-0.5 rounded border border-slate-200">
+                                                                            {item.unitTitle}
+                                                                        </span>
+                                                                    )}
+                                                                </div>
+
+                                                                <span className="text-xs font-black text-slate-700 bg-slate-100 px-2.5 py-1 rounded-md border border-slate-200">
+                                                                    أخطأت في {item.errorCount} من أصل {item.totalQuestionsInTopic} أسئلة ({item.errorPercentage}%)
+                                                                </span>
+                                                            </div>
+
+                                                            {/* عنوان الدرس أو المحور */}
+                                                            <h4 className="text-sm sm:text-base font-black text-slate-900 mb-2 leading-snug">
+                                                                📖 {item.lessonTitle}
+                                                            </h4>
+
+                                                            {/* تفاصيل المرجع المدرسي وأرقام الأسئلة */}
+                                                            <div className="flex flex-wrap items-center gap-y-2 gap-x-4 text-xs text-slate-600 mb-3 bg-white p-2.5 rounded-lg border border-slate-200">
+                                                                {item.suggestedPageRange && (
+                                                                    <div className="flex items-center gap-1.5 font-bold text-primary">
+                                                                        <BookOpenIcon className="w-4 h-4" />
+                                                                        <span>الكتاب المدرسي: <strong className="font-black text-slate-900">{item.suggestedPageRange}</strong></span>
+                                                                    </div>
+                                                                )}
+
+                                                                <div className="flex items-center gap-1.5 font-bold">
+                                                                    <span>الأسئلة المعنية:</span>
+                                                                    <div className="flex flex-wrap gap-1">
+                                                                        {item.questionNumbers.map((qNum, i) => (
+                                                                            <button
+                                                                                key={qNum}
+                                                                                onClick={() => scrollToQuestion(item.questionIndices[i])}
+                                                                                className="px-2 py-0.5 bg-red-100 text-red-700 hover:bg-red-200 rounded text-[11px] font-black border border-red-200 transition-colors cursor-pointer"
+                                                                                title={`انتقال للسؤال ${qNum} في المراجعة`}
+                                                                            >
+                                                                                سؤال {qNum}
+                                                                            </button>
+                                                                        ))}
+                                                                    </div>
+                                                                </div>
+                                                            </div>
+
+                                                            {/* نصائح وإرشادات المراجعة الموجهة */}
+                                                            <div className="bg-amber-50/60 border border-amber-200 rounded-lg p-3 mb-4">
+                                                                <div className="flex items-center gap-1.5 text-xs font-black text-amber-900 mb-1.5">
+                                                                    <Lightbulb className="w-4 h-4 text-amber-600" />
+                                                                    <span>نصائح وملاحظات علاجية مقترحة:</span>
+                                                                </div>
+                                                                <ul className="space-y-1 text-xs text-amber-950 font-bold pr-5 list-disc">
+                                                                    {item.recommendations.map((rec, rIdx) => (
+                                                                        <li key={rIdx} className="leading-relaxed">{rec}</li>
+                                                                    ))}
+                                                                </ul>
+                                                            </div>
+
+                                                            {/* أزرار الإجراءات */}
+                                                            <div className="flex flex-wrap items-center justify-between gap-2 pt-2 border-t border-slate-200">
+                                                                <div className="flex flex-wrap gap-2">
+                                                                    <button
+                                                                        onClick={() => toggleWeaknessExpand(item.id)}
+                                                                        className="px-3.5 py-2 bg-slate-100 hover:bg-slate-200 text-slate-800 rounded-lg text-xs font-black border border-slate-900 transition-all flex items-center gap-1.5 cursor-pointer active:scale-95"
+                                                                    >
+                                                                        {isExpanded ? <ChevronUp className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5" />}
+                                                                        <span>{isExpanded ? 'إخفاء تفاصيل الأسئلة' : `معاينة الأسئلة والحلول (${item.errorCount})`}</span>
+                                                                    </button>
+
+                                                                    <button
+                                                                        onClick={() => {
+                                                                            setReviewMode('incorrect');
+                                                                            scrollToQuestion(item.questionIndices[0]);
+                                                                        }}
+                                                                        className="px-3.5 py-2 bg-red-600 hover:bg-red-700 text-white rounded-lg text-xs font-black border border-slate-900 transition-all flex items-center gap-1.5 cursor-pointer active:scale-95"
+                                                                    >
+                                                                        <ArrowDown className="w-3.5 h-3.5" />
+                                                                        <span>عرض في قسم المراجعة</span>
+                                                                    </button>
+                                                                </div>
+
+                                                                <button
+                                                                    onClick={onBackToIndex}
+                                                                    className="px-3.5 py-2 bg-primary text-white hover:brightness-110 rounded-lg text-xs font-black border border-slate-900 transition-all flex items-center gap-1.5 cursor-pointer active:scale-95"
+                                                                >
+                                                                    <ExternalLink className="w-3.5 h-3.5" />
+                                                                    <span>مراجعة الدرس في الفهرس</span>
+                                                                </button>
+                                                            </div>
+                                                        </div>
+
+                                                        {/* جزء تفاصيل الأسئلة الخاطئة القابل للطي */}
+                                                        {isExpanded && (
+                                                            <div className="border-t-2 border-slate-900 bg-slate-50 p-4 sm:p-5 space-y-4">
+                                                                <div className="text-xs font-black text-slate-700 flex items-center gap-1.5 mb-2">
+                                                                    <CheckCircle2 className="w-4 h-4 text-primary" />
+                                                                    <span>معاينة الأسئلة الخاطئة مع الإجابات النموذجية والشرح:</span>
+                                                                </div>
+
+                                                                {item.questionIndices.map((qIdx) => {
+                                                                    const q = currentQuiz[qIdx];
+                                                                    const userAnswer = userAnswers[qIdx];
+                                                                    const explanationText = q.explanation || (q as any).Explanation;
+
+                                                                    return (
+                                                                        <div key={qIdx} className="bg-white rounded-xl p-4 border border-slate-300 shadow-xs">
+                                                                            <div className="flex items-start justify-between gap-3 mb-2">
+                                                                                <div className="flex items-center gap-2">
+                                                                                    <span className="w-6 h-6 rounded-full bg-red-500 text-white text-xs font-black flex items-center justify-center shrink-0">
+                                                                                        {qIdx + 1}
+                                                                                    </span>
+                                                                                    <span className="text-xs font-black text-slate-800">
+                                                                                        سؤال رقم {qIdx + 1}
+                                                                                    </span>
+                                                                                </div>
+                                                                                <button
+                                                                                    onClick={() => scrollToQuestion(qIdx)}
+                                                                                    className="text-[11px] font-black text-primary hover:underline cursor-pointer"
+                                                                                >
+                                                                                    الذهاب للسؤال ↓
+                                                                                </button>
+                                                                            </div>
+
+                                                                            <div className="text-xs font-bold text-slate-900 mb-3 leading-relaxed">
+                                                                                <MathRenderer text={q.question} />
+                                                                            </div>
+
+                                                                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs mb-3">
+                                                                                <div className="p-2.5 rounded-lg bg-red-50 border border-red-200 text-red-900">
+                                                                                    <span className="font-bold text-[10px] text-red-600 block mb-0.5">إجابتك التي اخترتها:</span>
+                                                                                    <div className="font-black">
+                                                                                        {userAnswer ? <MathRenderer text={userAnswer} /> : 'لم تتم الإجابة'}
+                                                                                    </div>
+                                                                                </div>
+
+                                                                                <div className="p-2.5 rounded-lg bg-emerald-50 border border-emerald-200 text-emerald-900">
+                                                                                    <span className="font-bold text-[10px] text-emerald-600 block mb-0.5">الإجابة الصحيحة المعتمدة:</span>
+                                                                                    <div className="font-black">
+                                                                                        <MathRenderer text={q.correct_answer} />
+                                                                                    </div>
+                                                                                </div>
+                                                                            </div>
+
+                                                                            {explanationText && (
+                                                                                <div className="p-3 rounded-lg bg-emerald-50/60 border border-emerald-200 text-emerald-950 text-xs font-medium leading-relaxed font-naskh">
+                                                                                    <div className="flex items-center gap-1.5 font-black text-emerald-900 text-[11px] mb-1">
+                                                                                        <BookOpenIcon className="w-3.5 h-3.5" />
+                                                                                        <span>الشرح والتوضيح:</span>
+                                                                                    </div>
+                                                                                    <MathRenderer text={explanationText} />
+                                                                                </div>
+                                                                            )}
+                                                                        </div>
+                                                                    );
+                                                                })}
+                                                            </div>
+                                                        )}
+                                                    </div>
+                                                );
+                                            })}
+                                        </div>
+                                    </div>
+                                )}
+                            </div>
+                        </motion.div>
+                    )}
+                </AnimatePresence>
+            </div>
+
             {/* مراجعة الأسئلة */}
             {activeChallenge ? (
                 <div className="bg-white rounded-2xl p-6 sm:p-8 border-2 border-slate-900 shadow-md text-center mb-16" dir="rtl">
@@ -461,6 +1071,7 @@ const ResultsPage: React.FC<ResultsPageProps> = ({
                         return (
                             <motion.div 
                                 key={idx}
+                                id={`review-question-${idx}`}
                                 initial={{ opacity: 0.9, y: 3 }}
                                 animate={{ opacity: 1, y: 0 }}
                                 transition={{ duration: 0.08, ease: "easeOut" }}
@@ -489,8 +1100,9 @@ const ResultsPage: React.FC<ResultsPageProps> = ({
                                         <ShareIcon className="w-4 h-4" />
                                     </button>
                                     <button 
-                                        className="p-2 rounded-lg bg-slate-100 text-slate-400 hover:bg-slate-200 transition-colors border border-slate-900"
-                                        title="تبليغ عن مشكلة"
+                                        onClick={() => setReportedQuestionData({ question: q, number: idx + 1 })}
+                                        className="p-2 rounded-lg bg-slate-100 text-slate-400 hover:bg-slate-200 transition-colors border border-slate-900 cursor-pointer"
+                                        title="الإبلاغ عن خطأ في السؤال"
                                     >
                                         <FlagIcon className="w-4 h-4" />
                                     </button>
@@ -862,6 +1474,19 @@ const ResultsPage: React.FC<ResultsPageProps> = ({
                     <div style={{ marginTop: '10px', color: '#3b82f6', fontWeight: 'bold', fontSize: '14px' }}>زوروا موقعنا: JoSchool11.netlify.app</div>
                 </div>
             </div>
+
+            {/* Question Report Modal */}
+            {reportedQuestionData && (
+                <ReportQuestionModal
+                    isOpen={!!reportedQuestionData}
+                    onClose={() => setReportedQuestionData(null)}
+                    question={reportedQuestionData.question}
+                    questionNumber={reportedQuestionData.number}
+                    subject={selectedSubject?.id || ''}
+                    unitTitle={currentUnitTitle || ''}
+                    examTitle={currentLessonTitle || (examNumber ? `اختبار ${examNumber}` : '')}
+                />
+            )}
 
             {/* Hidden Print PDF Content (Ministry Style) */}
             <div 

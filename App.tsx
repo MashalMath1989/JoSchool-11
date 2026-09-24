@@ -29,7 +29,8 @@ import WelcomePage from './WelcomePage';
 import FriendChallengePage from './FriendChallengePage';
 import { FriendChallenge } from './types';
 import { createChallenge, submitChallengeResult } from './services/challengeService';
-import { fetchRemoteResources, fetchRemoteMathBasics } from './services/resourceService';
+import { fetchRemoteResources, fetchRemoteMathBasics, fetchRemoteArabicBasics } from './services/resourceService';
+import { getGoogleViewerUrl } from './viewerUtils';
 
 // روابط امتحانات مادة تاريخ الأردن - الفصل الأول
 const HISTORY_U1_EXAMS = [
@@ -1057,7 +1058,9 @@ const App: React.FC = () => {
             fetchRemoteResources(SubjectName.Math, Semester.First).catch(() => {});
             fetchRemoteResources(SubjectName.JordanHistory, Semester.First).catch(() => {});
             fetchRemoteResources(SubjectName.Arabic, Semester.First).catch(() => {});
+            fetchRemoteResources(SubjectName.IslamicEducation, Semester.First).catch(() => {});
             fetchRemoteMathBasics().catch(() => {});
+            fetchRemoteArabicBasics().catch(() => {});
         }, 1500);
         
         return () => clearTimeout(timeout);
@@ -1405,7 +1408,8 @@ const App: React.FC = () => {
         if (selectedSubject.multiBooks) {
             setShowMultiBooksModal(true);
         } else if (selectedSubject.textbookUrl) {
-            window.open(selectedSubject.textbookUrl, '_blank');
+            const openUrl = getGoogleViewerUrl(selectedSubject.textbookUrl, false);
+            window.open(openUrl, '_blank');
         }
     };
 
@@ -2586,6 +2590,8 @@ const App: React.FC = () => {
                             onBack={goBack}
                             selectedSubject={selectedSubject}
                             currentLessonTitle={currentLessonTitle}
+                            currentUnitTitle={currentUnitTitle}
+                            examNumber={examNumber}
                             isQuestionFavorite={isQuestionFavorite}
                             toggleFavoriteQuestion={toggleFavoriteQuestion}
                             isFavoriteDisabled={!!sessionTitle || !!activeChallenge}
@@ -2760,10 +2766,10 @@ const App: React.FC = () => {
                 <button 
                     onClick={goBack}
                     className={`fixed top-4 z-[9999] p-3 bg-white border border-slate-900 rounded-full shadow-lg text-slate-600 hover:text-primary transition-all active:scale-95 
-                        ${((currentView === View.SessionSubjects || currentView === View.Favorites || currentView === View.Progress || currentView === View.PdfViewer || currentView === View.Announcements) && currentView !== View.MoEResults) ? 'left-4' : 'right-4'}`}
+                        ${(currentView === View.SessionSubjects || currentView === View.Favorites || currentView === View.Progress || currentView === View.PdfViewer || currentView === View.Announcements) ? 'left-4' : 'right-4'}`}
                     title="رجوع"
                 >
-                    {((currentView === View.SessionSubjects || currentView === View.Favorites || currentView === View.Progress || currentView === View.PdfViewer || currentView === View.Announcements) && currentView !== View.MoEResults) ? <ChevronLeftIcon className="w-6 h-6" strokeWidth={3} /> : <ChevronRightIcon className="w-6 h-6" strokeWidth={3} />}
+                    {(currentView === View.SessionSubjects || currentView === View.Favorites || currentView === View.Progress || currentView === View.PdfViewer || currentView === View.Announcements) ? <ChevronLeftIcon className="w-6 h-6" strokeWidth={3} /> : <ChevronRightIcon className="w-6 h-6" strokeWidth={3} />}
                 </button>
             )}
 
@@ -2919,7 +2925,11 @@ const App: React.FC = () => {
                             {selectedSubject?.multiBooks?.map((book, idx) => (
                                 <button 
                                     key={idx} 
-                                    onClick={() => { window.open(book.url, '_blank'); setShowMultiBooksModal(false); }} 
+                                    onClick={() => { 
+                                        const openUrl = getGoogleViewerUrl(book.url, false);
+                                        window.open(openUrl, '_blank'); 
+                                        setShowMultiBooksModal(false); 
+                                    }} 
                                     className="w-full p-4 bg-white border-r-[6px] border-sky-400 border-l border-t border-b border-sky-400 shadow-md shadow-sky-400/30 rounded-2xl flex items-center gap-3 transition-all duration-100 hover:scale-[1.01] active:scale-[0.99] hover:shadow-lg hover:shadow-sky-400/40 group whitespace-nowrap touch-manipulation"
                                 >
                                     {book.coverImage ? (

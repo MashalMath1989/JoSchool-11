@@ -2,6 +2,7 @@ import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react'
 import { View, Subject, LessonResource, Semester } from './types';
 import { ArrowRightIcon } from './data/Icons';
 import { ResourceViewerModal } from './ResourceViewerModal';
+import { DownloadConfirmModal } from './DownloadConfirmModal';
 import { 
     RefreshCw, 
     FileText, 
@@ -116,6 +117,7 @@ const LibraryPage: React.FC<LibraryPageProps> = ({
     const [libraryGroups, setLibraryGroups] = useState<RawLibraryGroup[]>(() => loadCachedLibraryData());
     const [isRefreshing, setIsRefreshing] = useState(false);
     const [syncNotification, setSyncNotification] = useState<string | null>(null);
+    const [copyToast, setCopyToast] = useState<string | null>(null);
 
     // الخطوات بالترتيب الأصلي: المادة أولاً، ثم الفصل الدراسي، ثم التصنيف
     const [selectedSubject, setSelectedSubject] = useState<string>("الرياضيات");
@@ -152,6 +154,13 @@ const LibraryPage: React.FC<LibraryPageProps> = ({
     } | null>(null);
     const isModalInHistoryRef = useRef(false);
 
+    // حالة نافذة تعديل اسم الملف قبل التحميل الفائق السرعة
+    const [downloadModalItem, setDownloadModalItem] = useState<{
+        item: ValidLibraryItem;
+        fileName: string;
+        fileType: string;
+    } | null>(null);
+
     // إجمالي عدد الملفات الصالحة المتوفرة حالياً في كامل المكتبة
     const totalAvailableInLibrary = useMemo(() => {
         return extractValidLibraryItems(libraryGroups).length;
@@ -164,14 +173,17 @@ const LibraryPage: React.FC<LibraryPageProps> = ({
             const freshData = await fetchRemoteLibraryData();
             if (freshData && ((Array.isArray(freshData) && freshData.length > 0) || (typeof freshData === 'object' && Object.keys(freshData).length > 0))) {
                 setLibraryGroups(freshData);
-                const freshCount = extractValidLibraryItems(freshData).length;
-                if (isManual) {
-                    setSyncNotification(`تم فحص وتحديث مصادر المكتبة فورياً (${freshCount} ملف متوفر)`);
-                    setTimeout(() => setSyncNotification(null), 4000);
-                }
+            }
+            if (isManual) {
+                setSyncNotification("تم فحص وتحديث مصادر المكتبة فورياً ");
+                setTimeout(() => setSyncNotification(null), 4000);
             }
         } catch (err) {
             console.warn('Could not refresh remote library resources:', err);
+            if (isManual) {
+                setSyncNotification("تم فحص وتحديث مصادر المكتبة فورياً ");
+                setTimeout(() => setSyncNotification(null), 4000);
+            }
         } finally {
             if (isManual) setIsRefreshing(false);
         }
@@ -250,6 +262,21 @@ const LibraryPage: React.FC<LibraryPageProps> = ({
         }
     };
 
+    // فتح نافذة تعديل اسم الملف والتحميل فائق السرعة
+    const handleInitiateDownload = (item: ValidLibraryItem) => {
+        if (!item.fileUrl) return;
+        const resType = inferResourceType(item.type, item.fileUrl);
+        const fileExt = resType === 'pdf' ? 'pdf' : resType === 'video' ? 'mp4' : 'png';
+        const cleanTitle = item.title.replace(/[/\\?%*:|"<>]/g, '').trim();
+        const initialFileName = `${cleanTitle}.${fileExt}`;
+
+        setDownloadModalItem({
+            item,
+            fileName: initialFileName,
+            fileType: resType
+        });
+    };
+
     // مشاركة رابط وتفاصيل الملف عبر مشاركة النظام أو النسخ
     const handleShareFile = async (item: ValidLibraryItem) => {
         if (!item.fileUrl) return;
@@ -283,11 +310,11 @@ const LibraryPage: React.FC<LibraryPageProps> = ({
                 document.execCommand('copy');
                 document.body.removeChild(textArea);
             }
-            setSyncNotification(`تم نسخ رابط "${item.title}" للمشاركة بنجاح 📋`);
-            setTimeout(() => setSyncNotification(null), 3500);
+            setCopyToast(`تم نسخ رابط "${item.title}" للمشاركة بنجاح 📋`);
+            setTimeout(() => setCopyToast(null), 3500);
         } catch {
-            setSyncNotification(`تم نسخ الرابط: ${item.fileUrl}`);
-            setTimeout(() => setSyncNotification(null), 3500);
+            setCopyToast(`تم نسخ الرابط: ${item.fileUrl}`);
+            setTimeout(() => setCopyToast(null), 3500);
         }
     };
 
@@ -389,9 +416,10 @@ const LibraryPage: React.FC<LibraryPageProps> = ({
             <div className="bg-white rounded-2xl p-4 sm:p-5 border-2 border-slate-900 shadow-[4px_4px_0px_0px_rgba(0,0,0,1)] space-y-5 mb-5">
                 {/* الخطوة ١: اختيار المادة أولاً */}
                 <div>
-                    <h4 className="text-xs sm:text-sm font-black text-slate-900 mb-2.5 flex items-center gap-1.5">
-                        <span className="w-2.5 h-2.5 rounded-full bg-yellow-400"></span>
-                        ١. اختر المادة الدراسية:
+                    <h4 className="text-xs sm:text-sm font-black text-slate-900 mb-2.5 flex items-center gap-1.5 flex-wrap">
+                        <span className="w-2.5 h-2.5 rounded-full bg-yellow-400 shrink-0"></span>
+                        <span>١. اختر المادة الدراسية:</span>
+                        <span className="text-red-600 font-black">(المواد الوزارية لجيل 2010)</span>
                     </h4>
                     <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
                         {LIBRARY_SUBJECTS.map((sub) => {
@@ -574,18 +602,18 @@ const LibraryPage: React.FC<LibraryPageProps> = ({
 
                                     {/* أزرار الإجراء: التحميل والمشاركة أسفل بعضهما */}
                                     <div className="flex flex-col items-center gap-1.5 shrink-0">
-                                        {/* زر تنزيل الملف */}
-                                        <a
-                                            href={item.fileUrl}
-                                            download={`${item.title}.pdf`}
-                                            target="_blank"
-                                            rel="noopener noreferrer"
-                                            onClick={(e) => e.stopPropagation()}
-                                            className="w-8 h-8 sm:w-9 sm:h-9 bg-slate-100 hover:bg-slate-200 text-slate-800 rounded-lg border border-slate-300 font-bold flex items-center justify-center transition-colors cursor-pointer shadow-2xs hover:border-slate-900 active:scale-95"
-                                            title="تحميل الملف"
+                                        {/* زر تنزيل الملف مع إتاحة تعديل الاسم والتسريع الفائق */}
+                                        <button
+                                            type="button"
+                                            onClick={(e) => {
+                                                e.stopPropagation();
+                                                handleInitiateDownload(item);
+                                            }}
+                                            className="w-8 h-8 sm:w-9 sm:h-9 bg-slate-100 hover:bg-emerald-50 hover:text-emerald-700 text-slate-800 rounded-lg border border-slate-300 font-bold flex items-center justify-center transition-colors cursor-pointer shadow-2xs hover:border-emerald-600 active:scale-95"
+                                            title="تحميل وتعديل اسم الملف"
                                         >
-                                            <Download className="w-4 h-4 text-slate-700" />
-                                        </a>
+                                            <Download className="w-4 h-4 text-slate-700 hover:text-emerald-700" />
+                                        </button>
 
                                         {/* زر مشاركة الملف أسفل زر التحميل */}
                                         <button
@@ -620,11 +648,11 @@ const LibraryPage: React.FC<LibraryPageProps> = ({
                 )}
             </div>
 
-            {/* إشعار عائم لتأكيد المشاركة أو التحديث */}
-            {syncNotification && (
+            {/* إشعار عائم لتأكيد نسخ الرابط فقط */}
+            {copyToast && (
                 <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 px-4 py-2.5 bg-slate-900 text-white border-2 border-yellow-400 rounded-2xl font-black text-xs sm:text-sm flex items-center gap-2 shadow-[0_8px_30px_rgb(0,0,0,0.35)] animate-fade-in pointer-events-none">
                     <CheckCircle2 className="w-4 h-4 text-yellow-400 shrink-0" />
-                    <span>{syncNotification}</span>
+                    <span>{copyToast}</span>
                 </div>
             )}
 
@@ -635,6 +663,19 @@ const LibraryPage: React.FC<LibraryPageProps> = ({
                     lessonTitle={activeResourceModal.title}
                     downloadFileName={activeResourceModal.downloadFileName}
                     onClose={closeResourceModal}
+                />
+            )}
+
+            {/* نافذة تعديل اسم الملف والتحميل فائق السرعة */}
+            {downloadModalItem && (
+                <DownloadConfirmModal
+                    isOpen={Boolean(downloadModalItem)}
+                    onClose={() => setDownloadModalItem(null)}
+                    initialFileName={downloadModalItem.fileName}
+                    fileUrl={downloadModalItem.item.fileUrl}
+                    fileType={downloadModalItem.fileType}
+                    itemTitle={downloadModalItem.item.title}
+                    subjectName={`${downloadModalItem.item.subject} • ${downloadModalItem.item.category}`}
                 />
             )}
         </div>

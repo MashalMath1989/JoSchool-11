@@ -4,7 +4,7 @@ import { PlayCircle, FileText, Image as ImageIcon, X, ExternalLink, RefreshCw, S
 import { BookOpenIcon, ChevronDownIcon, StarIcon, BookmarkIcon, RefreshIcon, ChevronLeftIcon, ChevronRightIcon, ArrowLeftIcon, ArrowRightIcon, CheckCircleIcon, Loader2 } from './data/Icons';
 import { Subject, Unit, Lesson, View, SubjectName, Semester, LessonResource } from './types';
 import { isSubjectLoaded, getLessonChunksCount, isLessonLoaded } from './services/quizService';
-import { loadCachedResources, fetchRemoteResources, fetchRemoteHistoryResources, getResourcesForLesson, getResourcesForUnit, generatePdfDownloadFileName, ResourceJsonUnit, MathBasicsItem, loadCachedMathBasics, fetchRemoteMathBasics, getYoutubeThumbnailUrl, fetchYoutubeVideoTitle, countValidResourcesInUnits } from './services/resourceService';
+import { loadCachedResources, fetchRemoteResources, fetchRemoteHistoryResources, getResourcesForLesson, getResourcesForUnit, generatePdfDownloadFileName, ResourceJsonUnit, MathBasicsItem, loadCachedMathBasics, fetchRemoteMathBasics, loadCachedArabicBasics, fetchRemoteArabicBasics, getYoutubeThumbnailUrl, fetchYoutubeVideoTitle, countValidResourcesInUnits } from './services/resourceService';
 import { ResourceViewerModal } from './ResourceViewerModal';
 
 interface SubjectIndexPageProps {
@@ -48,13 +48,21 @@ const SubjectIndexPage: React.FC<SubjectIndexPageProps> = React.memo(({
     const [activeResource, setActiveResource] = React.useState<{ resource: LessonResource; lessonTitle: string; downloadFileName?: string } | null>(null);
     const [isSyncingResource, setIsSyncingResource] = React.useState<boolean>(false);
     const [showMathBasicsView, setShowMathBasicsView] = React.useState<boolean>(false);
+    const [activeBasicsSubject, setActiveBasicsSubject] = React.useState<SubjectName | null>(null);
     const [mathBasicsItems, setMathBasicsItems] = React.useState<MathBasicsItem[]>(() => loadCachedMathBasics());
+    const [arabicBasicsItems, setArabicBasicsItems] = React.useState<MathBasicsItem[]>(() => loadCachedArabicBasics());
     const [activeLessonVideos, setActiveLessonVideos] = React.useState<{ unitTitle: string; lessonTitle: string; videos: LessonResource[] } | null>(null);
     const [ytTitles, setYtTitles] = React.useState<Record<string, string>>({});
 
     React.useEffect(() => {
-        if (showMathBasicsView && mathBasicsItems.length > 0) {
-            mathBasicsItems.forEach(item => {
+        const currentItems = activeBasicsSubject === SubjectName.Arabic 
+            ? arabicBasicsItems 
+            : (activeBasicsSubject === SubjectName.Math || showMathBasicsView) 
+                ? mathBasicsItems 
+                : [];
+
+        if (currentItems.length > 0) {
+            currentItems.forEach(item => {
                 if (item.youtubeTitle) {
                     setYtTitles(prev => ({ ...prev, [item.url]: item.youtubeTitle! }));
                 } else {
@@ -66,7 +74,7 @@ const SubjectIndexPage: React.FC<SubjectIndexPageProps> = React.memo(({
                 }
             });
         }
-    }, [showMathBasicsView, mathBasicsItems]);
+    }, [activeBasicsSubject, showMathBasicsView, mathBasicsItems, arabicBasicsItems]);
 
     React.useEffect(() => {
         if (activeLessonVideos && activeLessonVideos.videos.length > 0) {
@@ -82,23 +90,30 @@ const SubjectIndexPage: React.FC<SubjectIndexPageProps> = React.memo(({
         }
     }, [activeLessonVideos]);
 
-    const openMathBasicsView = () => {
-        setShowMathBasicsView(true);
+    const openBasicsView = (subj: SubjectName) => {
+        setActiveBasicsSubject(subj);
+        if (subj === SubjectName.Math) {
+            setShowMathBasicsView(true);
+        }
         try {
             const currentState = window.history.state || {};
-            window.history.pushState({ ...currentState, mathBasics: true }, '');
+            window.history.pushState({ ...currentState, basicsSubject: subj, mathBasics: subj === SubjectName.Math }, '');
         } catch (e) {
             console.warn("pushState error:", e);
         }
     };
 
-    const closeMathBasicsView = () => {
-        if (window.history.state?.mathBasics) {
+    const closeBasicsView = () => {
+        if (window.history.state?.basicsSubject || window.history.state?.mathBasics) {
             window.history.back();
         } else {
+            setActiveBasicsSubject(null);
             setShowMathBasicsView(false);
         }
     };
+
+    const openMathBasicsView = () => openBasicsView(SubjectName.Math);
+    const closeMathBasicsView = closeBasicsView;
 
     const openLessonVideosView = (unitTitle: string, lessonTitle: string, videos: LessonResource[]) => {
         setActiveLessonVideos({ unitTitle, lessonTitle, videos });
@@ -146,8 +161,9 @@ const SubjectIndexPage: React.FC<SubjectIndexPageProps> = React.memo(({
                 setActiveResource(null);
             }
 
-            if (!state.mathBasics) {
+            if (!state.mathBasics && !state.basicsSubject) {
                 setShowMathBasicsView(false);
+                setActiveBasicsSubject(null);
             }
 
             if (!state.lessonVideos) {
@@ -179,6 +195,11 @@ const SubjectIndexPage: React.FC<SubjectIndexPageProps> = React.memo(({
                 if (mathItems && mathItems.length > 0) {
                     setMathBasicsItems(mathItems);
                 }
+            } else if (selectedSubject.id === SubjectName.Arabic && selectedSubject.semester === Semester.First) {
+                const arabicItems = await fetchRemoteArabicBasics();
+                if (arabicItems && arabicItems.length > 0) {
+                    setArabicBasicsItems(arabicItems);
+                }
             }
         } catch (err) {
             console.warn("Silent resource sync failed:", err);
@@ -196,7 +217,11 @@ const SubjectIndexPage: React.FC<SubjectIndexPageProps> = React.memo(({
         setResourcesData(loadCachedResources(selectedSubject.id, selectedSubject.semester));
         if (selectedSubject.id === SubjectName.Math && selectedSubject.semester === Semester.First) {
             setMathBasicsItems(loadCachedMathBasics());
+        } else if (selectedSubject.id === SubjectName.Arabic && selectedSubject.semester === Semester.First) {
+            setArabicBasicsItems(loadCachedArabicBasics());
         }
+        setActiveBasicsSubject(null);
+        setShowMathBasicsView(false);
 
         // 2. Immediate background fetch to check for new links added to JSON
         syncResources(false);
@@ -427,9 +452,19 @@ const SubjectIndexPage: React.FC<SubjectIndexPageProps> = React.memo(({
 
     const comprehensiveStatus = getComprehensiveExamStatus();
 
-    if (showMathBasicsView) {
+    const isBasicsOpen = Boolean(activeBasicsSubject || showMathBasicsView);
+    const currentBasicsSubject = activeBasicsSubject || (showMathBasicsView ? SubjectName.Math : null);
+
+    if (isBasicsOpen && currentBasicsSubject) {
+        const isArabic = currentBasicsSubject === SubjectName.Arabic;
+        const currentItems = isArabic ? arabicBasicsItems : mathBasicsItems;
+        const subjectDisplayName = isArabic ? 'اللغة العربية' : 'الرياضيات';
+        const pageTitle = `حصص التأسيس - ${subjectDisplayName}`;
+        const lessonModalTitle = `حصص التأسيس - ${subjectDisplayName} (الفصل الأول)`;
+
         return (
-            <div className="container mx-auto max-w-2xl p-4 pt-2 pb-8" dir="rtl">
+            <div className="min-h-[calc(100vh-5rem)] -mb-10 pb-16 bg-[#F8F4EE]">
+                <div className="container mx-auto max-w-2xl p-4 pt-4" dir="rtl">
                 {/* Page Header with Back Button */}
                 <div className="bg-gradient-to-r from-slate-900 via-slate-800 to-slate-900 text-white p-4 sm:p-5 rounded-2xl border-2 border-slate-900 shadow-[4px_4px_0px_0px_rgba(0,0,0,1)] flex items-center justify-between gap-3 mb-6">
                     <div className="flex items-center gap-3 min-w-0">
@@ -438,16 +473,16 @@ const SubjectIndexPage: React.FC<SubjectIndexPageProps> = React.memo(({
                         </div>
                         <div className="min-w-0">
                             <h2 className="font-black text-base sm:text-xl text-white leading-tight truncate">
-                                حصص التأسيس - الرياضيات
+                                {pageTitle}
                             </h2>
                             <p className="text-xs text-slate-300 font-bold mt-0.5 truncate">
-                                الفصل الأول • فيديوهات التأسيس الشاملة ({mathBasicsItems.length} حصة)
+                                الفصل الأول • فيديوهات التأسيس الشاملة ({currentItems.length} حصة)
                             </p>
                         </div>
                     </div>
 
                     <button 
-                        onClick={closeMathBasicsView}
+                        onClick={closeBasicsView}
                         className="w-10 h-10 sm:w-12 sm:h-12 shadow-[3px_3px_0px_0px_rgba(0,0,0,1)] bg-white border-2 border-slate-900 rounded-xl text-slate-800 hover:bg-slate-100 transition-all active:translate-x-[2px] active:translate-y-[2px] active:shadow-none shrink-0 flex items-center justify-center cursor-pointer group"
                         title="رجوع"
                     >
@@ -456,28 +491,30 @@ const SubjectIndexPage: React.FC<SubjectIndexPageProps> = React.memo(({
                 </div>
 
                 {/* Math Basics Booklet Action (Centered above videos list) */}
-                <div className="flex justify-center mb-5">
-                    <button
-                        onClick={() => {
-                            openResourceModal({
-                                resource: {
-                                    type: 'pdf',
-                                    url: 'https://raw.githubusercontent.com/MashalMath/Pdf_Library/main/MathBasics_Book.pdf',
-                                    resourceTitle: 'دوسية أساسيات الرياضيات'
-                                },
-                                lessonTitle: 'حصص التأسيس - الرياضيات',
-                                downloadFileName: 'دوسية_أساسيات_الرياضيات.pdf'
-                            });
-                        }}
-                        className="inline-flex items-center justify-center gap-2 px-5 py-2.5 rounded-xl border-2 border-slate-900 bg-red-600 hover:bg-red-700 text-white active:scale-95 transition-all shadow-[3px_3px_0px_0px_rgba(0,0,0,1)] hover:shadow-[1px_1px_0px_0px_rgba(0,0,0,1)] hover:translate-x-[1px] hover:translate-y-[1px] text-xs sm:text-sm font-black group cursor-pointer"
-                        title="عرض ملف PDF: دوسية أساسيات الرياضيات"
-                    >
-                        <div className="w-5 h-5 rounded flex items-center justify-center shrink-0">
-                            <FileText className="w-4 h-4 sm:w-4.5 sm:h-4.5 text-white group-hover:scale-110 transition-transform" />
-                        </div>
-                        <span className="leading-tight">دوسية أساسيات الرياضيات</span>
-                    </button>
-                </div>
+                {!isArabic && (
+                    <div className="flex justify-center mb-5">
+                        <button
+                            onClick={() => {
+                                openResourceModal({
+                                    resource: {
+                                        type: 'pdf',
+                                        url: 'https://raw.githubusercontent.com/MashalMath/Pdf_Library/main/MathBasics_Book.pdf',
+                                        resourceTitle: 'دوسية أساسيات الرياضيات'
+                                    },
+                                    lessonTitle: 'حصص التأسيس - الرياضيات',
+                                    downloadFileName: 'دوسية_أساسيات_الرياضيات.pdf'
+                                });
+                            }}
+                            className="inline-flex items-center justify-center gap-2 px-5 py-2.5 rounded-xl border-2 border-slate-900 bg-red-600 hover:bg-red-700 text-white active:scale-95 transition-all shadow-[3px_3px_0px_0px_rgba(0,0,0,1)] hover:shadow-[1px_1px_0px_0px_rgba(0,0,0,1)] hover:translate-x-[1px] hover:translate-y-[1px] text-xs sm:text-sm font-black group cursor-pointer"
+                            title="عرض ملف PDF: دوسية أساسيات الرياضيات"
+                        >
+                            <div className="w-5 h-5 rounded flex items-center justify-center shrink-0">
+                                <FileText className="w-4 h-4 sm:w-4.5 sm:h-4.5 text-white group-hover:scale-110 transition-transform" />
+                            </div>
+                            <span className="leading-tight">دوسية أساسيات الرياضيات</span>
+                        </button>
+                    </div>
+                )}
 
                 {/* Videos Grid */}
                 <div className="space-y-4">
@@ -487,22 +524,22 @@ const SubjectIndexPage: React.FC<SubjectIndexPageProps> = React.memo(({
                             قائمة فيديوهات التأسيس
                         </h3>
                         <span className="text-xs font-bold text-slate-500 bg-slate-200/70 px-2.5 py-1 rounded-lg">
-                            {mathBasicsItems.length} حصة
+                            {currentItems.length} حصة
                         </span>
                     </div>
 
-                    {mathBasicsItems.length === 0 ? (
+                    {currentItems.length === 0 ? (
                         <div className="bg-white rounded-2xl border-2 border-slate-900 shadow-[4px_4px_0px_0px_rgba(0,0,0,1)] p-8 text-center text-slate-500 font-bold flex flex-col items-center justify-center gap-3">
                             <Loader2 className="w-8 h-8 text-red-600 animate-spin" />
                             <span>جاري تحميل حصص التأسيس...</span>
                         </div>
                     ) : (
                         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5 sm:gap-4">
-                            {mathBasicsItems.map((item, idx) => {
+                            {currentItems.map((item, idx) => {
                                 const thumbUrl = getYoutubeThumbnailUrl(item.url);
                                 return (
                                     <button
-                                        key={item.videoId || idx}
+                                        key={`${item.videoId || 'basics'}-${idx}`}
                                         onClick={() => {
                                             openResourceModal({
                                                 resource: {
@@ -510,7 +547,7 @@ const SubjectIndexPage: React.FC<SubjectIndexPageProps> = React.memo(({
                                                     url: item.url,
                                                     resourceTitle: item.videoTitle
                                                 },
-                                                lessonTitle: 'حصص التأسيس - الرياضيات (الفصل الأول)',
+                                                lessonTitle: lessonModalTitle,
                                                 downloadFileName: `${item.videoTitle}.mp4`
                                             });
                                         }}
@@ -555,13 +592,15 @@ const SubjectIndexPage: React.FC<SubjectIndexPageProps> = React.memo(({
                         onClose={closeResourceModal}
                     />
                 )}
+                </div>
             </div>
         );
     }
 
     if (activeLessonVideos) {
         return (
-            <div className="container mx-auto max-w-2xl p-4 pt-2 pb-8" dir="rtl">
+            <div className="min-h-[calc(100vh-5rem)] -mb-10 pb-16 bg-[#F8F4EE]">
+                <div className="container mx-auto max-w-2xl p-4 pt-4" dir="rtl">
                 {/* Page Header with Back Button */}
                 <div className="bg-gradient-to-r from-slate-900 via-slate-800 to-slate-900 text-white p-4 sm:p-5 rounded-2xl border-2 border-slate-900 shadow-[4px_4px_0px_0px_rgba(0,0,0,1)] flex items-center justify-between gap-3 mb-6">
                     <div className="flex items-center gap-3 min-w-0">
@@ -660,6 +699,7 @@ const SubjectIndexPage: React.FC<SubjectIndexPageProps> = React.memo(({
                         onClose={closeResourceModal}
                     />
                 )}
+                </div>
             </div>
         );
     }
@@ -707,11 +747,11 @@ const SubjectIndexPage: React.FC<SubjectIndexPageProps> = React.memo(({
                                      <RefreshCw className={`w-4 h-4 sm:w-6 sm:h-6 text-slate-800 group-hover:text-primary transition-colors ${isSyncingResources ? 'animate-spin text-primary' : ''}`} />
                                  </button>
 
-                                 {selectedSubject.id === SubjectName.Math && selectedSubject.semester === Semester.First && (
+                                 {((selectedSubject.id === SubjectName.Math || selectedSubject.id === SubjectName.Arabic) && selectedSubject.semester === Semester.First) && (
                                       <button
-                                          onClick={openMathBasicsView}
+                                          onClick={() => openBasicsView(selectedSubject.id)}
                                           className="w-11 h-11 sm:w-13 sm:h-13 bg-gradient-to-b from-red-600 to-rose-600 hover:from-red-700 hover:to-rose-700 text-white font-black rounded-xl border-2 border-slate-900 shadow-[3px_3px_0px_0px_rgba(0,0,0,1)] active:translate-x-[1px] active:translate-y-[1px] active:shadow-none transition-all cursor-pointer shrink-0 flex flex-col items-center justify-center text-[11px] sm:text-xs leading-none p-1 text-center"
-                                          title="حصص التأسيس"
+                                          title={`حصص التأسيس - ${selectedSubject.name}`}
                                       >
                                           <span>حصص</span>
                                           <span className="mt-0.5">التأسيس</span>
@@ -830,28 +870,28 @@ const SubjectIndexPage: React.FC<SubjectIndexPageProps> = React.memo(({
                     const unitProgress = calculateUnitProgress(unit);
 
                     return (
-                        <div key={uIdx} className="bg-white rounded-lg shadow-sm overflow-hidden border border-slate-900 transition-all duration-300">
+                        <div key={uIdx} className="bg-[#F8F4EE] rounded-lg shadow-sm overflow-hidden border border-slate-900 transition-all duration-300">
                             <button
                                 onClick={() => toggleUnit(uIdx)}
-                                className={`w-full flex flex-col p-4 sm:p-5 transition-colors ${isExpanded ? 'bg-slate-50' : 'bg-white'}`}
+                                className="w-full flex flex-col p-4 sm:p-5 transition-colors bg-[#F8F4EE] hover:bg-[#F2EDE5]"
                             >
                                 <div className="w-full flex items-center justify-between">
-                                    <h3 className="text-sm sm:text-base font-black text-slate-800 flex-1 ml-4 text-right">{unit.title}</h3>
-                                    <div className={`w-9 h-9 sm:w-10 sm:h-10 rounded-full flex items-center justify-center transition-all ${isExpanded ? 'bg-primary text-white rotate-180' : 'bg-slate-100 text-slate-400'}`}>
+                                    <h3 className="text-sm sm:text-base font-black text-slate-900 flex-1 ml-4 text-right">{unit.title}</h3>
+                                    <div className={`w-9 h-9 sm:w-10 sm:h-10 rounded-full flex items-center justify-center transition-all border ${isExpanded ? 'bg-primary text-white border-primary rotate-180' : 'bg-white text-slate-700 border-[#E8DFD3]'}`}>
                                         <ChevronDownIcon className="w-5 h-5 sm:w-6 sm:h-6" />
                                     </div>
                                 </div>
                                 
                                 {unitProgress > 0 && (
                                     <div className="w-full mt-3 px-1 flex items-center gap-3">
-                                        <div className="flex-1 h-1.5 bg-slate-100 rounded-full overflow-hidden border border-slate-200">
+                                        <div className="flex-1 h-1.5 bg-white rounded-full overflow-hidden border border-[#E8DFD3]">
                                             <motion.div 
                                                 initial={{ width: 0 }}
                                                 animate={{ width: `${unitProgress}%` }}
                                                 className="h-full bg-emerald-500"
                                             />
                                         </div>
-                                        <span className="text-[10px] sm:text-xs font-black text-emerald-600 whitespace-nowrap shrink-0">{Math.round(unitProgress)}%</span>
+                                        <span className="text-[10px] sm:text-xs font-black text-emerald-700 whitespace-nowrap shrink-0">{Math.round(unitProgress)}%</span>
                                     </div>
                                 )}
                             </button>
@@ -864,7 +904,7 @@ const SubjectIndexPage: React.FC<SubjectIndexPageProps> = React.memo(({
                                         exit={{ height: 0, opacity: 0 }}
                                         className="overflow-hidden"
                                     >
-                                        <div className="p-4 bg-slate-50/30">
+                                        <div className="p-4 bg-[#F8F4EE] border-t border-[#E8DFD3]">
                                             {unit.lessons.length === 0 ? (
                                                 <div className="flex flex-col items-center justify-center gap-2 py-6 px-4 text-center bg-amber-50/80 border border-dashed border-amber-300 rounded-xl w-full my-2" dir="rtl">
                                                     <span className="text-2xl">⏳</span>
@@ -941,7 +981,12 @@ const SubjectIndexPage: React.FC<SubjectIndexPageProps> = React.memo(({
 
                                                                                 {/* Lesson Resources Grid (RTL Organized Compact Grid) */}
                                                                                 {(() => {
-                                                                                    const isSupportedSubject = (selectedSubject?.id === SubjectName.JordanHistory || selectedSubject?.id === SubjectName.Math || selectedSubject?.id === SubjectName.Arabic) && selectedSubject?.semester !== Semester.Second;
+                                                                                    const isSupportedSubject = (
+                                                                                        selectedSubject?.id === SubjectName.JordanHistory || 
+                                                                                        selectedSubject?.id === SubjectName.Math || 
+                                                                                        selectedSubject?.id === SubjectName.Arabic ||
+                                                                                        selectedSubject?.id === SubjectName.IslamicEducation
+                                                                                    ) && selectedSubject?.semester !== Semester.Second;
 
                                                                                     const lessonResources = isSupportedSubject ? getResourcesForLesson(
                                                                                         unit.title,
@@ -1073,7 +1118,8 @@ const SubjectIndexPage: React.FC<SubjectIndexPageProps> = React.memo(({
                                                 const isSupportedSubject = (
                                                     selectedSubject?.id === SubjectName.JordanHistory || 
                                                     selectedSubject?.id === SubjectName.Math || 
-                                                    selectedSubject?.id === SubjectName.Arabic
+                                                    selectedSubject?.id === SubjectName.Arabic ||
+                                                    selectedSubject?.id === SubjectName.IslamicEducation
                                                 ) && selectedSubject?.semester === Semester.First;
                                                 if (!isSupportedSubject) {
                                                     return null;

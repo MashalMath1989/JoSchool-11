@@ -1,7 +1,8 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { ExternalLink } from 'lucide-react';
 import { XIcon } from './data/Icons';
 import { Subject } from './types';
+import { getGoogleViewerUrl } from './viewerUtils';
 
 interface PdfViewerScreenProps {
     selectedSubject: Subject | null;
@@ -12,37 +13,46 @@ const PdfViewerScreen: React.FC<PdfViewerScreenProps> = ({
     selectedSubject,
     openExternalBook
 }) => {
+    const currentUrl = selectedSubject?.textbookUrl || '';
+    const [loadedUrl, setLoadedUrl] = useState<string | null>(null);
+    const isLoading = Boolean(currentUrl) && loadedUrl !== currentUrl;
+
+    useEffect(() => {
+        if (!currentUrl) return;
+        const timer = setTimeout(() => {
+            setLoadedUrl(currentUrl);
+        }, 3000);
+        return () => clearTimeout(timer);
+    }, [currentUrl]);
+
     if (!selectedSubject) return null;
 
     const getTextbookPreviewUrl = (url?: string) => {
-        if (!url) return '';
-        const trimmed = url.trim();
-        if (trimmed.includes('drive.google.com')) {
-            let fileId = '';
-            if (trimmed.includes('/file/d/')) {
-                fileId = trimmed.split('/file/d/')[1]?.split('/')[0]?.split('?')[0] || '';
-            } else if (trimmed.includes('id=')) {
-                const match = trimmed.match(/[?&]id=([^&]+)/);
-                if (match && match[1]) fileId = match[1];
-            }
-            if (fileId) {
-                return `https://drive.google.com/file/d/${fileId}/preview`;
-            }
-        }
-        if (trimmed.includes('/preview')) return trimmed;
-        return `https://docs.google.com/viewer?url=${encodeURIComponent(trimmed)}&embedded=true`;
+        return getGoogleViewerUrl(url || '', true);
     };
 
     return (
         <div className="fixed inset-0 z-50 bg-white flex flex-col pt-2">
             <div className="flex-1 relative bg-app-bg">
                 {selectedSubject.textbookUrl ? (
-                    <iframe
-                        src={getTextbookPreviewUrl(selectedSubject.textbookUrl)}
-                        className="w-full h-full border-none"
-                        title="Textbook Viewer"
-                        allow="autoplay"
-                    />
+                    <>
+                        {isLoading && (
+                            <div className="absolute inset-0 z-10 flex flex-col items-center justify-center bg-slate-50">
+                                <div className="w-10 h-10 border-3 border-sky-500 border-t-transparent rounded-full animate-spin mb-3"></div>
+                                <p className="text-sm font-black text-slate-700">جاري فتح الكتاب فوراً عبر Google...</p>
+                                <span className="text-xs font-bold text-slate-400 mt-1">عرض سحابي مباشر عالي السرعة</span>
+                            </div>
+                        )}
+                        <iframe
+                            src={getTextbookPreviewUrl(selectedSubject.textbookUrl)}
+                            className="w-full h-full border-none"
+                            title="Textbook Viewer"
+                            allow="autoplay"
+                            loading="eager"
+                            sandbox="allow-scripts allow-same-origin allow-forms allow-popups allow-popups-to-escape-sandbox"
+                            onLoad={() => setLoadedUrl(currentUrl)}
+                        />
+                    </>
                 ) : (
                     <div className="flex flex-col items-center justify-center h-full p-10 text-center">
                         <div className="w-20 h-20 bg-primary/10 text-primary rounded-xl flex items-center justify-center mb-6">

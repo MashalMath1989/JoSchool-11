@@ -1,11 +1,42 @@
 /* Global styles */
 /* Tailwind is loaded via CDN in index.html */
 
+@keyframes soft-pulse {
+  0%, 100% {
+    transform: scale(1);
+    box-shadow: 0 0 0 0 rgba(245, 158, 11, 0.5), 0 2px 8px rgba(15, 23, 42, 0.2);
+  }
+  50% {
+    transform: scale(1.04);
+    box-shadow: 0 0 0 9px rgba(245, 158, 11, 0), 0 6px 18px rgba(245, 158, 11, 0.35);
+  }
+}
+
+.soft-pulse,
 #start-challenge-button {
+  animation: soft-pulse 2.2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+  will-change: transform, box-shadow;
   transition: transform 0.08s ease-out, background-color 0.08s ease-out;
 }
 
-#start-challenge-button:active {
-  background-color: #1e293b !important;
-  transform: scale(0.93) !important;
+#start-challenge-button:hover,
+.soft-pulse:hover {
+  animation-play-state: paused;
+  transform: scale(1.05);
 }
+
+#start-challenge-button:active,
+.soft-pulse:active {
+  animation: none !important;
+  background-color: #0f172a !important;
+  transform: scale(0.94) !important;
+  box-shadow: none !important;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  #start-challenge-button,
+  .soft-pulse {
+    animation: none !important;
+  }
+}
+

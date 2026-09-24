@@ -6,6 +6,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import TrigGraph from './TrigGraph';
 import { shareQuestionDirectly } from './shareUtils';
 import { subjectsData } from './data';
+import { ReportQuestionModal } from './ReportQuestionModal';
 
 interface FavoriteQuestionsPageProps {
     favoriteQuestions: FavoriteQuestion[];
@@ -26,6 +27,7 @@ const FavoriteQuestionsPage: React.FC<FavoriteQuestionsPageProps> = ({
     const [selectedIndices, setSelectedIndices] = React.useState<Set<number>>(new Set());
     const [expandedExplanations, setExpandedExplanations] = React.useState<Record<number, boolean>>({});
     const [shareQuestion, setShareQuestion] = React.useState<FavoriteQuestion | null>(null);
+    const [reportedQuestionData, setReportedQuestionData] = React.useState<{ question: Question; index: number; subject?: string; lessonTitle?: string } | null>(null);
 
     const toggleExplanation = (idx: number) => {
         setExpandedExplanations(prev => ({
@@ -327,7 +329,11 @@ const FavoriteQuestionsPage: React.FC<FavoriteQuestionsPageProps> = ({
                                 </div>
                             </div>
                             {!isBulkMode && (
-                                <button className={`absolute bottom-1.5 ${isEnglish ? 'right-4' : 'left-4'} text-[10px] font-bold text-slate-300 hover:text-red-400 flex items-center gap-1 transition-colors`}>
+                                <button 
+                                    onClick={() => setReportedQuestionData({ question: q, index: idx + 1, subject: q.subjectId, lessonTitle: q.lessonTitle })}
+                                    className={`absolute bottom-1.5 ${isEnglish ? 'right-4' : 'left-4'} text-[10px] font-bold text-slate-300 hover:text-red-400 flex items-center gap-1 transition-colors cursor-pointer`}
+                                    title="الإبلاغ عن خطأ في السؤال"
+                                >
                                     <FlagIcon className="w-3 h-3" />
                                     <span>تبليغ</span>
                                 </button>
@@ -396,6 +402,18 @@ const FavoriteQuestionsPage: React.FC<FavoriteQuestionsPageProps> = ({
                     </div>
                 )}
             </AnimatePresence>
+
+            {/* Question Report Modal */}
+            {reportedQuestionData && (
+                <ReportQuestionModal
+                    isOpen={!!reportedQuestionData}
+                    onClose={() => setReportedQuestionData(null)}
+                    question={reportedQuestionData.question}
+                    questionNumber={reportedQuestionData.index}
+                    subject={reportedQuestionData.subject || selectedSubject?.id || ''}
+                    examTitle={reportedQuestionData.lessonTitle || ''}
+                />
+            )}
         </div>
     );
 };

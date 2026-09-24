@@ -61,6 +61,27 @@
         "completedAt": { "type": "string", "format": "date-time" }
       },
       "required": ["participantId", "name", "status"]
+    },
+    "QuestionReport": {
+      "title": "QuestionReport",
+      "description": "Student report for an error in a question.",
+      "type": "object",
+      "properties": {
+        "subject": { "type": "string" },
+        "unitTitle": { "type": "string" },
+        "examTitle": { "type": "string" },
+        "questionNumber": { "type": "number" },
+        "questionText": { "type": "string" },
+        "choices": { "type": "array", "items": { "type": "string" } },
+        "correctAnswer": { "type": "string" },
+        "explanation": { "type": "string" },
+        "studentReport": { "type": "string" },
+        "studentEmail": { "type": "string" },
+        "studentUid": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "status": { "type": "string", "enum": ["new", "reviewed", "resolved", "dismissed"] }
+      },
+      "required": ["questionText", "studentReport", "status"]
     }
   },
   "firestore": {
@@ -79,6 +100,10 @@
     "/challenges/{challengeId}/participants/{participantId}": {
       "schema": "ChallengeParticipant",
       "description": "Participant results and status in a challenge."
+    },
+    "/questionReports/{reportId}": {
+      "schema": "QuestionReport",
+      "description": "Reports submitted by students about question errors."
     }
   }
 }

@@ -45,6 +45,30 @@ service cloud.firestore {
       }
     }
 
+    // Question Reports submitted by students
+    function isValidQuestionReport(data) {
+      return data.studentReport is string && 
+             data.studentReport.size() > 0 && 
+             data.studentReport.size() <= 5000 &&
+             data.status == 'new' &&
+             data.createdAt == request.time &&
+             (data.questionText is string || !data.keys().hasAll(['questionText'])) &&
+             (data.subject is string || !data.keys().hasAll(['subject'])) &&
+             (data.unitTitle is string || !data.keys().hasAll(['unitTitle'])) &&
+             (data.examTitle is string || !data.keys().hasAll(['examTitle'])) &&
+             (data.questionNumber is number || !data.keys().hasAll(['questionNumber'])) &&
+             (data.choices is list || !data.keys().hasAll(['choices'])) &&
+             (data.correctAnswer is string || !data.keys().hasAll(['correctAnswer'])) &&
+             (data.explanation is string || !data.keys().hasAll(['explanation'])) &&
+             (data.studentEmail is string || !data.keys().hasAll(['studentEmail'])) &&
+             (data.studentUid is string || !data.keys().hasAll(['studentUid']));
+    }
+
+    match /questionReports/{reportId} {
+      allow read, update, delete: if false;
+      allow create: if isValidId(reportId) && isValidQuestionReport(request.resource.data);
+    }
+
     // Default deny for everything else
     match /{document=**} {
       allow read, write: if false;

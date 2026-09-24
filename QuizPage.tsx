@@ -5,6 +5,9 @@ import { Question, Subject, SubjectName, UserProgress } from './types';
 import { MathRenderer, renderTextWithUnderline } from './textRenderer';
 import TrigGraph from './TrigGraph';
 import { shareQuestionDirectly, isMathSubject, checkIsChoiceCorrect } from './shareUtils';
+import { Volume2, VolumeX } from 'lucide-react';
+import { soundManager } from './audioFeedback';
+import { ReportQuestionModal } from './ReportQuestionModal';
 
 interface QuizPageProps {
     currentQuiz: Question[];
@@ -20,6 +23,8 @@ interface QuizPageProps {
     onBack: () => void;
     selectedSubject: Subject | null;
     currentLessonTitle: string;
+    currentUnitTitle?: string;
+    examNumber?: number | null;
     isQuestionFavorite: (questionText: string) => boolean;
     toggleFavoriteQuestion: (question: Question, subjectId: string, lessonTitle: string) => void;
     isFavoriteDisabled?: boolean;
@@ -40,6 +45,8 @@ const QuizPage: React.FC<QuizPageProps> = React.memo(({
     onBack,
     selectedSubject,
     currentLessonTitle,
+    currentUnitTitle,
+    examNumber,
     isQuestionFavorite,
     toggleFavoriteQuestion,
     isFavoriteDisabled,
@@ -66,6 +73,13 @@ const QuizPage: React.FC<QuizPageProps> = React.memo(({
     const [prevIndex, setPrevIndex] = useState(safeIndex);
     const [showExplanation, setShowExplanation] = useState(false);
     const [isShareModalOpen, setIsShareModalOpen] = useState(false);
+    const [isReportModalOpen, setIsReportModalOpen] = useState(false);
+    const [isSoundEnabled, setIsSoundEnabled] = useState(() => soundManager.isEnabled());
+
+    const toggleSound = () => {
+        const next = soundManager.toggle();
+        setIsSoundEnabled(next);
+    };
 
     if (safeIndex !== prevIndex) {
         setPrevIndex(safeIndex);
@@ -155,6 +169,14 @@ const QuizPage: React.FC<QuizPageProps> = React.memo(({
                 <div className="absolute -bottom-10 -left-10 w-32 h-32 bg-secondary/5 rounded-full blur-3xl"></div>
 
                 <div className={`flex items-center gap-2 absolute top-3 z-10 ${isEnglish ? 'right-3' : 'left-3'}`}>
+                    <button 
+                        onClick={toggleSound}
+                        className={`p-2 rounded-lg transition-colors border border-slate-900 ${isSoundEnabled ? 'bg-emerald-50 text-emerald-600 hover:bg-emerald-100' : 'bg-slate-100 text-slate-400 hover:bg-slate-200'}`}
+                        title={isSoundEnabled ? (isEnglish ? 'Mute sound effects' : 'كتم المؤثرات الصوتية') : (isEnglish ? 'Enable sound effects' : 'تشغيل المؤثرات الصوتية')}
+                        aria-label={isSoundEnabled ? 'كتم المؤثرات الصوتية' : 'تشغيل المؤثرات الصوتية'}
+                    >
+                        {isSoundEnabled ? <Volume2 className="w-4 h-4" /> : <VolumeX className="w-4 h-4" />}
+                    </button>
                     {!isFavoriteDisabled && (
                         <button 
                             onClick={() => toggleFavoriteQuestion(q, selectedSubject?.id || '', currentLessonTitle)}
@@ -177,8 +199,9 @@ const QuizPage: React.FC<QuizPageProps> = React.memo(({
                         <ShareIcon className="w-4 h-4" />
                     </button>
                     <button 
-                        className="p-2 rounded-lg bg-slate-100 text-slate-400 hover:bg-slate-200 transition-colors border border-slate-900"
-                        title="تبليغ عن مشكلة"
+                        onClick={() => setIsReportModalOpen(true)}
+                        className="p-2 rounded-lg bg-slate-100 text-slate-400 hover:bg-slate-200 transition-colors border border-slate-900 cursor-pointer"
+                        title="الإبلاغ عن خطأ في السؤال"
                     >
                         <FlagIcon className="w-4 h-4" />
                     </button>
@@ -241,6 +264,12 @@ const QuizPage: React.FC<QuizPageProps> = React.memo(({
                                     key={idx}
                                     onClick={() => {
                                         if (!isChallenge && isMath && hasAnswered) return;
+                                        const isCorrect = checkIsChoiceCorrect(q, choice, idx);
+                                        if (isCorrect) {
+                                            soundManager.playCorrect();
+                                        } else {
+                                            soundManager.playIncorrect();
+                                        }
                                         handleAnswer(choice);
                                     }}
                                     dir={isLtr ? 'ltr' : 'rtl'}
@@ -373,6 +402,19 @@ const QuizPage: React.FC<QuizPageProps> = React.memo(({
                         </motion.div>
                     )}
                 </AnimatePresence>
+            )}
+
+            {/* Report Question Error Modal */}
+            {q && (
+                <ReportQuestionModal
+                    isOpen={isReportModalOpen}
+                    onClose={() => setIsReportModalOpen(false)}
+                    question={q}
+                    questionNumber={currentQuestionIndex + 1}
+                    subject={selectedSubject?.id || ''}
+                    unitTitle={currentUnitTitle || ''}
+                    examTitle={currentLessonTitle || (examNumber ? `اختبار ${examNumber}` : '')}
+                />
             )}
         </div>
     );

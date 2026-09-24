@@ -1,4 +1,7 @@
 import { LessonResource, Unit, SubjectName, Semester } from '../types';
+import { INITIAL_ISLAMIC_RESOURCES } from './islamicResourcesData';
+
+export { INITIAL_ISLAMIC_RESOURCES };
 
 export interface ResourceJsonLesson {
     lessonId: string;
@@ -460,6 +463,31 @@ export const INITIAL_MATH_BASICS_RESOURCES: MathBasicsItem[] = [
     }
 ];
 
+export function sanitizeBasicsItems(rawItems: any[]): MathBasicsItem[] {
+    if (!Array.isArray(rawItems)) return [];
+    const seenIds = new Set<string>();
+    const sanitized: MathBasicsItem[] = [];
+
+    rawItems.forEach((item, idx) => {
+        if (!item || typeof item !== 'object') return;
+        let videoId = typeof item.videoId === 'string' && item.videoId.trim() ? item.videoId.trim() : `foundation_${idx}`;
+        if (seenIds.has(videoId)) {
+            videoId = `${videoId}_${idx}`;
+        }
+        seenIds.add(videoId);
+
+        sanitized.push({
+            videoId,
+            videoTitle: typeof item.videoTitle === 'string' && item.videoTitle.trim() ? item.videoTitle.trim() : `حصة التأسيس ${idx + 1}`,
+            type: 'video',
+            url: typeof item.url === 'string' ? item.url.trim() : '',
+            ...(item.youtubeTitle ? { youtubeTitle: item.youtubeTitle } : {})
+        });
+    });
+
+    return sanitized;
+}
+
 const MATH_BASICS_CACHE_KEY = "math_basics_resources_v1";
 
 export function loadCachedMathBasics(): MathBasicsItem[] {
@@ -477,7 +505,7 @@ export function loadCachedMathBasics(): MathBasicsItem[] {
             } else if (parsed && parsed.foundation && Array.isArray(parsed.foundation)) {
                 items = parsed.foundation;
             }
-            if (items.length > 0) return items;
+            if (items.length > 0) return sanitizeBasicsItems(items);
         }
     } catch (e) {
         console.warn("Failed to read cached math basics:", e);
@@ -515,7 +543,7 @@ export async function fetchRemoteMathBasics(): Promise<MathBasicsItem[]> {
         } else if (data && data.foundation && Array.isArray(data.foundation)) {
             items = data.foundation;
         }
-        return items;
+        return sanitizeBasicsItems(items);
     };
 
     // 1. Fetch live GitHub API (zero CDN delay) and Raw concurrently
@@ -589,6 +617,176 @@ export async function fetchRemoteMathBasics(): Promise<MathBasicsItem[]> {
     return loadCachedMathBasics();
 }
 
+export const ARABIC_BASICS_CACHE_KEY = "arabic_basics_resources_v1";
+
+export const INITIAL_ARABIC_BASICS_RESOURCES: MathBasicsItem[] = [
+    {
+        videoId: "foundation0",
+        videoTitle: "تعريف بمادة اللغة العربية 2010",
+        type: "video",
+        url: "https://youtu.be/K25I87gttkQ?si=nSiZn5PCCPf7s2XL"
+    },
+    {
+        videoId: "foundation1",
+        videoTitle: "حصة التأسيس 1",
+        type: "video",
+        url: "https://youtu.be/_6ohnRBvsyo?si=PyzYyphdbeXGJ_Li"
+    },
+    {
+        videoId: "foundation2",
+        videoTitle: "حصة التأسيس 2",
+        type: "video",
+        url: "https://youtu.be/YSAqvKcc0LE?si=eSBtMfMDMrCh2bg1"
+    },
+    {
+        videoId: "foundation3",
+        videoTitle: "حصة التأسيس 3",
+        type: "video",
+        url: "https://youtu.be/sw09H7BGpZ0?si=NXf9ym-xaGcEmpG3"
+    },
+    {
+        videoId: "foundation4",
+        videoTitle: "حصة التأسيس 4",
+        type: "video",
+        url: "https://youtu.be/He3cJ4o_nmI?si=Lhxg-QnueG0K9UQi"
+    },
+    {
+        videoId: "foundation5",
+        videoTitle: "حصة التأسيس 5",
+        type: "video",
+        url: "https://youtu.be/Gtls-tel7uM?si=cRLb_QbIKGTNlB2e"
+    },
+    {
+        videoId: "foundation6",
+        videoTitle: "حصة التأسيس 6",
+        type: "video",
+        url: "https://youtu.be/lCqQ5eDGuaE?si=Xw5D0ky4Hs5pMN1x"
+    },
+    {
+        videoId: "foundation7",
+        videoTitle: "حصة التأسيس 7",
+        type: "video",
+        url: "https://youtu.be/FmjrQUOwYpk?si=4DKTaOmeCdHtSTh-"
+    }
+];
+
+export function loadCachedArabicBasics(): MathBasicsItem[] {
+    try {
+        const cached = localStorage.getItem(ARABIC_BASICS_CACHE_KEY);
+        if (cached) {
+            const parsed = JSON.parse(cached);
+            let items: MathBasicsItem[] = [];
+            if (Array.isArray(parsed) && parsed.length > 0) {
+                if (parsed[0].foundation && Array.isArray(parsed[0].foundation)) {
+                    items = parsed[0].foundation;
+                } else if (parsed[0].videoId) {
+                    items = parsed;
+                }
+            } else if (parsed && parsed.foundation && Array.isArray(parsed.foundation)) {
+                items = parsed.foundation;
+            }
+            if (items.length > 0) return sanitizeBasicsItems(items);
+        }
+    } catch (e) {
+        console.warn("Failed to read cached arabic basics:", e);
+    }
+    return INITIAL_ARABIC_BASICS_RESOURCES;
+}
+
+export async function fetchRemoteArabicBasics(): Promise<MathBasicsItem[]> {
+    const filename = "ArabicBasicsStructure11_S1.json";
+    const timestamp = Date.now();
+    const rnd = Math.random().toString(36).slice(2, 8);
+    const apiUrl = `https://api.github.com/repos/MashalMath/joschool-11-arabic-exams/contents/${filename}?ref=JoSchool112010&t=${timestamp}&_r=${rnd}`;
+    const rawUrl = `https://raw.githubusercontent.com/MashalMath/joschool-11-arabic-exams/JoSchool112010/${filename}?t=${timestamp}&_r=${rnd}`;
+    const fallbackRawUrl = `https://raw.githubusercontent.com/MashalMath/joschool-11-arabic-exams/main/${filename}?t=${timestamp}&_r=${rnd}`;
+
+    const parseArabicBasics = (data: any): MathBasicsItem[] => {
+        if (!data) return [];
+        let items: MathBasicsItem[] = [];
+        if (Array.isArray(data) && data.length > 0) {
+            if (data[0].foundation && Array.isArray(data[0].foundation)) {
+                items = data[0].foundation;
+            } else if (data[0].videoId) {
+                items = data;
+            }
+        } else if (data && data.foundation && Array.isArray(data.foundation)) {
+            items = data.foundation;
+        }
+        return sanitizeBasicsItems(items);
+    };
+
+    // 1. Fetch live GitHub API (zero CDN delay) and Raw concurrently
+    try {
+        const pApi = (async () => {
+            try {
+                const res = await fetch(apiUrl);
+                if (!res.ok) return null;
+                const jsonMeta = await res.json();
+                if (jsonMeta && typeof jsonMeta.content === 'string' && jsonMeta.encoding === 'base64') {
+                    const text = decodeBase64Utf8(jsonMeta.content);
+                    const parsed = cleanAndRepairJson<any>(text);
+                    const items = parseArabicBasics(parsed);
+                    if (items.length > 0) return items;
+                }
+            } catch (_e) {
+                // Ignore API fetch error
+            }
+            return null;
+        })();
+
+        const pRaw = (async () => {
+            try {
+                const res = await fetch(rawUrl);
+                if (!res.ok) return null;
+                const text = await res.text();
+                const parsed = cleanAndRepairJson<any>(text);
+                const items = parseArabicBasics(parsed);
+                if (items.length > 0) return items;
+            } catch (_e) {
+                // Ignore raw fetch error
+            }
+            return null;
+        })();
+
+        const results = await Promise.allSettled([pApi, pRaw]);
+        for (const r of results) {
+            if (r.status === 'fulfilled' && r.value && r.value.length > 0) {
+                try {
+                    localStorage.setItem(ARABIC_BASICS_CACHE_KEY, JSON.stringify(r.value));
+                } catch (_e) {
+                    // Ignore storage quota error
+                }
+                return r.value;
+            }
+        }
+    } catch (e) {
+        console.warn("Error fetching arabic basics:", e);
+    }
+
+    // 2. Try fallback URL
+    try {
+        const res = await fetch(fallbackRawUrl);
+        if (res.ok) {
+            const text = await res.text();
+            const parsed = cleanAndRepairJson<any>(text);
+            const items = parseArabicBasics(parsed);
+            if (items.length > 0) {
+                try {
+                    localStorage.setItem(ARABIC_BASICS_CACHE_KEY, JSON.stringify(items));
+                } catch (_e) {
+                    // Ignore storage quota error
+                }
+                return items;
+            }
+        }
+    } catch (_e) {
+        // Fallback failed
+    }
+
+    return loadCachedArabicBasics();
+}
+
 export const LOCAL_STORAGE_KEY_HISTORY = "jordan_history_resources_v1";
 export const LOCAL_STORAGE_KEY_MATH = "math_resources_v1";
 
@@ -630,8 +828,10 @@ export function getResourceFilenames(subject?: string, semester?: string): strin
     }
     if (subject === SubjectName.IslamicEducation) {
         return [
+            `IslamicStructureSources11_${semSuffix}`,
             `IslamicStructureSources11_${semSuffix}.json`,
-            `Islamic11_${semSuffixLower}_resources.json`
+            `Islamic11_${semSuffixLower}_resources.json`,
+            `Islamic11_${semSuffixLower}_resources`
         ];
     }
     if (subject === SubjectName.Arabic) {
@@ -925,7 +1125,11 @@ export function countValidResourcesInUnits(units: ResourceJsonUnit[]): number {
 export function loadCachedResources(subject?: string, semester?: string): ResourceJsonUnit[] {
     const defaultData = subject === SubjectName.Math 
         ? INITIAL_MATH_RESOURCES 
-        : (subject === SubjectName.Arabic ? INITIAL_ARABIC_RESOURCES : INITIAL_JORDAN_HISTORY_RESOURCES);
+        : (subject === SubjectName.Arabic 
+            ? INITIAL_ARABIC_RESOURCES 
+            : (subject === SubjectName.IslamicEducation 
+                ? INITIAL_ISLAMIC_RESOURCES 
+                : INITIAL_JORDAN_HISTORY_RESOURCES));
     try {
         const key = getLocalStorageKey(subject, semester);
         const legacyKey = subject === SubjectName.Math ? LOCAL_STORAGE_KEY_MATH : LOCAL_STORAGE_KEY_HISTORY;
@@ -935,7 +1139,7 @@ export function loadCachedResources(subject?: string, semester?: string): Resour
             const units = extractUnitsFromRawData(parsed);
             if (units.length > 0) {
                 const cachedValidCount = countValidResourcesInUnits(units);
-                const defaultValidCount = ((subject === SubjectName.Math || subject === SubjectName.Arabic) && (!semester || semester === Semester.First))
+                const defaultValidCount = ((subject === SubjectName.Math || subject === SubjectName.Arabic || subject === SubjectName.IslamicEducation) && (!semester || semester === Semester.First))
                     ? countValidResourcesInUnits(defaultData)
                     : 0;
                 if (cachedValidCount >= defaultValidCount) {
@@ -1162,21 +1366,68 @@ export function generatePdfDownloadFileName(
     }
 }
 
+/**
+ * Extracts YouTube video ID (11 chars) reliably from all YouTube link formats:
+ * - youtu.be/VIDEO_ID
+ * - youtube.com/watch?v=VIDEO_ID
+ * - youtube.com/embed/VIDEO_ID
+ * - youtube.com/live/VIDEO_ID
+ * - youtube.com/shorts/VIDEO_ID
+ * Ignores any trailing query parameters like ?si=..., &t=..., etc.
+ */
+export function extractYoutubeVideoId(url: string): string | null {
+    if (!url || typeof url !== 'string') return null;
+    const trimmed = url.trim();
+
+    // Single comprehensive unified regex covering all formats:
+    // 1. youtu.be/VIDEO_ID
+    // 2. youtube.com/watch?v=VIDEO_ID (or any other query parameters preceding v=)
+    // 3. youtube.com/embed/VIDEO_ID
+    // 4. youtube.com/live/VIDEO_ID
+    // 5. youtube.com/shorts/VIDEO_ID
+    const regex = /(?:https?:\/\/)?(?:www\.|m\.)?(?:youtu\.be\/|(?:youtube\.com|youtube-nocookie\.com)\/(?:embed\/|v\/|shorts\/|live\/|(?:(?:watch|browse)?\?(?:.*&)?v=)))([\w-]{11})/i;
+    const match = trimmed.match(regex);
+    if (match && match[1]) {
+        return match[1];
+    }
+
+    // Resilient fallback using standard URL parser
+    try {
+        const urlObj = new URL(trimmed.startsWith('http') ? trimmed : `https://${trimmed}`);
+        const host = urlObj.hostname.toLowerCase();
+        if (host.includes('youtube.com') || host.includes('youtu.be') || host.includes('youtube-nocookie.com')) {
+            const v = urlObj.searchParams.get('v');
+            if (v && /^[\w-]{11}$/.test(v)) return v;
+
+            const segments = urlObj.pathname.split('/').filter(Boolean);
+            const liveIdx = segments.indexOf('live');
+            if (liveIdx !== -1 && segments[liveIdx + 1] && /^[\w-]{11}$/.test(segments[liveIdx + 1])) {
+                return segments[liveIdx + 1];
+            }
+            const shortsIdx = segments.indexOf('shorts');
+            if (shortsIdx !== -1 && segments[shortsIdx + 1] && /^[\w-]{11}$/.test(segments[shortsIdx + 1])) {
+                return segments[shortsIdx + 1];
+            }
+            const embedIdx = segments.indexOf('embed');
+            if (embedIdx !== -1 && segments[embedIdx + 1] && /^[\w-]{11}$/.test(segments[embedIdx + 1])) {
+                return segments[embedIdx + 1];
+            }
+            const lastPart = segments[segments.length - 1];
+            if (lastPart && /^[\w-]{11}$/.test(lastPart)) return lastPart;
+        }
+    } catch {
+        // Return null
+    }
+
+    return null;
+}
+
+export const extractYoutubeId = extractYoutubeVideoId;
+
 export function getYoutubeThumbnailUrl(url: string): string | null {
     if (!url) return null;
     try {
-        const trimmed = url.trim();
-        let videoId: string | undefined;
-        if (trimmed.includes('youtube.com/shorts/')) {
-            videoId = trimmed.split('youtube.com/shorts/')[1]?.split('?')[0];
-        } else if (trimmed.includes('youtube.com/watch')) {
-            const urlParams = new URLSearchParams(new URL(trimmed).search);
-            videoId = urlParams.get('v') || undefined;
-        } else if (trimmed.includes('youtu.be/')) {
-            videoId = trimmed.split('youtu.be/')[1]?.split('?')[0];
-        } else if (trimmed.includes('youtube.com/embed/')) {
-            videoId = trimmed.split('youtube.com/embed/')[1]?.split('?')[0];
-        }
+        const videoId = extractYoutubeVideoId(url);
         if (videoId) {
             return `https://img.youtube.com/vi/${videoId}/hqdefault.jpg`;
         }
@@ -1202,7 +1453,9 @@ export async function fetchYoutubeVideoTitle(url: string): Promise<string | null
     }
 
     try {
-        const res = await fetch(`https://www.youtube.com/oembed?url=${encodeURIComponent(url)}&format=json`);
+        const videoId = extractYoutubeVideoId(url);
+        const targetUrl = videoId ? `https://www.youtube.com/watch?v=${videoId}` : url;
+        const res = await fetch(`https://www.youtube.com/oembed?url=${encodeURIComponent(targetUrl)}&format=json`);
         if (res.ok) {
             const data = await res.json();
             if (data && data.title) {
