@@ -1,11 +1,243 @@
 import React from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { PlayCircle, FileText, Image as ImageIcon, X, ExternalLink, RefreshCw, Sparkles } from 'lucide-react';
+import { PlayCircle, FileText, Image as ImageIcon, X, ExternalLink, RefreshCw, Sparkles, CheckCircle2, RotateCcw } from 'lucide-react';
 import { BookOpenIcon, ChevronDownIcon, StarIcon, BookmarkIcon, RefreshIcon, ChevronLeftIcon, ChevronRightIcon, ArrowLeftIcon, ArrowRightIcon, CheckCircleIcon, Loader2 } from './data/Icons';
 import { Subject, Unit, Lesson, View, SubjectName, Semester, LessonResource } from './types';
 import { isSubjectLoaded, getLessonChunksCount, isLessonLoaded } from './services/quizService';
 import { loadCachedResources, fetchRemoteResources, fetchRemoteHistoryResources, getResourcesForLesson, getResourcesForUnit, generatePdfDownloadFileName, ResourceJsonUnit, MathBasicsItem, loadCachedMathBasics, fetchRemoteMathBasics, loadCachedArabicBasics, fetchRemoteArabicBasics, getYoutubeThumbnailUrl, fetchYoutubeVideoTitle, countValidResourcesInUnits } from './services/resourceService';
 import { ResourceViewerModal } from './ResourceViewerModal';
+
+const STUDIED_RESOURCES_STORAGE_KEY = 'joschool_studied_resources_v1';
+
+const loadStudiedResourcesFromStorage = (): Set<string> => {
+    if (typeof window === 'undefined') return new Set();
+    try {
+        const raw = localStorage.getItem(STUDIED_RESOURCES_STORAGE_KEY);
+        if (raw) {
+            const arr = JSON.parse(raw);
+            if (Array.isArray(arr)) {
+                return new Set(arr);
+            }
+        }
+    } catch {
+        // ignore
+    }
+    return new Set();
+};
+
+const saveStudiedResourcesToStorage = (set: Set<string>) => {
+    if (typeof window === 'undefined') return;
+    try {
+        localStorage.setItem(STUDIED_RESOURCES_STORAGE_KEY, JSON.stringify(Array.from(set)));
+    } catch {
+        // ignore
+    }
+};
+
+interface ResourceItemButtonProps {
+    res: LessonResource;
+    rIdx: number;
+    unitTitle: string;
+    lessonTitle?: string;
+    subjectId: string;
+    semester: string;
+    isStudied: boolean;
+    onToggleStudiedPrompt: (promptData: {
+        key: string;
+        resTitle: string;
+        locationLabel: string;
+        isStudied: boolean;
+    }) => void;
+    onClick: () => void;
+}
+
+const ResourceItemButton: React.FC<ResourceItemButtonProps> = React.memo(({
+    res,
+    rIdx,
+    unitTitle,
+    lessonTitle,
+    subjectId,
+    semester,
+    isStudied,
+    onToggleStudiedPrompt,
+    onClick
+}) => {
+    const isLink = Boolean(
+        res.type === 'link' || 
+        res.type === 'exam' || 
+        res.type === 'form' || 
+        res.type === 'url' ||
+        (res.url || '').toLowerCase().includes('forms.gle') || 
+        (res.url || '').toLowerCase().includes('forms.cloud.microsoft') ||
+        (res.url || '').toLowerCase().includes('forms.office.com') || 
+        (res.url || '').toLowerCase().includes('docs.google.com/forms')
+    );
+
+    const isPdf = !isLink && (
+        res.type === 'pdf' || 
+        (res.url || '').toLowerCase().includes('.pdf') || 
+        ((res.url || '').toLowerCase().includes('drive.google.com') && 
+         !(res.url || '').toLowerCase().includes('youtube') && 
+         !(res.url || '').toLowerCase().includes('forms'))
+    );
+
+    const normalizedRes: LessonResource = isLink 
+        ? { ...res, type: 'link' } 
+        : isPdf 
+            ? { ...res, type: 'pdf' } 
+            : res;
+
+    const resTitle = normalizedRes.resourceTitle?.trim() 
+        ? normalizedRes.resourceTitle 
+        : isPdf 
+            ? (lessonTitle ? 'ملخص PDF' : 'ملخص الوحدة PDF')
+            : isLink 
+                ? 'رابط خارجي' 
+                : (lessonTitle ? 'ملخص مصور' : 'خريطة ذهنية للوحدة');
+
+    const rawUrl = (res.url || '').trim();
+    const cleanId = rawUrl || resTitle || `idx_${rIdx}`;
+    const storageKey = `${subjectId}_${semester}_${unitTitle}_${lessonTitle || 'unit'}_${cleanId}`;
+    const locationLabel = lessonTitle ? `${unitTitle} • ${lessonTitle}` : unitTitle;
+
+    const timerRef = React.useRef<NodeJS.Timeout | null>(null);
+    const isLongPressRef = React.useRef(false);
+    const startPosRef = React.useRef<{ x: number; y: number } | null>(null);
+
+    const handleTriggerLongPress = React.useCallback(() => {
+        try {
+            if (typeof window !== 'undefined' && window.navigator && window.navigator.vibrate) {
+                window.navigator.vibrate(50);
+            }
+        } catch {
+            // ignore
+        }
+        onToggleStudiedPrompt({
+            key: storageKey,
+            resTitle,
+            locationLabel,
+            isStudied
+        });
+    }, [storageKey, resTitle, locationLabel, isStudied, onToggleStudiedPrompt]);
+
+    const startTimer = (x?: number, y?: number) => {
+        isLongPressRef.current = false;
+        if (x !== undefined && y !== undefined) {
+            startPosRef.current = { x, y };
+        }
+        if (timerRef.current) clearTimeout(timerRef.current);
+        timerRef.current = setTimeout(() => {
+            isLongPressRef.current = true;
+            handleTriggerLongPress();
+        }, 550);
+    };
+
+    const clearTimer = () => {
+        if (timerRef.current) {
+            clearTimeout(timerRef.current);
+            timerRef.current = null;
+        }
+        startPosRef.current = null;
+    };
+
+    const onTouchStart = (e: React.TouchEvent) => {
+        const t = e.touches[0];
+        startTimer(t.clientX, t.clientY);
+    };
+
+    const onTouchMove = (e: React.TouchEvent) => {
+        if (!startPosRef.current) return;
+        const t = e.touches[0];
+        const dx = Math.abs(t.clientX - startPosRef.current.x);
+        const dy = Math.abs(t.clientY - startPosRef.current.y);
+        if (dx > 10 || dy > 10) {
+            clearTimer();
+        }
+    };
+
+    const onTouchEnd = (e: React.TouchEvent) => {
+        const wasLongPress = isLongPressRef.current;
+        clearTimer();
+        if (wasLongPress) {
+            e.preventDefault();
+        }
+    };
+
+    const onMouseDown = (e: React.MouseEvent) => {
+        if (e.button !== 0) return;
+        startTimer(e.clientX, e.clientY);
+    };
+
+    const onMouseUp = (e: React.MouseEvent) => {
+        const wasLongPress = isLongPressRef.current;
+        clearTimer();
+        if (wasLongPress) {
+            e.preventDefault();
+            e.stopPropagation();
+        }
+    };
+
+    const onMouseLeave = () => {
+        clearTimer();
+    };
+
+    const handleButtonClick = (e: React.MouseEvent) => {
+        if (isLongPressRef.current) {
+            e.preventDefault();
+            e.stopPropagation();
+            isLongPressRef.current = false;
+            return;
+        }
+        onClick();
+    };
+
+    const onContextMenu = (e: React.MouseEvent) => {
+        e.preventDefault();
+        handleTriggerLongPress();
+    };
+
+    return (
+        <button
+            type="button"
+            onClick={handleButtonClick}
+            onTouchStart={onTouchStart}
+            onTouchMove={onTouchMove}
+            onTouchEnd={onTouchEnd}
+            onMouseDown={onMouseDown}
+            onMouseUp={onMouseUp}
+            onMouseLeave={onMouseLeave}
+            onContextMenu={onContextMenu}
+            title={isStudied ? "تمت دراسته (اضغط مطولاً لإزالة التظليل لمراجعته لاحقاً)" : "اضغط مطولاً لتظليله باللون الأخضر كـ (تمت دراسته)"}
+            className={`w-full flex items-center justify-start gap-1.5 px-2 py-1.5 rounded-lg transition-all active:scale-[0.98] select-none group cursor-pointer relative overflow-hidden ${
+                isStudied
+                    ? 'border-2 border-slate-900 bg-emerald-500 hover:bg-emerald-600 text-white font-black shadow-xs'
+                    : 'border border-slate-900 bg-white hover:bg-slate-50 text-slate-800 font-bold shadow-2xs text-xs'
+            }`}
+        >
+            <div className="w-4 h-4 rounded flex items-center justify-center shrink-0">
+                {isStudied ? (
+                    <CheckCircle2 className="w-3.5 h-3.5 text-white animate-scale-in" />
+                ) : (
+                    <>
+                        {isLink && <ExternalLink className="w-3.5 h-3.5 text-sky-600 group-hover:scale-110 transition-transform" />}
+                        {isPdf && <FileText className="w-3.5 h-3.5 text-rose-600 group-hover:scale-110 transition-transform" />}
+                        {!isLink && !isPdf && normalizedRes.type === 'image' && <ImageIcon className="w-3.5 h-3.5 text-emerald-600 group-hover:scale-110 transition-transform" />}
+                    </>
+                )}
+            </div>
+
+            <span className={`truncate text-right flex-1 text-[11px] leading-tight ${isStudied ? 'text-white font-black' : 'text-slate-800'}`}>
+                {resTitle}
+            </span>
+
+            {isStudied && (
+                <span className="text-[8.5px] bg-emerald-700/90 text-white px-1 py-0.2 rounded font-black shrink-0 leading-none">
+                    تمت دراسته
+                </span>
+            )}
+        </button>
+    );
+});
 
 interface SubjectIndexPageProps {
     selectedSubject: Subject | null;
@@ -53,6 +285,34 @@ const SubjectIndexPage: React.FC<SubjectIndexPageProps> = React.memo(({
     const [arabicBasicsItems, setArabicBasicsItems] = React.useState<MathBasicsItem[]>(() => loadCachedArabicBasics());
     const [activeLessonVideos, setActiveLessonVideos] = React.useState<{ unitTitle: string; lessonTitle: string; videos: LessonResource[] } | null>(null);
     const [ytTitles, setYtTitles] = React.useState<Record<string, string>>({});
+
+    const [studiedResources, setStudiedResources] = React.useState<Set<string>>(() => loadStudiedResourcesFromStorage());
+    const [studiedPrompt, setStudiedPrompt] = React.useState<{
+        key: string;
+        resTitle: string;
+        locationLabel: string;
+        isStudied: boolean;
+    } | null>(null);
+    const [studiedToast, setStudiedToast] = React.useState<string | null>(null);
+
+    React.useEffect(() => {
+        if (!studiedToast) return;
+        const timer = setTimeout(() => setStudiedToast(null), 2500);
+        return () => clearTimeout(timer);
+    }, [studiedToast]);
+
+    const toggleResourceStudied = React.useCallback((key: string, markAsStudied: boolean) => {
+        setStudiedResources(prev => {
+            const next = new Set(prev);
+            if (markAsStudied) {
+                next.add(key);
+            } else {
+                next.delete(key);
+            }
+            saveStudiedResourcesToStorage(next);
+            return next;
+        });
+    }, []);
 
     React.useEffect(() => {
         const currentItems = activeBasicsSubject === SubjectName.Arabic 
@@ -146,10 +406,13 @@ const SubjectIndexPage: React.FC<SubjectIndexPageProps> = React.memo(({
     };
 
     const closeResourceModal = () => {
+        setActiveResource(null);
         if (window.history.state?.activeResourceModal) {
-            window.history.back();
-        } else {
-            setActiveResource(null);
+            try {
+                window.history.back();
+            } catch (e) {
+                console.warn("history back error:", e);
+            }
         }
     };
 
@@ -1051,17 +1314,23 @@ const SubjectIndexPage: React.FC<SubjectIndexPageProps> = React.memo(({
                                                                                                     : isPdf 
                                                                                                         ? { ...res, type: 'pdf' } 
                                                                                                         : res;
-                                                                                                const resTitle = normalizedRes.resourceTitle?.trim() 
-                                                                                                    ? normalizedRes.resourceTitle 
-                                                                                                    : isPdf 
-                                                                                                        ? 'ملخص PDF' 
-                                                                                                        : isLink 
-                                                                                                            ? 'رابط خارجي' 
-                                                                                                            : 'ملخص مصور';
+                                                                                                const rawUrl = (res.url || '').trim();
+                                                                                                const title = (res.resourceTitle || '').trim();
+                                                                                                const cleanId = rawUrl || title || `idx_${rIdx}`;
+                                                                                                const storageKey = `${selectedSubject.id}_${selectedSubject.semester}_${unit.title}_${lesson.title}_${cleanId}`;
+                                                                                                const isStudied = studiedResources.has(storageKey);
 
                                                                                                 return (
-                                                                                                    <button
+                                                                                                    <ResourceItemButton
                                                                                                         key={rIdx}
+                                                                                                        res={res}
+                                                                                                        rIdx={rIdx}
+                                                                                                        unitTitle={unit.title}
+                                                                                                        lessonTitle={lesson.title}
+                                                                                                        subjectId={selectedSubject.id}
+                                                                                                        semester={selectedSubject.semester}
+                                                                                                        isStudied={isStudied}
+                                                                                                        onToggleStudiedPrompt={setStudiedPrompt}
                                                                                                         onClick={() => {
                                                                                                             if (isLink || normalizedRes.type === 'link' || res.type === 'link') {
                                                                                                                 if (res.url) {
@@ -1071,15 +1340,7 @@ const SubjectIndexPage: React.FC<SubjectIndexPageProps> = React.memo(({
                                                                                                             }
                                                                                                             handleResourceClick(unit.title, lesson.title, uIdx, lIdx, rIdx, normalizedRes);
                                                                                                         }}
-                                                                                                        className="w-full flex items-center justify-start gap-1.5 px-2 py-1.5 rounded-lg border border-slate-900 bg-white hover:bg-slate-50 active:scale-[0.98] transition-all shadow-2xs text-slate-800 font-bold text-xs group cursor-pointer"
-                                                                                                    >
-                                                                                                        <div className="w-4 h-4 rounded flex items-center justify-center shrink-0">
-                                                                                                            {isLink && <ExternalLink className="w-3.5 h-3.5 text-sky-600 group-hover:scale-110 transition-transform" />}
-                                                                                                            {isPdf && <FileText className="w-3.5 h-3.5 text-rose-600 group-hover:scale-110 transition-transform" />}
-                                                                                                            {!isLink && !isPdf && normalizedRes.type === 'image' && <ImageIcon className="w-3.5 h-3.5 text-emerald-600 group-hover:scale-110 transition-transform" />}
-                                                                                                        </div>
-                                                                                                        <span className="truncate text-right flex-1 text-[11px] leading-tight">{resTitle}</span>
-                                                                                                    </button>
+                                                                                                    />
                                                                                                 );
                                                                                             })}
                                                                                         </div>
@@ -1155,13 +1416,15 @@ const SubjectIndexPage: React.FC<SubjectIndexPageProps> = React.memo(({
                                                     <div className="w-full mt-3 pt-2.5 border-t border-slate-200/80 grid grid-cols-2 sm:grid-cols-3 gap-1.5" dir="rtl">
                                                         {videoResources.length > 0 && (
                                                             <button
-                                                                onClick={() => openLessonVideosView(unit.title, `شرح ${unit.title}`, videoResources)}
+                                                                onClick={() => openLessonVideosView(unit.title, isArabic ? `شرح ${unit.title}` : `مراجعة ${unit.title}`, videoResources)}
                                                                 className="w-full flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border-2 border-slate-900 bg-red-600 hover:bg-red-700 text-white font-black text-xs active:scale-95 transition-all shadow-2xs group cursor-pointer"
                                                             >
                                                                 <div className="w-4 h-4 rounded flex items-center justify-center shrink-0">
                                                                     <PlayCircle className="w-3.5 h-3.5 text-white group-hover:scale-110 transition-transform" />
                                                                 </div>
-                                                                <span className="truncate text-right flex-1 text-[11px] leading-tight">حصص الشرح</span>
+                                                                <span className="truncate text-right flex-1 text-[11px] leading-tight">
+                                                                    {isArabic ? 'حصص شرح الوحدة' : 'حصص مراجعة الوحدة'}
+                                                                </span>
                                                             </button>
                                                         )}
 
@@ -1173,17 +1436,22 @@ const SubjectIndexPage: React.FC<SubjectIndexPageProps> = React.memo(({
                                                                 : isPdf 
                                                                     ? { ...res, type: 'pdf' } 
                                                                     : res;
-                                                            const resTitle = normalizedRes.resourceTitle?.trim() 
-                                                                ? normalizedRes.resourceTitle 
-                                                                : isPdf 
-                                                                    ? 'ملخص الوحدة PDF' 
-                                                                    : isLink 
-                                                                        ? 'رابط خارجي' 
-                                                                        : 'خريطة ذهنية للوحدة';
+                                                            const rawUrl = (res.url || '').trim();
+                                                            const title = (res.resourceTitle || '').trim();
+                                                            const cleanId = rawUrl || title || `idx_${rIdx}`;
+                                                            const storageKey = `${selectedSubject.id}_${selectedSubject.semester}_${unit.title}_unit_${cleanId}`;
+                                                            const isStudied = studiedResources.has(storageKey);
 
-                                                             return (
-                                                                <button
+                                                            return (
+                                                                <ResourceItemButton
                                                                     key={rIdx}
+                                                                    res={res}
+                                                                    rIdx={rIdx}
+                                                                    unitTitle={unit.title}
+                                                                    subjectId={selectedSubject.id}
+                                                                    semester={selectedSubject.semester}
+                                                                    isStudied={isStudied}
+                                                                    onToggleStudiedPrompt={setStudiedPrompt}
                                                                     onClick={() => {
                                                                         if (isLink || normalizedRes.type === 'link' || res.type === 'link') {
                                                                             if (res.url) {
@@ -1191,17 +1459,10 @@ const SubjectIndexPage: React.FC<SubjectIndexPageProps> = React.memo(({
                                                                             }
                                                                             return;
                                                                         }
+                                                                        const resTitle = normalizedRes.resourceTitle?.trim() || 'ملخص الوحدة PDF';
                                                                         handleResourceClick(unit.title, resTitle, uIdx, -1, rIdx, normalizedRes, unit);
                                                                     }}
-                                                                    className="w-full flex items-center justify-start gap-1.5 px-2.5 py-1.5 rounded-lg border border-slate-900 bg-white hover:bg-slate-50 active:scale-[0.98] transition-all shadow-2xs text-slate-800 font-bold text-xs group cursor-pointer"
-                                                                >
-                                                                    <div className="w-4 h-4 rounded flex items-center justify-center shrink-0">
-                                                                        {isLink && <ExternalLink className="w-3.5 h-3.5 text-sky-600 group-hover:scale-110 transition-transform" />}
-                                                                        {isPdf && <FileText className="w-3.5 h-3.5 text-rose-600 group-hover:scale-110 transition-transform" />}
-                                                                        {!isLink && !isPdf && normalizedRes.type === 'image' && <ImageIcon className="w-3.5 h-3.5 text-emerald-600 group-hover:scale-110 transition-transform" />}
-                                                                    </div>
-                                                                    <span className="truncate text-right flex-1 text-[11px] leading-tight">{resTitle}</span>
-                                                                </button>
+                                                                />
                                                             );
                                                         })}
                                                     </div>
@@ -1224,6 +1485,130 @@ const SubjectIndexPage: React.FC<SubjectIndexPageProps> = React.memo(({
                     isSyncing={isSyncingResource}
                     onClose={closeResourceModal}
                 />
+            )}
+
+            {/* Studied Confirmation Modal */}
+            <AnimatePresence>
+                {studiedPrompt && (
+                    <div 
+                        className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4"
+                        onClick={() => setStudiedPrompt(null)}
+                        dir="rtl"
+                    >
+                        <motion.div 
+                            initial={{ scale: 0.95, opacity: 0 }}
+                            animate={{ scale: 1, opacity: 1 }}
+                            exit={{ scale: 0.95, opacity: 0 }}
+                            transition={{ duration: 0.15 }}
+                            className="bg-white rounded-2xl border-2 border-slate-900 shadow-[6px_6px_0px_0px_rgba(0,0,0,1)] max-w-sm w-full p-5 text-right space-y-4"
+                            onClick={(e) => e.stopPropagation()}
+                        >
+                            {/* Modal Header */}
+                            <div className="flex items-center justify-between pb-3 border-b border-slate-200">
+                                <div className="flex items-center gap-2.5">
+                                    <div className={`w-9 h-9 rounded-xl border-2 border-slate-900 flex items-center justify-center shadow-2xs ${
+                                        studiedPrompt.isStudied ? 'bg-amber-100 text-amber-800' : 'bg-emerald-100 text-emerald-800'
+                                    }`}>
+                                        {studiedPrompt.isStudied ? (
+                                            <RotateCcw className="w-5 h-5 text-amber-700" />
+                                        ) : (
+                                            <CheckCircle2 className="w-5 h-5 text-emerald-600" />
+                                        )}
+                                    </div>
+                                    <div>
+                                        <h4 className="font-black text-slate-900 text-sm sm:text-base leading-tight">
+                                            {studiedPrompt.isStudied ? 'تعديل حالة المصدر' : 'تحديد حالة المصدر'}
+                                        </h4>
+                                        <p className="text-[10px] text-slate-500 font-bold mt-0.5">
+                                            {studiedPrompt.isStudied ? 'إزالة التظليل لمراجعته لاحقاً' : 'تظليل الزر باللون الأخضر'}
+                                        </p>
+                                    </div>
+                                </div>
+
+                                <button
+                                    onClick={() => setStudiedPrompt(null)}
+                                    className="w-7 h-7 rounded-lg border border-slate-300 hover:bg-slate-100 flex items-center justify-center text-slate-500 hover:text-slate-800 cursor-pointer"
+                                    title="إغلاق"
+                                >
+                                    <X className="w-4 h-4" />
+                                </button>
+                            </div>
+
+                            {/* Resource Card */}
+                            <div className={`p-3 rounded-xl border-2 ${
+                                studiedPrompt.isStudied 
+                                    ? 'bg-emerald-50/80 border-emerald-500 text-emerald-950' 
+                                    : 'bg-slate-50 border-slate-200 text-slate-900'
+                            }`}>
+                                <div className="flex items-center gap-2">
+                                    <div className={`w-6 h-6 rounded-lg flex items-center justify-center shrink-0 ${
+                                        studiedPrompt.isStudied ? 'bg-emerald-500 text-white' : 'bg-slate-200 text-slate-700'
+                                    }`}>
+                                        <CheckCircle2 className="w-3.5 h-3.5" />
+                                    </div>
+                                    <span className="font-black text-xs sm:text-sm leading-snug truncate">
+                                        {studiedPrompt.resTitle}
+                                    </span>
+                                </div>
+                                <div className="mt-1.5 text-[10px] font-bold text-slate-500 flex items-center gap-1.5">
+                                    <span>📌</span>
+                                    <span className="truncate">{studiedPrompt.locationLabel}</span>
+                                </div>
+                            </div>
+
+                            {/* Explanation */}
+                            <p className="text-xs text-slate-700 font-bold leading-relaxed">
+                                {studiedPrompt.isStudied
+                                    ? 'هذا الزر مظلل حالياً باللون الأخضر للإشارة إلى أنه تمت دراسته. هل ترغب في إزالة التظليل الأخضر عنه لمراجعته لاحقاً؟'
+                                    : 'هل أتممت دراسة هذا المصدر وترغب في تظليل الزر باللون الأخضر لتمييزه وتسهيل متابعة إنجازك؟'}
+                            </p>
+
+                            {/* Action Buttons */}
+                            <div className="pt-2 flex flex-col gap-2">
+                                {studiedPrompt.isStudied ? (
+                                    <button
+                                        onClick={() => {
+                                            toggleResourceStudied(studiedPrompt.key, false);
+                                            setStudiedPrompt(null);
+                                            setStudiedToast('تمت إزالة التظليل من المصدر لمراجعته لاحقاً ↺');
+                                        }}
+                                        className="w-full py-2.5 px-4 bg-amber-500 hover:bg-amber-600 text-slate-950 rounded-xl font-black text-xs sm:text-sm border-2 border-slate-900 shadow-[2px_2px_0px_0px_rgba(0,0,0,1)] active:translate-x-[1px] active:translate-y-[1px] active:shadow-none transition-all flex items-center justify-center gap-2 cursor-pointer"
+                                    >
+                                        <RotateCcw className="w-4 h-4 text-slate-950" />
+                                        <span>إزالة التظليل (لمراجعته لاحقاً)</span>
+                                    </button>
+                                ) : (
+                                    <button
+                                        onClick={() => {
+                                            toggleResourceStudied(studiedPrompt.key, true);
+                                            setStudiedPrompt(null);
+                                            setStudiedToast('تم تظليل الزر باللون الأخضر (تمت دراسته) ✓');
+                                        }}
+                                        className="w-full py-2.5 px-4 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl font-black text-xs sm:text-sm border-2 border-slate-900 shadow-[2px_2px_0px_0px_rgba(0,0,0,1)] active:translate-x-[1px] active:translate-y-[1px] active:shadow-none transition-all flex items-center justify-center gap-2 cursor-pointer"
+                                    >
+                                        <CheckCircle2 className="w-4 h-4 text-white" />
+                                        <span>تظليل باللون الأخضر (تمت دراسته)</span>
+                                    </button>
+                                )}
+
+                                <button
+                                    onClick={() => setStudiedPrompt(null)}
+                                    className="w-full py-2 px-4 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl font-bold text-xs border border-slate-300 transition-colors cursor-pointer"
+                                >
+                                    {studiedPrompt.isStudied ? 'إبقاء التظليل (تمت دراسته)' : 'إلغاء'}
+                                </button>
+                            </div>
+                        </motion.div>
+                    </div>
+                )}
+            </AnimatePresence>
+
+            {/* Studied Feedback Toast */}
+            {studiedToast && (
+                <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 px-4 py-2.5 bg-slate-900 text-white border-2 border-yellow-400 rounded-2xl font-black text-xs sm:text-sm flex items-center gap-2 shadow-[0_8px_30px_rgb(0,0,0,0.35)] animate-fade-in pointer-events-none select-none">
+                    <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
+                    <span>{studiedToast}</span>
+                </div>
             )}
 
             {syncNotification && (

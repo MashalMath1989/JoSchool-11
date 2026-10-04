@@ -24,6 +24,35 @@ export default defineConfig(({ mode }) => {
       },
       optimizeDeps: {
         include: ['react', 'react-dom', 'react-dom/client', 'react/jsx-runtime', 'react/jsx-dev-runtime']
+      },
+      build: {
+        target: 'esnext',
+        cssCodeSplit: true,
+        chunkSizeWarningLimit: 1200,
+        rollupOptions: {
+          output: {
+            manualChunks(id) {
+              if (id.includes('node_modules/jspdf') || id.includes('node_modules/html2pdf.js') || id.includes('node_modules/html-to-image')) {
+                return 'vendor-pdf-export';
+              }
+              if (id.includes('node_modules/recharts')) {
+                return 'vendor-charts';
+              }
+              if (id.includes('node_modules/katex')) {
+                return 'vendor-katex';
+              }
+              if (id.includes('node_modules/firebase')) {
+                return 'vendor-firebase';
+              }
+              if (id.includes('node_modules/framer-motion')) {
+                return 'vendor-framer-motion';
+              }
+              if (id.includes('node_modules/lucide-react')) {
+                return 'vendor-icons';
+              }
+            }
+          }
+        }
       }
     };
 });

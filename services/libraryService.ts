@@ -221,24 +221,42 @@ export function regexExtractLibraryItems(text: string): ValidLibraryItem[] {
 
     while ((match = objectRegex.exec(text)) !== null) {
         const block = match[0];
+        const matchIndex = match.index;
         const rawUrl = match[1]?.trim();
         if (!rawUrl || rawUrl === '""') continue;
 
-        const titleMatch = block.match(/"title"\s*:\s*"([^"]+)"/i);
+        const titleMatch = block.match(/"title"\s*:\s*"([^"]+)"/i) || block.match(/"title"\s*:\s*([^",}\n\r]+)/i);
         const typeMatch = block.match(/"type"\s*:\s*"([^"]+)"/i);
         const thumbnailMatch = block.match(/"(?:thumbnail|thumbnailUrl|coverImage|cover)"\s*:\s*"([^"]+)"/i);
-        const subjectMatch = block.match(/"subject"\s*:\s*"([^"]+)"/i);
-        const semesterMatch = block.match(/"semester"\s*:\s*"([^"]+)"/i);
-        const categoryMatch = block.match(/"category"\s*:\s*"([^"]+)"/i);
+
+        // Check if subject/semester/category exist inside the block itself
+        let subMatch = block.match(/"subject"\s*:\s*"([^"]+)"/i);
+        let semMatch = block.match(/"semester"\s*:\s*"([^"]+)"/i);
+        let catMatch = block.match(/"category"\s*:\s*"([^"]+)"/i);
+
+        // If not inside the block itself, search backwards in the text up to matchIndex to find the enclosing group's subject, semester, and category
+        const textBefore = text.slice(0, matchIndex);
+        if (!subMatch) {
+            const allSubs = [...textBefore.matchAll(/"subject"\s*:\s*"([^"]+)"/gi)];
+            if (allSubs.length > 0) subMatch = allSubs[allSubs.length - 1];
+        }
+        if (!semMatch) {
+            const allSems = [...textBefore.matchAll(/"semester"\s*:\s*"([^"]+)"/gi)];
+            if (allSems.length > 0) semMatch = allSems[allSems.length - 1];
+        }
+        if (!catMatch) {
+            const allCats = [...textBefore.matchAll(/"category"\s*:\s*"([^"]+)"/gi)];
+            if (allCats.length > 0) catMatch = allCats[allCats.length - 1];
+        }
 
         const rawTitle = titleMatch ? titleMatch[1].trim() : 'ملف دراسي';
-        const curSub = subjectMatch ? subjectMatch[1].trim() : 'الرياضيات';
+        const curSub = subMatch ? subMatch[1].trim() : 'الرياضيات';
         // Skip English items
         if (curSub.includes('انجليز') || curSub.includes('انكليز') || curSub.toLowerCase().includes('english')) {
             continue;
         }
-        const curSem = semesterMatch ? semesterMatch[1].trim() : 'الفصل الأول';
-        const curCat = categoryMatch ? categoryMatch[1].trim() : 'الكتب المدرسية';
+        const curSem = semMatch ? semMatch[1].trim() : 'الفصل الأول';
+        const curCat = catMatch ? catMatch[1].trim() : 'الكتب المدرسية';
 
         const itemKey = `${curSub}|${curSem}|${curCat}|${rawTitle}|${rawUrl}`;
         if (seenKeys.has(itemKey)) continue;
@@ -260,7 +278,7 @@ export function regexExtractLibraryItems(text: string): ValidLibraryItem[] {
     return results;
 }
 
-// Resilient parser that repairs common human JSON editing mistakes (trailing commas, unclosed braces, comments, smart quotes, accidental nesting)
+// Resilient parser that repairs common human JSON editing mistakes (trailing commas, unclosed braces, comments, smart quotes, accidental nesting, missing quotes)
 export function robustParseLibraryJSON(text: string): any {
     if (!text || typeof text !== 'string') return null;
 
@@ -281,8 +299,37 @@ export function robustParseLibraryJSON(text: string): any {
     // 4. Normalize smart/curly quotes to standard double quotes
     clean = clean.replace(/[\u201C\u201D\u00AB\u00BB]/g, '"').replace(/[\u2018\u2019]/g, '"');
 
+    // 4.5. Repair missing or mismatched quotes on properties and values
+    // e.g. "title": بنك أسئلة ...", -> "title": "بنك أسئلة ...",
+    // e.g. "title": "بنك أسئلة ..., -> "title": "بنك أسئلة ...",
+    // e.g. "title": بنك أسئلة ..., -> "title": "بنك أسئلة ...",
+    const repairQuotes = (str: string): string => {
+        let s = str;
+        // Missing opening quote: "key": value",
+        s = s.replace(/(["']?(?:title|subject|category|semester|type|fileUrl|thumbnail|thumbnailUrl|coverImage|cover)["']?\s*:\s*)([^\s"'{}[\]][^"'\r\n,}]*)(["']\s*[,}])/gi, (_m, p1, p2, p3) => {
+            return p1 + '"' + p2.trim() + '"' + (p3.includes(',') ? ',' : p3.includes('}') ? '}' : '');
+        });
+        // Missing closing quote: "key": "value,
+        s = s.replace(/(["']?(?:title|subject|category|semester|type|fileUrl|thumbnail|thumbnailUrl|coverImage|cover)["']?\s*:\s*["'])([^"'\r\n,{}]+)(\s*[,}])/gi, (_m, p1, p2, p3) => {
+            return p1 + p2.trim() + '"' + p3;
+        });
+        // Missing both quotes: "key": value,
+        s = s.replace(/(["']?(?:title|subject|category|semester|type|fileUrl|thumbnail|thumbnailUrl|coverImage|cover)["']?\s*:\s*)([^\s"'{}[\]0-9][^"'\r\n,{}]*)(\s*[,}])/gi, (_m, p1, p2, p3) => {
+            return p1 + '"' + p2.trim() + '"' + p3;
+        });
+        return s;
+    };
+
+    const quoteRepaired = repairQuotes(clean);
+    try {
+        const parsed = JSON.parse(quoteRepaired);
+        if (parsed) return parsed;
+    } catch {
+        // Continue
+    }
+
     // 5. Remove trailing commas before } or ]
-    const noCommas = clean.replace(/,\s*([\]}])/g, '$1');
+    const noCommas = quoteRepaired.replace(/,\s*([\]}])/g, '$1');
     try {
         const parsed = JSON.parse(noCommas);
         if (parsed) return parsed;
@@ -301,7 +348,7 @@ export function robustParseLibraryJSON(text: string): any {
     }
 
     // 7. Balance mismatched brackets and braces at end of string
-    const candidates = [fixedNesting, noCommas, clean];
+    const candidates = [fixedNesting, noCommas, quoteRepaired, clean];
     for (const candidate of candidates) {
         const openBraces = (candidate.match(/\{/g) || []).length;
         let closeBraces = (candidate.match(/\}/g) || []).length;
@@ -345,10 +392,12 @@ export function loadCachedLibraryData(): RawLibraryGroup[] {
         if (cached) {
             const parsed = robustParseLibraryJSON(cached);
             if (Array.isArray(parsed) && parsed.length > 0) {
-                // Ensure cached data has at least as many valid items as default bundled data
-                const cachedValidCount = extractValidLibraryItems(parsed).length;
+                const items = extractValidLibraryItems(parsed);
+                const categories = new Set(items.map(it => it.category));
+                const cachedValidCount = items.length;
                 const defaultValidCount = extractValidLibraryItems(DEFAULT_LIBRARY_DATA).length;
-                if (cachedValidCount >= defaultValidCount) {
+                // Ensure cached data is valid and not corrupted by old fallback that collapsed all items into 1 category
+                if (cachedValidCount >= defaultValidCount && (categories.size > 1 || cachedValidCount <= 5)) {
                     return parsed;
                 }
             }

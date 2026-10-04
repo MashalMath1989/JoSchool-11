@@ -22,6 +22,7 @@ import {
     countValidItemsInCategory,
     inferResourceType
 } from './services/libraryService';
+import { getPdfCoverThumbnail } from './services/pdfThumbnailService';
 
 interface LibraryPageProps {
     subjectsData: Subject[];
@@ -74,14 +75,50 @@ interface LibraryItemCoverProps {
     item: ValidLibraryItem;
 }
 
-// عرض صورة الغلاف إذا توفرت في حقل thumbnail أو العرض الافتراضي كأيقونة
+// عرض صورة الغلاف إذا توفرت في حقل thumbnail أو أول صفحة من ملف PDF أو العرض الافتراضي كأيقونة
 const LibraryItemCover: React.FC<LibraryItemCoverProps> = ({ item }) => {
     const [imgFailed, setImgFailed] = useState(false);
+    const [pdfCover, setPdfCover] = useState<string | null>(null);
+    const [pdfCoverStatus, setPdfCoverStatus] = useState<'idle' | 'loading' | 'success' | 'failed'>(() => {
+        const isPdf = item.type === 'pdf';
+        const hasThumbnail = Boolean(item.thumbnail && item.thumbnail.trim());
+        const hasUrl = Boolean(item.fileUrl && item.fileUrl.trim());
+        return (isPdf && !hasThumbnail && hasUrl) ? 'loading' : 'idle';
+    });
+
     const isPdf = item.type === 'pdf';
     const isImage = item.type === 'image';
     const isVideo = item.type === 'video';
     const hasThumbnail = Boolean(item.thumbnail && item.thumbnail.trim() && !imgFailed);
+    const shouldFetch = isPdf && !hasThumbnail && Boolean(item.fileUrl && item.fileUrl.trim()) && pdfCoverStatus !== 'failed' && pdfCoverStatus !== 'success';
 
+    // استخراج أول صفحة من ملف الـ PDF كصورة غلاف عند عدم توفر رابط صورة غلاف
+    useEffect(() => {
+        let isCancelled = false;
+
+        if (shouldFetch && item.fileUrl) {
+            getPdfCoverThumbnail(item.fileUrl)
+                .then((thumb) => {
+                    if (isCancelled) return;
+                    if (thumb) {
+                        setPdfCover(thumb);
+                        setPdfCoverStatus('success');
+                    } else {
+                        setPdfCoverStatus('failed');
+                    }
+                })
+                .catch(() => {
+                    if (isCancelled) return;
+                    setPdfCoverStatus('failed');
+                });
+        }
+
+        return () => {
+            isCancelled = true;
+        };
+    }, [shouldFetch, item.fileUrl]);
+
+    // 1. إذا توفرت صورة غلاف صريحة في حقل thumbnail
     if (hasThumbnail) {
         return (
             <div
@@ -99,6 +136,34 @@ const LibraryItemCover: React.FC<LibraryItemCoverProps> = ({ item }) => {
         );
     }
 
+    // 2. إذا تم استخراج صورة أول صفحة من ملف الـ PDF كغلاف
+    if (isPdf && pdfCover) {
+        return (
+            <div
+                className="relative w-14 sm:w-16 h-20 sm:h-22 rounded-lg overflow-hidden border border-black shrink-0 shadow-xs bg-white block p-0 group-hover:scale-[1.02] transition-transform text-right"
+                title={item.title}
+            >
+                <img
+                    src={pdfCover}
+                    alt={`غلاف ${item.title}`}
+                    className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+                    loading="lazy"
+                />
+            </div>
+        );
+    }
+
+    // 3. أثناء جاري استخراج الصفحة الأولى كغلاف (مظهر تحميل أنيق يطابق مقاس الغلاف)
+    if (isPdf && pdfCoverStatus === 'loading') {
+        return (
+            <div className="relative w-14 sm:w-16 h-20 sm:h-22 rounded-lg overflow-hidden border border-slate-300 shrink-0 shadow-2xs bg-slate-100 flex flex-col items-center justify-center p-1 text-center animate-pulse">
+                <FileText className="w-5 h-5 text-rose-500 mb-1 opacity-70 animate-bounce" />
+                <span className="text-[8px] font-black text-slate-500 leading-tight">جاري الغلاف</span>
+            </div>
+        );
+    }
+
+    // 4. العرض الافتراضي كأيقونة في حال الفشل أو عدم توفر رابط أو للملفات الأخرى
     return (
         <div className="w-10 h-10 rounded-xl border border-slate-900 flex items-center justify-center shrink-0 shadow-[1.5px_1.5px_0px_0px_rgba(0,0,0,1)] transition-colors bg-slate-100 group-hover:bg-yellow-100">
             {isPdf && <FileText className="w-5 h-5 text-rose-600" />}
@@ -575,8 +640,8 @@ const LibraryPage: React.FC<LibraryPageProps> = ({
                                     className="bg-white p-3.5 sm:p-4 rounded-xl border-2 border-slate-900 shadow-[2px_2px_0px_0px_rgba(0,0,0,1)] hover:shadow-[4px_4px_0px_0px_rgba(0,0,0,1)] hover:border-slate-950 active:translate-x-[1px] active:translate-y-[1px] active:shadow-none transition-all flex flex-row items-center justify-between gap-3 sm:gap-4 text-right group cursor-pointer select-none"
                                 >
                                     <div className="flex items-center gap-3 sm:gap-3.5 flex-1 min-w-0">
-                                        {/* صورة الغلاف إذا توفرت في حقل thumbnail أو الأيقونة الافتراضية */}
-                                        <LibraryItemCover item={item} />
+                                        {/* صورة الغلاف إذا توفرت في حقل thumbnail أو أول صفحة من ملف PDF أو الأيقونة الافتراضية */}
+                                        <LibraryItemCover key={`${item.id}-${item.fileUrl || index}`} item={item} />
 
                                         {/* تفاصيل الملف */}
                                         <div className="space-y-1.5 flex-1 min-w-0">

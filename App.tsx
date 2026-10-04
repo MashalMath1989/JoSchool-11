@@ -12,21 +12,50 @@ import { onAuthStateChanged, signOut, User } from 'firebase/auth';
 import { saveUserProgress, subscribeToUserProgress } from './services/firestoreService';
 
 import LandingPage from './LandingPage';
-import SubjectIndexPage from './SubjectIndexPage';
-import QuizPage from './QuizPage';
-import ResultsPage from './ResultsPage';
-import PdfViewerScreen from './PdfViewerScreen';
-import ProgressDashboard from './ProgressDashboard';
-import FavoriteQuestionsPage from './FavoriteQuestionsPage';
-import SessionSubjectsPage from './SessionSubjectsPage';
-import MoEResultsPage from './MoEResultsPage';
-import AnnouncementsPage from './AnnouncementsPage';
-import AuthPage from './AuthPage';
-import SessionsListPage from './SessionsListPage';
-import { LOGO_DATA_URI } from './logoDataUri';
-import LibraryPage from './LibraryPage';
 import WelcomePage from './WelcomePage';
-import FriendChallengePage from './FriendChallengePage';
+import SubjectIndexPage from './SubjectIndexPage';
+import AuthPage from './AuthPage';
+import PdfViewerScreen from './PdfViewerScreen';
+
+// Resilient dynamic loader with automatic retries for heavy secondary pages
+const lazyWithRetry = <T extends React.ComponentType<any>>(
+    factory: () => Promise<{ default: T }>
+) => {
+    return React.lazy(async () => {
+        try {
+            return await factory();
+        } catch (error) {
+            console.warn("Dynamic import failed, retrying in 200ms...", error);
+            await new Promise(r => setTimeout(r, 200));
+            try {
+                return await factory();
+            } catch (err2) {
+                console.warn("Second dynamic import attempt failed, retrying in 400ms...", err2);
+                await new Promise(r => setTimeout(r, 400));
+                return await factory();
+            }
+        }
+    });
+};
+
+const QuizPage = lazyWithRetry(() => import('./QuizPage'));
+const ResultsPage = lazyWithRetry(() => import('./ResultsPage'));
+const ProgressDashboard = lazyWithRetry(() => import('./ProgressDashboard'));
+const FavoriteQuestionsPage = lazyWithRetry(() => import('./FavoriteQuestionsPage'));
+const SessionSubjectsPage = lazyWithRetry(() => import('./SessionSubjectsPage'));
+const MoEResultsPage = lazyWithRetry(() => import('./MoEResultsPage'));
+const AnnouncementsPage = lazyWithRetry(() => import('./AnnouncementsPage'));
+const SessionsListPage = lazyWithRetry(() => import('./SessionsListPage'));
+const LibraryPage = lazyWithRetry(() => import('./LibraryPage'));
+const FriendChallengePage = lazyWithRetry(() => import('./FriendChallengePage'));
+
+const PageLoadingFallback: React.FC = () => (
+    <div className="flex flex-col items-center justify-center min-h-[50vh] py-16 px-4 text-center">
+        <Loader2 className="w-10 h-10 text-primary animate-spin mb-3" />
+        <p className="font-bold text-xs sm:text-sm text-slate-500">جاري تجهيز الصفحة...</p>
+    </div>
+);
+import { LOGO_DATA_URI } from './logoDataUri';
 import { FriendChallenge } from './types';
 import { createChallenge, submitChallengeResult } from './services/challengeService';
 import { fetchRemoteResources, fetchRemoteMathBasics, fetchRemoteArabicBasics } from './services/resourceService';
@@ -566,13 +595,27 @@ const App: React.FC = () => {
     const timerRef = useRef<NodeJS.Timeout | null>(null);
     const lastSyncedProgressRef = useRef<UserProgress | null>(null);
 
-    const [user, setUser] = useState<User | null>(null);
+    const [user, setUser] = useState<User | null>(() => auth.currentUser);
     const [isAuthenticating, setIsAuthenticating] = useState(true);
+
+    // Fallback safety timeout: only fires if Firebase completely hangs/fails (4s)
+    useEffect(() => {
+        const timer = setTimeout(() => {
+            setIsAuthenticating(false);
+        }, 4000);
+        return () => clearTimeout(timer);
+    }, []);
 
     const getStorageKey = useCallback((suffix: string, userId?: string) => `joschool_${userId || 'guest'}_${suffix}`, []);
 
     // Initial state cleanup for legacy shared progress
     useEffect(() => {
+        try {
+            sessionStorage.removeItem('chunk_reload_attempted');
+        } catch (e) {
+            // Ignore storage access errors in restricted iframe
+        }
+
         const legacyKeys = ['userProgress', 'joschool_app_state'];
         legacyKeys.forEach(key => {
             if (localStorage.getItem(key)) {
@@ -694,84 +737,79 @@ const App: React.FC = () => {
     // Effect to handle user identity and isolated state loading
     useEffect(() => {
         const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
-            setUser(prevUser => {
-                const prevUid = prevUser?.uid;
-                const newUid = currentUser?.uid;
+            const newUid = currentUser?.uid;
 
-                // Only act if user identity changed or it's first load
-                if (prevUid !== newUid || isAuthenticating) {
-                    setIsAuthenticating(false);
-
-                    // 1. Reset/Load progress
-                    const progressKey = getStorageKey('user_progress', newUid);
-                    const savedProgress = localStorage.getItem(progressKey);
-                    if (savedProgress) {
-                        try {
-                            const parsed = JSON.parse(savedProgress);
-                            const sanitizedFavorites = parsed?.favoriteQuestions 
-                                ? parsed.favoriteQuestions.filter((q: any) => typeof q === 'object' && q !== null)
-                                : [];
-                            setUserProgress({
-                                ...getDefaultProgress(),
-                                ...parsed,
-                                favoriteQuestions: sanitizedFavorites
-                            });
-                        } catch (e) {
-                            setUserProgress(getDefaultProgress());
-                        }
-                    } else {
-                        setUserProgress(getDefaultProgress());
-                    }
-
-                    // 2. Reset/Load session state
-                    const state = loadStateForUser(newUid);
-                    if (state) {
-                        if (state.viewHistory) setViewHistory(state.viewHistory);
-                        if (state.selectedSubject) setSelectedSubject(state.selectedSubject);
-                        if (state.sessionTitle) setSessionTitle(state.sessionTitle);
-                        const loadedQuiz = state.currentQuiz || [];
-                        if (state.currentQuiz) setCurrentQuiz(loadedQuiz);
-                        if (state.currentQuestionIndex !== undefined) {
-                            const validIdx = (loadedQuiz.length > 0 && typeof state.currentQuestionIndex === 'number' && state.currentQuestionIndex >= 0 && state.currentQuestionIndex < loadedQuiz.length)
-                                ? state.currentQuestionIndex
-                                : 0;
-                            setCurrentQuestionIndex(validIdx);
-                        }
-                        if (state.userAnswers) setUserAnswers(state.userAnswers);
-                        if (state.showResults !== undefined) setShowResults(state.showResults);
-                        if (state.timer !== undefined) setTimer(state.timer);
-                        if (state.currentPdfUrl) setCurrentPdfUrl(state.currentPdfUrl);
-                        if (state.pdfTitle) setPdfTitle(state.pdfTitle);
-                        if (state.currentLessonTitle) setCurrentLessonTitle(state.currentLessonTitle);
-                        if (state.currentUnitTitle) setCurrentUnitTitle(state.currentUnitTitle);
-                        if (state.examNumber !== undefined) setExamNumber(state.examNumber);
-                        if (state.expandedUnitIndices) setExpandedUnitIndices(state.expandedUnitIndices);
-                        if (state.expandedLessonKeys) setExpandedLessonKeys(state.expandedLessonKeys);
-                    } else {
-                        // Start fresh for new account or guest
-                        const hasSeen = localStorage.getItem(getStorageKey('has_seen_welcome', newUid)) === 'true';
-                        setViewHistory(hasSeen ? [View.Landing] : [View.Welcome]);
-                        setSelectedSubject(null);
-                        setSessionTitle('');
-                        setCurrentQuiz([]);
-                        setCurrentQuestionIndex(0);
-                        setUserAnswers([]);
-                        setShowResults(false);
-                        setTimer(0);
-                        setCurrentPdfUrl('');
-                        setPdfTitle('');
-                        setCurrentLessonTitle('');
-                        setCurrentUnitTitle('');
-                        setExamNumber(null);
-                        setExpandedUnitIndices([]);
-                        setExpandedLessonKeys([]);
-                    }
+            // 1. Reset/Load progress
+            const progressKey = getStorageKey('user_progress', newUid);
+            const savedProgress = localStorage.getItem(progressKey);
+            if (savedProgress) {
+                try {
+                    const parsed = JSON.parse(savedProgress);
+                    const sanitizedFavorites = parsed?.favoriteQuestions 
+                        ? parsed.favoriteQuestions.filter((q: any) => typeof q === 'object' && q !== null)
+                        : [];
+                    setUserProgress({
+                        ...getDefaultProgress(),
+                        ...parsed,
+                        favoriteQuestions: sanitizedFavorites
+                    });
+                } catch (e) {
+                    setUserProgress(getDefaultProgress());
                 }
-                return currentUser;
-            });
+            } else {
+                setUserProgress(getDefaultProgress());
+            }
+
+            // 2. Reset/Load session state
+            const state = loadStateForUser(newUid);
+            if (state) {
+                if (state.viewHistory) setViewHistory(state.viewHistory);
+                if (state.selectedSubject) setSelectedSubject(state.selectedSubject);
+                if (state.sessionTitle) setSessionTitle(state.sessionTitle);
+                const loadedQuiz = state.currentQuiz || [];
+                if (state.currentQuiz) setCurrentQuiz(loadedQuiz);
+                if (state.currentQuestionIndex !== undefined) {
+                    const validIdx = (loadedQuiz.length > 0 && typeof state.currentQuestionIndex === 'number' && state.currentQuestionIndex >= 0 && state.currentQuestionIndex < loadedQuiz.length)
+                        ? state.currentQuestionIndex
+                        : 0;
+                    setCurrentQuestionIndex(validIdx);
+                }
+                if (state.userAnswers) setUserAnswers(state.userAnswers);
+                if (state.showResults !== undefined) setShowResults(state.showResults);
+                if (state.timer !== undefined) setTimer(state.timer);
+                if (state.currentPdfUrl) setCurrentPdfUrl(state.currentPdfUrl);
+                if (state.pdfTitle) setPdfTitle(state.pdfTitle);
+                if (state.currentLessonTitle) setCurrentLessonTitle(state.currentLessonTitle);
+                if (state.currentUnitTitle) setCurrentUnitTitle(state.currentUnitTitle);
+                if (state.examNumber !== undefined) setExamNumber(state.examNumber);
+                if (state.expandedUnitIndices) setExpandedUnitIndices(state.expandedUnitIndices);
+                if (state.expandedLessonKeys) setExpandedLessonKeys(state.expandedLessonKeys);
+            } else {
+                // Start fresh for new account or guest
+                const hasSeen = localStorage.getItem(getStorageKey('has_seen_welcome', newUid)) === 'true';
+                setViewHistory(hasSeen ? [View.Landing] : [View.Welcome]);
+                setSelectedSubject(null);
+                setSessionTitle('');
+                setCurrentQuiz([]);
+                setCurrentQuestionIndex(0);
+                setUserAnswers([]);
+                setShowResults(false);
+                setTimer(0);
+                setCurrentPdfUrl('');
+                setPdfTitle('');
+                setCurrentLessonTitle('');
+                setCurrentUnitTitle('');
+                setExamNumber(null);
+                setExpandedUnitIndices([]);
+                setExpandedLessonKeys([]);
+            }
+
+            // Simultaneously update user and end authenticating in a single atomic render
+            setUser(currentUser);
+            setIsAuthenticating(false);
         });
         return () => unsubscribe();
-    }, [getStorageKey, loadStateForUser, getDefaultProgress, isAuthenticating]); // Removed user from deps but kept isAuthenticating
+    }, [getStorageKey, loadStateForUser, getDefaultProgress]);
 
     useEffect(() => {
         const key = getStorageKey('user_progress', user?.uid);
@@ -1043,15 +1081,17 @@ const App: React.FC = () => {
     }, []);
 
     useEffect(() => {
-        // Load database from cache on startup
-        loadFromCache();
+        // Load database from cache with small deferral to prioritize first frame
+        const timerId = setTimeout(() => {
+            loadFromCache();
+        }, 30);
         
         // Initial setup for browser history to handle back button on Landing page
         if (!window.history.state || !window.history.state.view) {
             window.history.replaceState({ view: View.Landing, historyIndex: 0 }, '');
         }
 
-        // Start background data fetch with a small delay to prioritize app startup
+        // Start background data fetch with a 2.5s delay to keep startup 100% smooth
         const timeout = setTimeout(() => {
             fetchExams();
             // Pre-warm chapter resources in background with zero UI impact
@@ -1061,9 +1101,12 @@ const App: React.FC = () => {
             fetchRemoteResources(SubjectName.IslamicEducation, Semester.First).catch(() => {});
             fetchRemoteMathBasics().catch(() => {});
             fetchRemoteArabicBasics().catch(() => {});
-        }, 1500);
+        }, 2500);
         
-        return () => clearTimeout(timeout);
+        return () => {
+            clearTimeout(timerId);
+            clearTimeout(timeout);
+        };
     }, [fetchExams]);
 
     const getExamsForSubject = useCallback((subject: SubjectName) => {
@@ -2426,10 +2469,9 @@ const App: React.FC = () => {
         try {
             // Log current view state for debugging
             if (isAuthenticating) {
-                console.log("App: Authenticating...");
                 return (
-                    <div className="flex flex-col items-center justify-center min-h-[70vh] py-20 px-6 text-center">
-                        <div className="relative w-28 h-28 mx-auto mb-10 flex items-center justify-center">
+                    <div className="flex flex-col items-center justify-center min-h-[70vh] py-20 px-6 text-center" dir="rtl">
+                        <div className="relative w-28 h-28 mx-auto mb-8 flex items-center justify-center">
                             <div className="absolute inset-0 border-4 border-slate-100 rounded-full"></div>
                             <motion.div 
                                 className="absolute inset-0 border-4 border-[#1d5bfc] rounded-full border-t-transparent"
@@ -2440,8 +2482,8 @@ const App: React.FC = () => {
                                 <img src={LOGO_DATA_URI} alt="JoSchool" className="w-full h-auto object-contain" />
                             </div>
                         </div>
-                        <h3 className="text-2xl font-black text-slate-800 mb-2">جاري التحقق من الهوية...</h3>
-                        <p className="text-slate-500 font-bold text-sm">يرجى الانتظار قليلاً</p>
+                        <h3 className="text-2xl font-black text-slate-800 mb-2">JoSchool 11</h3>
+                        <p className="text-slate-500 font-bold text-sm">جاري بدء التطبيق...</p>
                     </div>
                 );
             }
@@ -2774,7 +2816,9 @@ const App: React.FC = () => {
             )}
 
             <main className="pb-10">
-                {currentViewComponent()}
+                <React.Suspense fallback={<PageLoadingFallback />}>
+                    {currentViewComponent()}
+                </React.Suspense>
             </main>
             <AnimatePresence>
                 {showBackConfirmation && (

@@ -3,20 +3,11 @@
  */
 
 /**
- * Transforms raw.githubusercontent.com URLs into cdn.jsdelivr.net URLs
- * so that Google Docs Viewer and mobile browsers receive a valid Content-Type (application/pdf)
- * instead of GitHub's restrictive application/octet-stream.
+ * Returns clean direct URL or CDN fallback
  */
 export function optimizePdfUrl(url: string): string {
     if (!url) return '';
-    const trimmed = url.trim();
-    if (trimmed.includes('raw.githubusercontent.com')) {
-        return trimmed.replace(
-            /^https?:\/\/raw\.githubusercontent\.com\/([^/]+)\/([^/]+)\/([^/]+)\/(.+)$/,
-            'https://cdn.jsdelivr.net/gh/$1/$2@$3/$4'
-        );
-    }
-    return trimmed;
+    return url.trim();
 }
 
 /**
@@ -48,7 +39,5 @@ export function getGoogleViewerUrl(url: string, embedded = true): string {
         return embedded ? trimmed : trimmed.replace('/preview', '/view');
     }
 
-    // Optimize URL so Google Docs Viewer gets a proper application/pdf MIME type
-    const optimized = optimizePdfUrl(trimmed);
-    return `https://docs.google.com/viewer?url=${encodeURIComponent(optimized)}${embedded ? '&embedded=true' : ''}`;
+    return `https://docs.google.com/viewer?url=${encodeURIComponent(trimmed)}${embedded ? '&embedded=true' : ''}`;
 }

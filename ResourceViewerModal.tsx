@@ -11,12 +11,15 @@ import {
     Image as ImageIcon,
     Loader2,
     Maximize2,
+    Minimize2,
     Pencil,
-    ExternalLink
+    ExternalLink,
+    Globe
 } from 'lucide-react';
 import { LessonResource } from './types';
 import { cleanTitleText, extractYoutubeVideoId } from './services/resourceService';
 import { DownloadConfirmModal } from './DownloadConfirmModal';
+import { PdfCanvasViewer } from './PdfCanvasViewer';
 import { getGoogleViewerUrl } from './viewerUtils';
 
 interface ResourceViewerModalProps {
@@ -88,19 +91,6 @@ export const ResourceViewerModal: React.FC<ResourceViewerModalProps> = ({
         };
     }, [isFullScreen]);
 
-    // Handle PDF loading state for immediate visual feedback
-    const [loadedPdfUrl, setLoadedPdfUrl] = useState<string | null>(null);
-    const currentPdfUrl = resource?.type === 'pdf' ? (resource.url || '') : '';
-    const isPdfLoading = currentPdfUrl !== '' && loadedPdfUrl !== currentPdfUrl;
-
-    useEffect(() => {
-        if (!currentPdfUrl) return;
-        const timer = setTimeout(() => {
-            setLoadedPdfUrl(currentPdfUrl);
-        }, 3000);
-        return () => clearTimeout(timer);
-    }, [currentPdfUrl]);
-
     if (!resource) return null;
 
     const title = resource.resourceTitle?.trim() 
@@ -125,11 +115,6 @@ export const ResourceViewerModal: React.FC<ResourceViewerModalProps> = ({
             // Return raw url
         }
         return url;
-    };
-
-    // Helper to format PDF URL so it renders inline in preview mode via Google Viewer for immediate display
-    const getPdfPreviewUrl = (url: string) => {
-        return getGoogleViewerUrl(url, true);
     };
 
     const handleZoomIn = () => setZoomLevel(prev => Math.min(prev + 25, 300));
@@ -207,12 +192,12 @@ export const ResourceViewerModal: React.FC<ResourceViewerModalProps> = ({
 
     return (
         <AnimatePresence>
-            <div className="fixed inset-0 z-[100] flex items-center justify-center p-3 sm:p-6 bg-slate-900/80 backdrop-blur-md animate-fast-fade" dir="rtl">
+            <div className={`fixed inset-0 z-[100] flex items-center justify-center ${isFullScreen ? 'p-0' : 'p-3 sm:p-6'} bg-slate-900/80 backdrop-blur-md animate-fast-fade`} dir="rtl">
                 <motion.div 
                     initial={{ opacity: 0, scale: 0.95, y: 10 }}
                     animate={{ opacity: 1, scale: 1, y: 0 }}
                     exit={{ opacity: 0, scale: 0.95, y: 10 }}
-                    className="bg-white w-full max-w-4xl rounded-2xl shadow-2xl overflow-hidden border border-slate-200 flex flex-col max-h-[92vh] h-[85vh]"
+                    className={`bg-white w-full ${isFullScreen ? 'h-full max-h-none rounded-none border-none' : 'max-w-4xl rounded-2xl shadow-2xl overflow-hidden border border-slate-200 max-h-[92vh] h-[85vh]'} flex flex-col`}
                 >
                     {/* Header */}
                     <div className="p-3.5 sm:p-4 bg-slate-900 text-white flex items-center justify-between gap-3 shrink-0">
@@ -275,24 +260,40 @@ export const ResourceViewerModal: React.FC<ResourceViewerModalProps> = ({
                                 </a>
                             )}
 
-                            {/* Fullscreen Button for Image & PDF */}
+                            {/* زر الفتح في متصفح جوجل بجانب عنوان الملف */}
+                            {resource.type === 'pdf' && (
+                                <a
+                                    href={getGoogleViewerUrl(resource.url, false)}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    className="p-2 sm:px-3 sm:py-2 bg-sky-600 hover:bg-sky-500 text-white rounded-xl flex items-center gap-1.5 text-xs font-black transition-all active:scale-95 shadow-sm cursor-pointer"
+                                    title="فتح في متصفح Google"
+                                >
+                                    <Globe className="w-4 h-4 text-white" />
+                                    <span className="hidden sm:inline">فتح في متصفح Google</span>
+                                </a>
+                            )}
+
+                            {/* زر ملء الشاشة بجانب عنوان الملف */}
                             {(resource.type === 'image' || resource.type === 'pdf') && (
                                 <button
-                                    onClick={handleEnterFullScreen}
+                                    type="button"
+                                    onClick={isFullScreen ? handleExitFullScreen : handleEnterFullScreen}
                                     className="p-2 bg-slate-800 hover:bg-slate-700 text-white rounded-xl flex items-center gap-1.5 text-xs font-bold transition-all active:scale-95 border border-slate-700/50 shadow-sm cursor-pointer"
-                                    title="عرض الشاشة كاملة"
+                                    title={isFullScreen ? 'إلغاء الشاشة الكاملة' : 'عرض الشاشة كاملة'}
                                 >
-                                    <Maximize2 className="w-4 h-4 text-emerald-400" />
-                                    <span className="hidden sm:inline">شاشة كاملة</span>
+                                    {isFullScreen ? <Minimize2 className="w-4 h-4 text-emerald-400" /> : <Maximize2 className="w-4 h-4 text-emerald-400" />}
+                                    <span className="hidden sm:inline">{isFullScreen ? 'تصغير' : 'شاشة كاملة'}</span>
                                 </button>
                             )}
 
-                            {/* Download Button (Image and PDF only) */}
+                            {/* زر التحميل الأخضر بجانب عنوان الملف */}
                             {(resource.type === 'image' || resource.type === 'pdf') && (
                                 <button
+                                    type="button"
                                     onClick={handleInitiateDownload}
                                     disabled={isDownloading}
-                                    className="p-2 bg-emerald-600 hover:bg-emerald-500 disabled:opacity-50 text-white rounded-xl flex items-center gap-1.5 text-xs font-black transition-all active:scale-95 shadow-sm"
+                                    className="p-2 bg-emerald-600 hover:bg-emerald-500 disabled:opacity-50 text-white rounded-xl flex items-center gap-1.5 text-xs font-black transition-all active:scale-95 shadow-sm cursor-pointer"
                                     title="تحميل الملف إلى جهازك"
                                 >
                                     {isDownloading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Download className="w-4 h-4" />}
@@ -300,13 +301,20 @@ export const ResourceViewerModal: React.FC<ResourceViewerModalProps> = ({
                                 </button>
                             )}
 
-                            {/* Close Button */}
+                            {/* زر الإغلاق المفعل والمباشر */}
                             <button
-                                onClick={onClose}
-                                className="p-2 bg-rose-500/20 hover:bg-rose-500 text-white rounded-xl transition-all active:scale-95"
+                                type="button"
+                                onClick={(e) => {
+                                    e.stopPropagation();
+                                    if (isFullScreen) {
+                                        handleExitFullScreen();
+                                    }
+                                    onClose();
+                                }}
+                                className="p-2 bg-rose-500/20 hover:bg-rose-500 text-white rounded-xl transition-all active:scale-95 cursor-pointer z-30"
                                 title="إغلاق"
                             >
-                                <X className="w-5 h-5" />
+                                <X className="w-5 h-5 text-rose-300 hover:text-white" />
                             </button>
                         </div>
                     </div>
@@ -326,22 +334,10 @@ export const ResourceViewerModal: React.FC<ResourceViewerModalProps> = ({
                         )}
 
                         {resource.type === 'pdf' && (
-                            <div className="w-full h-full flex flex-col bg-white rounded-xl shadow-sm border border-slate-300 overflow-hidden relative">
-                                {isPdfLoading && (
-                                    <div className="absolute inset-0 z-10 flex flex-col items-center justify-center bg-slate-50">
-                                        <div className="w-9 h-9 border-3 border-sky-500 border-t-transparent rounded-full animate-spin mb-3"></div>
-                                        <p className="text-xs font-black text-slate-700">جاري فتح المستند فوراً عبر Google...</p>
-                                        <span className="text-[11px] font-bold text-slate-400 mt-1">عرض سحابي مباشر عالي السرعة</span>
-                                    </div>
-                                )}
-                                <iframe
-                                    src={getPdfPreviewUrl(resource.url)}
-                                    className="w-full h-full border-none rounded-xl"
+                            <div className="w-full h-full flex flex-col bg-slate-950 rounded-xl shadow-sm border border-slate-700 overflow-hidden relative">
+                                <PdfCanvasViewer
+                                    url={resource.url}
                                     title={title}
-                                    allow="autoplay"
-                                    loading="eager"
-                                    sandbox="allow-scripts allow-same-origin allow-forms allow-popups allow-popups-to-escape-sandbox"
-                                    onLoad={() => setLoadedPdfUrl(currentPdfUrl)}
                                 />
                             </div>
                         )}
@@ -394,53 +390,6 @@ export const ResourceViewerModal: React.FC<ResourceViewerModalProps> = ({
                         )}
                     </div>
                 </motion.div>
-
-                {/* Fullscreen Overlay Mode - PDF View */}
-                {isFullScreen && resource.type === 'pdf' && (
-                    <div 
-                        className="fixed inset-0 z-[200] bg-slate-950 flex flex-col p-2 sm:p-4 select-none animate-fast-fade"
-                        dir="rtl"
-                    >
-                        {/* Floating Exit & Download Header in Fullscreen */}
-                        <div className="fixed top-4 left-4 right-4 z-[220] flex items-center justify-between gap-2 pointer-events-none">
-                            <div className="bg-slate-900/90 text-white px-4 py-2 rounded-2xl backdrop-blur-md border border-white/20 shadow-2xl pointer-events-auto flex items-center gap-2 max-w-[60%] truncate">
-                                <FileText className="w-5 h-5 text-rose-400 shrink-0" />
-                                <span className="font-black text-xs sm:text-sm truncate">{title}</span>
-                            </div>
-                            <div className="flex items-center gap-2 pointer-events-auto">
-                                <button
-                                    onClick={handleInitiateDownload}
-                                    disabled={isDownloading}
-                                    className="p-2.5 bg-emerald-600 hover:bg-emerald-500 text-white rounded-full backdrop-blur-md border border-white/20 shadow-2xl transition-all active:scale-95 flex items-center gap-1.5 text-xs font-black"
-                                    title="تحميل الملف"
-                                >
-                                    {isDownloading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Download className="w-4 h-4" />}
-                                    <span className="hidden sm:inline">{isDownloading ? 'جاري التحميل...' : 'تحميل PDF'}</span>
-                                </button>
-                                <button
-                                    onClick={handleExitFullScreen}
-                                    className="p-2.5 bg-slate-900/90 hover:bg-rose-600 text-white rounded-full backdrop-blur-md border border-white/20 shadow-2xl transition-all active:scale-95 flex items-center gap-1.5 text-xs font-black"
-                                    title="إغلاق الشاشة الكاملة"
-                                >
-                                    <X className="w-5 h-5" />
-                                    <span className="hidden sm:inline">إغلاق</span>
-                                </button>
-                            </div>
-                        </div>
-
-                        {/* Pure Fullscreen PDF Canvas */}
-                        <div className="w-full h-full pt-14 pb-2 rounded-2xl overflow-hidden">
-                            <iframe
-                                src={getPdfPreviewUrl(resource.url)}
-                                className="w-full h-full border-none rounded-xl bg-white"
-                                title={title}
-                                allow="autoplay"
-                                loading="eager"
-                                sandbox="allow-scripts allow-same-origin allow-forms allow-popups allow-popups-to-escape-sandbox"
-                            />
-                        </div>
-                    </div>
-                )}
 
                 {/* Fullscreen Overlay Mode - Pure Image View */}
                 {isFullScreen && resource.type === 'image' && (
