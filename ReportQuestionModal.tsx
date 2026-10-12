@@ -127,6 +127,7 @@ export const ReportQuestionModal: React.FC<ReportQuestionModalProps> = ({
         <AnimatePresence>
             <div className="fixed inset-0 z-[200] flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm" dir="rtl">
                 <motion.div 
+                    key="report-question-card"
                     initial={{ opacity: 0, scale: 0.95, y: 15 }}
                     animate={{ opacity: 1, scale: 1, y: 0 }}
                     exit={{ opacity: 0, scale: 0.95, y: 15 }}

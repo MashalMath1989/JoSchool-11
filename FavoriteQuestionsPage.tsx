@@ -347,6 +347,7 @@ const FavoriteQuestionsPage: React.FC<FavoriteQuestionsPageProps> = ({
             <AnimatePresence>
                 {isBulkMode && selectedIndices.size > 0 && (
                     <motion.div 
+                        key="bulk-delete-action"
                         initial={{ opacity: 0, y: 100 }}
                         animate={{ opacity: 1, y: 0 }}
                         exit={{ opacity: 0, y: 100 }}
@@ -366,8 +367,15 @@ const FavoriteQuestionsPage: React.FC<FavoriteQuestionsPageProps> = ({
             {/* Custom Confirmation Modal */}
             <AnimatePresence>
                 {showConfirmModal && (
-                    <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm">
+                    <motion.div 
+                        key="confirm-modal-backdrop"
+                        initial={{ opacity: 0 }}
+                        animate={{ opacity: 1 }}
+                        exit={{ opacity: 0 }}
+                        className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm"
+                    >
                         <motion.div 
+                            key="confirm-modal-card"
                             initial={{ scale: 0.9, opacity: 0 }}
                             animate={{ scale: 1, opacity: 1 }}
                             exit={{ scale: 0.9, opacity: 0 }}
@@ -399,7 +407,7 @@ const FavoriteQuestionsPage: React.FC<FavoriteQuestionsPageProps> = ({
                                 </button>
                             </div>
                         </motion.div>
-                    </div>
+                    </motion.div>
                 )}
             </AnimatePresence>
 

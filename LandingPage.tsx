@@ -2,6 +2,7 @@ import React from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Semester, Subject, SubjectName } from './types';
 import { SparklesIcon, MenuIcon, UserIcon, CalendarIcon, InfoIcon, LogOutIcon, XIcon, BookOpenIcon, ChevronLeftIcon, ChevronRightIcon, DownloadIcon, ChevronDownIcon, MessengerIcon, FacebookIcon, InstagramIcon } from './data/Icons';
+import { MessageSquareText } from 'lucide-react';
 import { User } from 'firebase/auth';
 import { LOGO_DATA_URI } from './logoDataUri';
 
@@ -20,6 +21,7 @@ const MinistryScheduleModal: React.FC<{ isOpen: boolean; onClose: () => void }> 
         <AnimatePresence>
             {isOpen && (
                 <motion.div
+                    key="ministry-schedule-modal-overlay"
                     initial={{ opacity: 0 }}
                     animate={{ opacity: 1 }}
                     exit={{ opacity: 0 }}
@@ -413,34 +415,38 @@ const LandingPage: React.FC<LandingPageProps> = React.memo(({
             {/* Header - Non-sticky */}
             <div className="mb-4 mt-2">
                 <div className="relative flex items-center justify-between min-h-[72px]">
-                    {/* Menu Button (Right side in RTL) */}
+                    {/* Menu and Forum Buttons (Right side in RTL) */}
                     {user && (
-                        <div className="relative z-50">
-                            <button 
-                                onClick={() => setIsMenuOpen(!isMenuOpen)}
-                                className="w-10 h-10 bg-white border border-slate-900 rounded-lg shadow-sm flex items-center justify-center text-slate-800 hover:bg-slate-50 transition-all active:scale-95 shrink-0"
-                                title="القائمة"
-                            >
-                                <MenuIcon className="w-6 h-6" />
-                            </button>
+                        <div className="relative z-50 flex items-center gap-2">
+                            {/* Menu Button */}
+                            <div className="relative">
+                                <button 
+                                    onClick={() => setIsMenuOpen(!isMenuOpen)}
+                                    className="w-10 h-10 bg-white border border-slate-900 rounded-lg shadow-sm flex items-center justify-center text-slate-800 hover:bg-slate-50 transition-all active:scale-95 shrink-0 cursor-pointer"
+                                    title="القائمة"
+                                    aria-label="القائمة"
+                                >
+                                    <MenuIcon className="w-6 h-6" />
+                                </button>
 
-                            <AnimatePresence>
-                                {isMenuOpen && (
-                                    <>
-                                        {/* Overlay to close menu */}
+                                <AnimatePresence>
+                                    {isMenuOpen && (
                                         <motion.div 
+                                            key="menu-backdrop"
                                             initial={{ opacity: 0 }}
                                             animate={{ opacity: 1 }}
                                             exit={{ opacity: 0 }}
-                                            className="fixed inset-0 bg-transparent"
+                                            className="fixed inset-0 bg-transparent z-40"
                                             onClick={() => setIsMenuOpen(false)}
                                         />
-                                        
+                                    )}
+                                    {isMenuOpen && (
                                         <motion.div
+                                            key="menu-dropdown-content"
                                             initial={{ opacity: 0, y: 10, scale: 0.95 }}
                                             animate={{ opacity: 1, y: 0, scale: 1 }}
                                             exit={{ opacity: 0, y: 10, scale: 0.95 }}
-                                            className="absolute right-0 mt-2 w-56 bg-white border-2 border-slate-900 rounded-2xl shadow-2xl overflow-hidden py-1"
+                                            className="absolute right-0 mt-2 w-56 bg-white border-2 border-slate-900 rounded-2xl shadow-2xl overflow-hidden py-1 z-50"
                                         >
                                             {menuItems.map((item) => (
                                                 item.href ? (
@@ -472,9 +478,20 @@ const LandingPage: React.FC<LandingPageProps> = React.memo(({
                                                 )
                                             ))}
                                         </motion.div>
-                                    </>
-                                )}
-                            </AnimatePresence>
+                                    )}
+                                </AnimatePresence>
+                            </div>
+
+                            {/* زر المنتدى على يسار زر القائمة المنسدلة بخلفية زرقاء */}
+                            <button
+                                id="forum-top-button"
+                                onClick={() => navigateTo(View.Forum)}
+                                className="w-10 h-10 bg-blue-600 hover:bg-blue-700 text-white border border-slate-900 rounded-lg shadow-sm flex items-center justify-center transition-all active:scale-95 shrink-0 cursor-pointer"
+                                title="منتدى الطلاب"
+                                aria-label="منتدى الطلاب"
+                            >
+                                <MessageSquareText className="w-5 h-5 text-white" />
+                            </button>
                         </div>
                     )}
 
@@ -507,6 +524,7 @@ const LandingPage: React.FC<LandingPageProps> = React.memo(({
                     <AnimatePresence>
                         {showInfoModal && (
                             <motion.div
+                                key="info-modal-backdrop"
                                 initial={{ opacity: 0 }}
                                 animate={{ opacity: 1 }}
                                 exit={{ opacity: 0 }}
@@ -697,11 +715,18 @@ const LandingPage: React.FC<LandingPageProps> = React.memo(({
             </div>
 
             {/* Additional Modals */}
+            {/* Logout Confirmation */}
             <AnimatePresence>
-                {/* Logout Confirmation */}
                 {showLogoutConfirm && (
-                    <div className="fixed inset-0 z-[2000] bg-slate-900/60 backdrop-blur-md flex items-center justify-center p-6">
+                    <motion.div 
+                        key="logout-modal-backdrop"
+                        initial={{ opacity: 0 }}
+                        animate={{ opacity: 1 }}
+                        exit={{ opacity: 0 }}
+                        className="fixed inset-0 z-[2000] bg-slate-900/60 backdrop-blur-md flex items-center justify-center p-6"
+                    >
                         <motion.div
+                            key="logout-modal-card"
                             initial={{ scale: 0.9, opacity: 0 }}
                             animate={{ scale: 1, opacity: 1 }}
                             exit={{ scale: 0.9, opacity: 0 }}
@@ -727,18 +752,21 @@ const LandingPage: React.FC<LandingPageProps> = React.memo(({
                                 </button>
                             </div>
                         </motion.div>
-                    </div>
+                    </motion.div>
                 )}
+            </AnimatePresence>
 
-                {/* Exam Schedule Modal */}
-                <MinistryScheduleModal 
-                    isOpen={showScheduleModal} 
-                    onClose={() => setShowScheduleModal(false)} 
-                />
+            {/* Exam Schedule Modal */}
+            <MinistryScheduleModal 
+                isOpen={showScheduleModal} 
+                onClose={() => setShowScheduleModal(false)} 
+            />
 
-                {/* Scanner Instructions Modal */}
+            {/* Scanner Instructions Modal */}
+            <AnimatePresence>
                 {showScannerModal && (
                     <motion.div
+                        key="scanner-modal-backdrop"
                         initial={{ opacity: 0 }}
                         animate={{ opacity: 1 }}
                         exit={{ opacity: 0 }}
@@ -746,6 +774,7 @@ const LandingPage: React.FC<LandingPageProps> = React.memo(({
                         onClick={() => setShowScannerModal(false)}
                     >
                         <motion.div
+                            key="scanner-modal-card"
                             initial={{ y: 50, opacity: 0, scale: 0.95 }}
                             animate={{ y: 0, opacity: 1, scale: 1 }}
                             exit={{ y: 50, opacity: 0, scale: 0.95 }}

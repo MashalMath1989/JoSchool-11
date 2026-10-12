@@ -1,6 +1,7 @@
 import { getApps, getApp, initializeApp } from 'firebase/app';
 import { getAuth, GoogleAuthProvider } from 'firebase/auth';
 import { initializeFirestore, getFirestore, doc, getDocFromServer, setLogLevel } from 'firebase/firestore';
+import { getStorage } from 'firebase/storage';
 import firebaseConfig from './firebase-applet-config.json';
 
 // Silence Firestore internal log warnings/errors (especially connection failure/offline warning logs in sandbox iframes)
@@ -38,6 +39,7 @@ try {
 export const db = dbInstance;
 export const auth = getAuth(app);
 export const googleProvider = new GoogleAuthProvider();
+export const storage = getStorage(app);
 
 async function testConnection() {
     try {

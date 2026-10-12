@@ -1,6 +1,10 @@
 import React, { useState } from 'react';
 import { ClockIcon, TrophyIcon, CheckCircleIcon, CheckIcon, StarIcon, BookmarkIcon, UserIcon } from './data/Icons';
 import { UserProgress } from './types';
+import { Trash2, AlertTriangle, ShieldAlert } from 'lucide-react';
+import { User } from 'firebase/auth';
+import { auth } from './firebase';
+import { DeleteAccountModal } from './DeleteAccountModal';
 import {
     ResponsiveContainer,
     AreaChart,
@@ -19,6 +23,8 @@ interface ProgressDashboardProps {
     userProgress: UserProgress;
     setUserProgress: React.Dispatch<React.SetStateAction<UserProgress>>;
     goBack?: () => void;
+    user?: User | null;
+    onAccountDeleted?: () => void;
 }
 
 const CustomTooltip = ({ active, payload, label }: any) => {
@@ -52,9 +58,14 @@ const CustomTooltip = ({ active, payload, label }: any) => {
 
 const ProgressDashboard: React.FC<ProgressDashboardProps> = ({
     userProgress,
-    setUserProgress
+    setUserProgress,
+    goBack,
+    user,
+    onAccountDeleted
 }) => {
     const [activeTab, setActiveTab] = useState<'profile' | 'achievements'>('profile');
+    const [showDeleteAccountModal, setShowDeleteAccountModal] = useState(false);
+    const currentUser = user || auth.currentUser;
 
     // Retrieve initial student profile fields, defaulting to empty strings
     const profile = userProgress.studentProfile || {};
@@ -563,6 +574,32 @@ const ProgressDashboard: React.FC<ProgressDashboardProps> = ({
                             </button>
                         </div>
                     </form>
+
+                    {/* منطقة إدارة الحساب وحذف الحساب */}
+                    <div className="mt-8 pt-6 border-t-2 border-dashed border-red-200">
+                        <div className="bg-red-50/70 border border-red-200 rounded-2xl p-4 sm:p-5 text-right">
+                            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                                <div className="space-y-1">
+                                    <h4 className="text-sm font-black text-red-950 flex items-center gap-1.5">
+                                        <AlertTriangle className="w-4 h-4 text-red-600 shrink-0" />
+                                        <span>منطقة إدارة الحساب</span>
+                                    </h4>
+                                    <p className="text-xs text-red-800/90 font-bold leading-relaxed max-w-md">
+                                        حذف الحساب إجراء نهائي يؤدي لمسح جميع بياناتك الدراسية وسجلات الاختبارات من المنصة نهائياً دون إمكانية استرجاعها.
+                                    </p>
+                                </div>
+                                <button
+                                    id="profile-delete-account-btn"
+                                    type="button"
+                                    onClick={() => setShowDeleteAccountModal(true)}
+                                    className="px-4 py-2.5 bg-red-600 hover:bg-red-700 active:scale-95 text-white font-black text-xs rounded-xl shadow-sm transition-all flex items-center justify-center gap-2 shrink-0 cursor-pointer border border-red-700"
+                                >
+                                    <Trash2 className="w-4 h-4" />
+                                    <span>حذف الحساب نهائياً</span>
+                                </button>
+                            </div>
+                        </div>
+                    </div>
                 </div>
             ) : (
                 /* Achievements Tab (Original Progress Dashboard) */
@@ -822,6 +859,19 @@ const ProgressDashboard: React.FC<ProgressDashboardProps> = ({
                     </div>
                 </>
             )}
+
+            {/* نافذة تأكيد حذف الحساب */}
+            <DeleteAccountModal
+                isOpen={showDeleteAccountModal}
+                onClose={() => setShowDeleteAccountModal(false)}
+                user={currentUser}
+                onSuccess={() => {
+                    setShowDeleteAccountModal(false);
+                    if (onAccountDeleted) {
+                        onAccountDeleted();
+                    }
+                }}
+            />
         </div>
     );
 };

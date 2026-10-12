@@ -380,6 +380,7 @@ const QuizPage: React.FC<QuizPageProps> = React.memo(({
                 <AnimatePresence>
                     {showExplanation && (
                         <motion.div
+                            key="math-explanation-card"
                             initial={{ opacity: 0, height: 0 }}
                             animate={{ opacity: 1, height: "auto" }}
                             exit={{ opacity: 0, height: 0 }}

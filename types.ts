@@ -18,6 +18,7 @@ export enum View {
   Library,
   FriendChallenge,
   Results,
+  Forum,
 }
 
 export enum Grade {
@@ -165,4 +166,50 @@ export interface FriendChallenge {
   createdAt: string;
   status: 'active' | 'completed';
   participantsCount?: number;
+}
+
+export interface ForumPost {
+  id: string;
+  userId: string;
+  userName: string;
+  userPhoto?: string;
+  userEmail?: string;
+  text: string;
+  imageUrl?: string;
+  createdAt: any;
+  likesCount: number;
+  commentsCount: number;
+  hasLiked?: boolean;
+  isEdited?: boolean;
+  updatedAt?: any;
+}
+
+export interface ForumComment {
+  id: string;
+  postId: string;
+  userId: string;
+  userName: string;
+  userPhoto?: string;
+  text: string;
+  createdAt: any;
+}
+
+export type ForumReportReason = 
+  | 'محتوى غير مناسب'
+  | 'إساءة أو تنمر'
+  | 'spam'
+  | 'محتوى مخالف'
+  | 'أخرى';
+
+export interface ForumReport {
+  id: string;
+  reporterId: string;
+  reporterName: string;
+  targetType: 'post' | 'comment';
+  targetId: string;
+  postId?: string;
+  reason: ForumReportReason;
+  details?: string;
+  createdAt: any;
+  status: 'pending' | 'reviewed' | 'resolved' | 'dismissed';
 }

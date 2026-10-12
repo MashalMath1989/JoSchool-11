@@ -16,45 +16,19 @@ import WelcomePage from './WelcomePage';
 import SubjectIndexPage from './SubjectIndexPage';
 import AuthPage from './AuthPage';
 import PdfViewerScreen from './PdfViewerScreen';
-
-// Resilient dynamic loader with automatic retries for heavy secondary pages
-const lazyWithRetry = <T extends React.ComponentType<any>>(
-    factory: () => Promise<{ default: T }>
-) => {
-    return React.lazy(async () => {
-        try {
-            return await factory();
-        } catch (error) {
-            console.warn("Dynamic import failed, retrying in 200ms...", error);
-            await new Promise(r => setTimeout(r, 200));
-            try {
-                return await factory();
-            } catch (err2) {
-                console.warn("Second dynamic import attempt failed, retrying in 400ms...", err2);
-                await new Promise(r => setTimeout(r, 400));
-                return await factory();
-            }
-        }
-    });
-};
-
-const QuizPage = lazyWithRetry(() => import('./QuizPage'));
-const ResultsPage = lazyWithRetry(() => import('./ResultsPage'));
-const ProgressDashboard = lazyWithRetry(() => import('./ProgressDashboard'));
-const FavoriteQuestionsPage = lazyWithRetry(() => import('./FavoriteQuestionsPage'));
-const SessionSubjectsPage = lazyWithRetry(() => import('./SessionSubjectsPage'));
-const MoEResultsPage = lazyWithRetry(() => import('./MoEResultsPage'));
-const AnnouncementsPage = lazyWithRetry(() => import('./AnnouncementsPage'));
-const SessionsListPage = lazyWithRetry(() => import('./SessionsListPage'));
-const LibraryPage = lazyWithRetry(() => import('./LibraryPage'));
-const FriendChallengePage = lazyWithRetry(() => import('./FriendChallengePage'));
-
-const PageLoadingFallback: React.FC = () => (
-    <div className="flex flex-col items-center justify-center min-h-[50vh] py-16 px-4 text-center">
-        <Loader2 className="w-10 h-10 text-primary animate-spin mb-3" />
-        <p className="font-bold text-xs sm:text-sm text-slate-500">جاري تجهيز الصفحة...</p>
-    </div>
-);
+import QuizPage from './QuizPage';
+import ResultsPage from './ResultsPage';
+import ProgressDashboard from './ProgressDashboard';
+import FavoriteQuestionsPage from './FavoriteQuestionsPage';
+import SessionSubjectsPage from './SessionSubjectsPage';
+import MoEResultsPage from './MoEResultsPage';
+import AnnouncementsPage from './AnnouncementsPage';
+import SessionsListPage from './SessionsListPage';
+import LibraryPage from './LibraryPage';
+import FriendChallengePage from './FriendChallengePage';
+import ForumPage from './ForumPage';
+import DeleteAccountInfoPage from './DeleteAccountInfoPage';
+import { useLocation, useNavigate } from 'react-router-dom';
 import { LOGO_DATA_URI } from './logoDataUri';
 import { FriendChallenge } from './types';
 import { createChallenge, submitChallengeResult } from './services/challengeService';
@@ -588,6 +562,9 @@ const safeLocalStorageSetItem = (key: string, value: string) => {
 };
 
 const App: React.FC = () => {
+    const location = useLocation();
+    const navigate = useNavigate();
+
     // -------------------------------------------------------------------------
     // 1. Basic State & Refs
     // -------------------------------------------------------------------------
@@ -2467,6 +2444,16 @@ const App: React.FC = () => {
 
     const currentViewComponent = () => {
         try {
+            // Check if user navigated to public account deletion policy page (available publicly without sign-in)
+            const isDeleteAccountInfoRoute = 
+                location.pathname === '/delete-account-info' || 
+                location.pathname.startsWith('/delete-account') ||
+                window.location.pathname.includes('/delete-account-info');
+
+            if (isDeleteAccountInfoRoute) {
+                return <DeleteAccountInfoPage />;
+            }
+
             // Log current view state for debugging
             if (isAuthenticating) {
                 return (
@@ -2654,6 +2641,17 @@ const App: React.FC = () => {
                             userProgress={userProgress} 
                             setUserProgress={setUserProgress}
                             goBack={goBack}
+                            user={user}
+                            onAccountDeleted={() => {
+                                setUserProgress(getDefaultProgress());
+                                setUser(null);
+                                setViewHistory([View.Landing]);
+                                try {
+                                    navigate('/login');
+                                } catch (e) {
+                                    window.history.pushState({}, '', '/login');
+                                }
+                            }}
                         />
                     );
                 case View.Announcements:
@@ -2733,6 +2731,14 @@ const App: React.FC = () => {
                             lastUserAnswers={userAnswers as (string | undefined)[]}
                         />
                     );
+                case View.Forum:
+                    return (
+                        <ForumPage 
+                            user={user}
+                            userProfileName={userProgress?.studentProfile?.name}
+                            onBack={goBack}
+                        />
+                    );
                 default: 
                     console.log("App: View not matched, showing LandingPage");
                     return (
@@ -2776,6 +2782,7 @@ const App: React.FC = () => {
             <AnimatePresence>
                 {isLoadingExam && (
                     <motion.div 
+                        key="loading-exam-overlay"
                         initial={{ opacity: 0 }}
                         animate={{ opacity: 1 }}
                         exit={{ opacity: 0 }}
@@ -2804,7 +2811,7 @@ const App: React.FC = () => {
                 )}
             </AnimatePresence>
 
-            {user && ![View.Welcome, View.Landing, View.Quiz, View.SubjectIndex, View.Results, View.SessionSubjects, View.Favorites, View.SessionsList, View.Library, View.FriendChallenge].includes(currentView) && (
+            {user && ![View.Welcome, View.Landing, View.Quiz, View.SubjectIndex, View.Results, View.SessionSubjects, View.Favorites, View.SessionsList, View.Library, View.FriendChallenge, View.Forum].includes(currentView) && (
                 <button 
                     onClick={goBack}
                     className={`fixed top-4 z-[9999] p-3 bg-white border border-slate-900 rounded-full shadow-lg text-slate-600 hover:text-primary transition-all active:scale-95 
@@ -2816,13 +2823,12 @@ const App: React.FC = () => {
             )}
 
             <main className="pb-10">
-                <React.Suspense fallback={<PageLoadingFallback />}>
-                    {currentViewComponent()}
-                </React.Suspense>
+                {currentViewComponent()}
             </main>
             <AnimatePresence>
                 {showBackConfirmation && (
                     <motion.div 
+                        key="back-confirmation-overlay"
                         initial={{ opacity: 0 }}
                         animate={{ opacity: 1 }}
                         exit={{ opacity: 0 }}
@@ -2880,6 +2886,7 @@ const App: React.FC = () => {
             <AnimatePresence>
                 {showExitConfirmation && (
                     <motion.div 
+                        key="exit-confirmation-overlay"
                         initial={{ opacity: 0 }}
                         animate={{ opacity: 1 }}
                         exit={{ opacity: 0 }}
@@ -2887,6 +2894,7 @@ const App: React.FC = () => {
                         dir="rtl"
                     >
                         <motion.div 
+                            key="exit-confirmation-card"
                             initial={{ scale: 0.9, opacity: 0 }}
                             animate={{ scale: 1, opacity: 1 }}
                             exit={{ scale: 0.9, opacity: 0 }}
@@ -2919,6 +2927,7 @@ const App: React.FC = () => {
             <AnimatePresence>
                 {showLogoutConfirmation && (
                     <motion.div 
+                        key="logout-confirmation-overlay"
                         initial={{ opacity: 0 }}
                         animate={{ opacity: 1 }}
                         exit={{ opacity: 0 }}
@@ -2926,6 +2935,7 @@ const App: React.FC = () => {
                         dir="rtl"
                     >
                         <motion.div 
+                            key="logout-confirmation-card"
                             initial={{ scale: 0.9, opacity: 0 }}
                             animate={{ scale: 1, opacity: 1 }}
                             exit={{ scale: 0.9, opacity: 0 }}
@@ -3001,6 +3011,7 @@ const App: React.FC = () => {
             <AnimatePresence>
                 {showResumeModal && (
                     <motion.div 
+                        key="resume-modal-overlay"
                         initial={{ opacity: 0 }}
                         animate={{ opacity: 1 }}
                         exit={{ opacity: 0 }}
@@ -3008,6 +3019,7 @@ const App: React.FC = () => {
                         dir="rtl"
                     >
                         <motion.div 
+                            key="resume-modal-card" 
                             initial={{ scale: 0.9, opacity: 0 }}
                             animate={{ scale: 1, opacity: 1 }}
                             exit={{ scale: 0.9, opacity: 0 }}

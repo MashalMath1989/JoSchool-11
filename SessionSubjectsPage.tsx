@@ -207,10 +207,18 @@ const SessionSubjectsPage: React.FC<SessionSubjectsPageProps> = ({
             </div>
 
             <div className="space-y-1.5 flex flex-col">
+                {/* Coming soon modal */}
                 <AnimatePresence>
                     {showComingSoon && (
-                        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/20 backdrop-blur-sm">
+                        <motion.div 
+                            key="coming-soon-backdrop"
+                            initial={{ opacity: 0 }}
+                            animate={{ opacity: 1 }}
+                            exit={{ opacity: 0 }}
+                            className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/20 backdrop-blur-sm"
+                        >
                             <motion.div
+                                key="coming-soon-card"
                                 initial={{ opacity: 0, scale: 0.9, y: 10 }}
                                 animate={{ opacity: 1, scale: 1, y: 0 }}
                                 exit={{ opacity: 0, scale: 0.9, y: 10 }}
@@ -220,12 +228,22 @@ const SessionSubjectsPage: React.FC<SessionSubjectsPageProps> = ({
                                 <div className="text-3xl mb-2">⏳</div>
                                 غير متاحة حالياً سيتم توفيرها قريباً
                             </motion.div>
-                        </div>
+                        </motion.div>
                     )}
+                </AnimatePresence>
 
+                {/* Reset single exam modal */}
+                <AnimatePresence>
                     {confirmReset && (
-                        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-md">
+                        <motion.div 
+                            key="confirm-reset-backdrop"
+                            initial={{ opacity: 0 }}
+                            animate={{ opacity: 1 }}
+                            exit={{ opacity: 0 }}
+                            className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-md"
+                        >
                             <motion.div
+                                key="confirm-reset-card"
                                 initial={{ opacity: 0, scale: 0.9, y: 20 }}
                                 animate={{ opacity: 1, scale: 1, y: 0 }}
                                 exit={{ opacity: 0, scale: 0.9, y: 20 }}
@@ -258,12 +276,22 @@ const SessionSubjectsPage: React.FC<SessionSubjectsPageProps> = ({
                                     </button>
                                 </div>
                             </motion.div>
-                        </div>
+                        </motion.div>
                     )}
+                </AnimatePresence>
 
+                {/* Reset entire session modal */}
+                <AnimatePresence>
                     {confirmSessionReset && (
-                        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-md">
+                        <motion.div 
+                            key="confirm-session-reset-backdrop"
+                            initial={{ opacity: 0 }}
+                            animate={{ opacity: 1 }}
+                            exit={{ opacity: 0 }}
+                            className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-md"
+                        >
                             <motion.div
+                                key="confirm-session-reset-card"
                                 initial={{ opacity: 0, scale: 0.9, y: 20 }}
                                 animate={{ opacity: 1, scale: 1, y: 0 }}
                                 exit={{ opacity: 0, scale: 0.9, y: 20 }}
@@ -295,12 +323,22 @@ const SessionSubjectsPage: React.FC<SessionSubjectsPageProps> = ({
                                     </button>
                                 </div>
                             </motion.div>
-                        </div>
+                        </motion.div>
                     )}
+                </AnimatePresence>
 
+                {/* Math notice modal */}
+                <AnimatePresence>
                     {mathNoticeModal && (
-                        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-md">
+                        <motion.div 
+                            key="math-notice-backdrop"
+                            initial={{ opacity: 0 }}
+                            animate={{ opacity: 1 }}
+                            exit={{ opacity: 0 }}
+                            className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-md"
+                        >
                             <motion.div
+                                key="math-notice-card"
                                 initial={{ opacity: 0, scale: 0.9, y: 20 }}
                                 animate={{ opacity: 1, scale: 1, y: 0 }}
                                 exit={{ opacity: 0, scale: 0.9, y: 20 }}
@@ -326,7 +364,7 @@ const SessionSubjectsPage: React.FC<SessionSubjectsPageProps> = ({
                                     حسناً، فهمت
                                 </button>
                             </motion.div>
-                        </div>
+                        </motion.div>
                     )}
                 </AnimatePresence>
 

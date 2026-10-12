@@ -1,18 +1,44 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { auth, googleProvider } from './firebase';
-import { signInWithEmailAndPassword, createUserWithEmailAndPassword, updateProfile, signInWithRedirect, getRedirectResult, signInWithPopup } from 'firebase/auth';
+import { 
+    signInWithEmailAndPassword, 
+    createUserWithEmailAndPassword, 
+    updateProfile, 
+    signInWithRedirect, 
+    getRedirectResult, 
+    signInWithPopup,
+    sendPasswordResetEmail 
+} from 'firebase/auth';
 import { motion } from 'framer-motion';
-import { AlertCircle } from 'lucide-react';
+import { AlertCircle, CheckCircle2, ExternalLink } from 'lucide-react';
+import { Link } from 'react-router-dom';
 import { LOGO_DATA_URI } from './logoDataUri';
 
-const AuthPage: React.FC = () => {
+interface AuthPageProps {
+    initialSuccessMessage?: string;
+}
+
+const AuthPage: React.FC<AuthPageProps> = ({ initialSuccessMessage }) => {
     const [isLogin, setIsLogin] = useState(true);
     const [email, setEmail] = useState('');
     const [password, setPassword] = useState('');
     const [name, setName] = useState('');
     const [error, setError] = useState('');
+    const [successMessage, setSuccessMessage] = useState<string>(() => {
+        if (initialSuccessMessage) return initialSuccessMessage;
+        try {
+            if (sessionStorage.getItem('joschool_account_deleted_notice') === 'true') {
+                sessionStorage.removeItem('joschool_account_deleted_notice');
+                return 'تم حذف حسابك وجميع بياناتك بنجاح';
+            }
+        } catch (e) {
+            // Ignore storage error
+        }
+        return '';
+    });
     const [loading, setLoading] = useState(false);
     const [googleLoading, setGoogleLoading] = useState(true); // default true for initial redirect check
+    const [isResettingPassword, setIsResettingPassword] = useState(false);
 
     const loginInProgressRef = useRef(false);
 
@@ -24,7 +50,7 @@ const AuthPage: React.FC = () => {
                     console.log("Logged in successfully via redirect on page load:", result.user.email);
                 }
             } catch (err: any) {
-                console.error("Redirect check error:", err);
+                console.warn("Redirect check notice:", err?.code || err);
                 // Suppress temporary redirect errors or custom domain restrictions gracefully without crashing/blocking
                 if (
                     err.code !== 'auth/unauthorized-domain' && 
@@ -53,7 +79,14 @@ const AuthPage: React.FC = () => {
             await signInWithPopup(auth, googleProvider);
             return;
         } catch (popupErr: any) {
-            console.warn("Popup sign-in failed/blocked. Attempting redirect sign-in as fallback:", popupErr);
+            if (popupErr.code === 'auth/popup-closed-by-user' || popupErr.code === 'auth/cancelled-popup-request') {
+                console.warn("Google popup closed by user.");
+                setGoogleLoading(false);
+                loginInProgressRef.current = false;
+                return;
+            }
+
+            console.warn("Popup sign-in notice. Attempting redirect sign-in as fallback:", popupErr?.code || popupErr);
             
             let isRedirecting = false;
             try {
@@ -62,7 +95,7 @@ const AuthPage: React.FC = () => {
                 await signInWithRedirect(auth, googleProvider);
                 return;
             } catch (err: any) {
-                console.error("Google Login Error:", err);
+                console.warn("Google Login notice:", err?.code || err);
                 
                 if (err.code === 'auth/network-request-failed') {
                     setError('فشل في الاتصال. يرجى التحقق من اتصال الإنترنت الخاص بك.');
@@ -80,11 +113,11 @@ const AuthPage: React.FC = () => {
                             }
                         }
                     } catch (e) {
-                        console.error("Error parsing internal error payload:", e);
+                        console.warn("Error parsing internal error payload:", e);
                     }
                     
                     if (detailedMessage) {
-                        setError(`خطأ داخلي في Firebase: ${detailedMessage}. يرجى التحقق من إعدادات مشروع Firebase الخاص بك (مثل صحة مفتاح الـ API Key).`);
+                        setError(`خطأ داخلي في Firebase: ${detailedMessage}. يرجى التحقق من إعدادات مشروع Firebase الخاص بك.`);
                     } else {
                         setError(`خطأ داخلي: فشل الاتصال بخدمة تسجيل الدخول. يرجى التأكد من صلاحية الإعدادات.`);
                     }
@@ -104,10 +137,44 @@ const AuthPage: React.FC = () => {
         }
     };
 
+    const handleForgotPassword = async () => {
+        const cleanEmail = email.trim();
+        if (!cleanEmail) {
+            setError('يرجى كتابة بريدك الإلكتروني في الحقل أولاً لإرسال رابط استعادة كلمة المرور.');
+            return;
+        }
+
+        setIsResettingPassword(true);
+        setError('');
+        try {
+            await sendPasswordResetEmail(auth, cleanEmail);
+            setSuccessMessage('تم إرسال رابط إعادة تعيين كلمة المرور إلى بريدك الإلكتروني بنجاح. تفقد صندوق الوارد.');
+        } catch (err: any) {
+            console.warn('Password reset notice:', err?.code);
+            if (err.code === 'auth/user-not-found' || err.code === 'auth/invalid-credential') {
+                setError('لم يتم العثور على حساب مسجل بهذا البريد. إذا كنت تسجل بجوجل اضغط على زر جوجل أدناه، أو اضغط «سجل الآن».');
+            } else if (err.code === 'auth/invalid-email') {
+                setError('صيغة البريد الإلكتروني غير صالحة.');
+            } else {
+                setError('تعذر إرسال رابط الاستعادة حالياً. يمكنك تجربة تسجيل الدخول بجوجل.');
+            }
+        } finally {
+            setIsResettingPassword(false);
+        }
+    };
+
     const handleAuth = async (e: React.FormEvent) => {
         e.preventDefault();
         
-        if (password.length < 6) {
+        const cleanEmail = email.trim().toLowerCase();
+        const cleanPassword = password;
+
+        if (!cleanEmail) {
+            setError('يرجى إدخال البريد الإلكتروني.');
+            return;
+        }
+
+        if (cleanPassword.length < 6) {
             setError('يجب أن تتكون كلمة المرور من 6 أحرف على الأقل.');
             return;
         }
@@ -116,25 +183,35 @@ const AuthPage: React.FC = () => {
         setError('');
         try {
             if (isLogin) {
-                await signInWithEmailAndPassword(auth, email, password);
+                await signInWithEmailAndPassword(auth, cleanEmail, cleanPassword);
             } else {
-                const userCredential = await createUserWithEmailAndPassword(auth, email, password);
-                if (name) {
-                    await updateProfile(userCredential.user, { displayName: name });
+                const userCredential = await createUserWithEmailAndPassword(auth, cleanEmail, cleanPassword);
+                if (name.trim()) {
+                    await updateProfile(userCredential.user, { displayName: name.trim() });
                 }
             }
         } catch (err: any) {
-            console.error("Auth Error:", err);
-            if (err.code === 'auth/user-not-found' || err.code === 'auth/wrong-password' || err.code === 'auth/invalid-credential') {
-                setError('البريد الإلكتروني أو كلمة المرور غير صحيحة.');
+            console.warn("Auth check notice:", err?.code || err?.message);
+            if (err.code === 'auth/invalid-credential' || err.code === 'auth/wrong-password' || err.code === 'auth/user-not-found') {
+                if (isLogin) {
+                    setError('البريد الإلكتروني أو كلمة المرور غير صحيحة. إذا كنت مسجلاً بحساب Google، اضغط على زر جوجل أدناه، أو اضغط «سجل الآن» بالأسفل لإنشاء حساب.');
+                } else {
+                    setError('تعذر إنشاء الحساب بهذه البيانات. يرجى التأكد من البريد وكلمة المرور.');
+                }
             } else if (err.code === 'auth/email-already-in-use') {
-                setError('البريد الإلكتروني مستخدم بالفعل.');
+                setError('البريد الإلكتروني مسجل مسبقاً. اضغط على «سجل دخول» في الأسفل.');
+            } else if (err.code === 'auth/invalid-email') {
+                setError('صيغة البريد الإلكتروني غير صحيحة. يرجى التأكد من كتابته بشكل سليم.');
             } else if (err.code === 'auth/weak-password') {
                 setError('كلمة المرور ضعيفة جداً. يجب أن تكون 6 أحرف على الأقل.');
+            } else if (err.code === 'auth/too-many-requests') {
+                setError('تم حظر المحاولات مؤقتاً بسبب تكرار إدخال كلمة المرور بشكل خاطئ. يرجى الانتظار قليلاً أو الدخول بحساب Google.');
+            } else if (err.code === 'auth/operation-not-allowed') {
+                setError('تسجيل الدخول بالبريد الإلكتروني غير مفعّل حالياً. يرجى استخدام تسجيل الدخول بجوجل أدناه.');
             } else if (err.code === 'auth/network-request-failed') {
-                setError('فشل الاتصال بالشبكة. يرجى التحقق من الإنترنت.');
+                setError('فشل الاتصال بالشبكة. يرجى التحقق من اتصال الإنترنت.');
             } else {
-                setError('حدث خطأ. يرجى التحقق من البيانات والمحاولة مرة أخرى.');
+                setError(err?.message || 'حدث خطأ. يرجى التحقق من البيانات والمحاولة مرة أخرى.');
             }
         } finally {
             setLoading(false);
@@ -159,6 +236,13 @@ const AuthPage: React.FC = () => {
                     <p className="text-slate-400 font-bold text-[10px]">المسار الأكاديمي 11 . جيل 2010</p>
                     <p className="text-slate-400 font-bold text-[10px] mt-0.5">منهاج 2027/2026</p>
                 </div>
+
+                {successMessage && (
+                    <div className="bg-emerald-50 border-2 border-emerald-500 text-emerald-800 p-3 rounded-xl mb-3 flex items-center gap-2.5 shadow-xs animate-fadeIn">
+                        <CheckCircle2 className="w-5 h-5 text-emerald-600 shrink-0" />
+                        <span className="text-xs font-black leading-tight">{successMessage}</span>
+                    </div>
+                )}
 
                 {error && (
                     <div className="bg-red-50 border-2 border-red-200 text-red-600 p-2 rounded-lg mb-3 flex items-center gap-2">
@@ -195,7 +279,19 @@ const AuthPage: React.FC = () => {
                     </div>
 
                     <div className="space-y-0.5 text-right">
-                        <label className="block text-slate-400 font-black mr-2 text-[10px]">كلمة المرور</label>
+                        <div className="flex items-center justify-between mr-2">
+                            <label className="block text-slate-400 font-black text-[10px]">كلمة المرور</label>
+                            {isLogin && (
+                                <button
+                                    type="button"
+                                    onClick={handleForgotPassword}
+                                    disabled={isResettingPassword}
+                                    className="text-[10px] font-bold text-[#1d5bfc] hover:underline cursor-pointer disabled:opacity-50"
+                                >
+                                    {isResettingPassword ? 'جاري الإرسال...' : 'نسيت كلمة المرور؟'}
+                                </button>
+                            )}
+                        </div>
                         <input 
                             type="password"
                             placeholder="••••••••"
@@ -270,6 +366,16 @@ const AuthPage: React.FC = () => {
                     >
                         {isLogin ? 'ليس لديك حساب؟ سجل الآن' : 'لديك حساب بالفعل؟ سجل دخول'}
                     </button>
+                </div>
+
+                <div className="mt-4 pt-3 border-t border-slate-100 text-center">
+                    <Link
+                        to="/delete-account-info"
+                        className="text-[11px] font-bold text-slate-500 hover:text-slate-800 transition-colors inline-flex items-center gap-1.5"
+                    >
+                        <span>دليل وسياسة حذف الحساب (متجر Google Play)</span>
+                        <ExternalLink className="w-3 h-3" />
+                    </Link>
                 </div>
             </motion.div>
         </div>

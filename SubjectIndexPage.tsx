@@ -1162,6 +1162,7 @@ const SubjectIndexPage: React.FC<SubjectIndexPageProps> = React.memo(({
                             <AnimatePresence>
                                 {isExpanded && (
                                     <motion.div
+                                        key={`unit-${unit.title || 'unit'}-content`}
                                         initial={{ height: 0, opacity: 0 }}
                                         animate={{ height: "auto", opacity: 1 }}
                                         exit={{ height: 0, opacity: 0 }}
@@ -1218,6 +1219,7 @@ const SubjectIndexPage: React.FC<SubjectIndexPageProps> = React.memo(({
                                                                 <AnimatePresence>
                                                                     {isLessonExpanded && (
                                                                         <motion.div
+                                                                            key={`lesson-${lesson.title}-content`}
                                                                             initial={{ height: 0, opacity: 0 }}
                                                                             animate={{ height: "auto", opacity: 1 }}
                                                                             exit={{ height: 0, opacity: 0 }}
@@ -1490,12 +1492,17 @@ const SubjectIndexPage: React.FC<SubjectIndexPageProps> = React.memo(({
             {/* Studied Confirmation Modal */}
             <AnimatePresence>
                 {studiedPrompt && (
-                    <div 
+                    <motion.div 
+                        key="studied-prompt-backdrop"
+                        initial={{ opacity: 0 }}
+                        animate={{ opacity: 1 }}
+                        exit={{ opacity: 0 }}
                         className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4"
                         onClick={() => setStudiedPrompt(null)}
                         dir="rtl"
                     >
                         <motion.div 
+                            key="studied-prompt-card"
                             initial={{ scale: 0.95, opacity: 0 }}
                             animate={{ scale: 1, opacity: 1 }}
                             exit={{ scale: 0.95, opacity: 0 }}
@@ -1599,7 +1606,7 @@ const SubjectIndexPage: React.FC<SubjectIndexPageProps> = React.memo(({
                                 </button>
                             </div>
                         </motion.div>
-                    </div>
+                    </motion.div>
                 )}
             </AnimatePresence>
 

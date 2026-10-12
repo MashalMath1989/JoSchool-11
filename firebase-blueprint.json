@@ -82,6 +82,69 @@
         "status": { "type": "string", "enum": ["new", "reviewed", "resolved", "dismissed"] }
       },
       "required": ["questionText", "studentReport", "status"]
+    },
+    "ForumPost": {
+      "title": "ForumPost",
+      "description": "A post in the student community forum.",
+      "type": "object",
+      "properties": {
+        "postId": { "type": "string" },
+        "userId": { "type": "string" },
+        "userName": { "type": "string" },
+        "userPhoto": { "type": "string" },
+        "userEmail": { "type": "string" },
+        "text": { "type": "string" },
+        "imageUrl": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "likesCount": { "type": "number" },
+        "commentsCount": { "type": "number" },
+        "isEdited": { "type": "boolean" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["userId", "userName", "text"]
+    },
+    "ForumComment": {
+      "title": "ForumComment",
+      "description": "A comment on a forum post.",
+      "type": "object",
+      "properties": {
+        "commentId": { "type": "string" },
+        "postId": { "type": "string" },
+        "userId": { "type": "string" },
+        "userName": { "type": "string" },
+        "userPhoto": { "type": "string" },
+        "text": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["postId", "userId", "userName", "text"]
+    },
+    "ForumLike": {
+      "title": "ForumLike",
+      "description": "A like on a forum post.",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["userId"]
+    },
+    "ForumReport": {
+      "title": "ForumReport",
+      "description": "A report regarding objectionable forum post or comment.",
+      "type": "object",
+      "properties": {
+        "reportId": { "type": "string" },
+        "reporterId": { "type": "string" },
+        "reporterName": { "type": "string" },
+        "targetType": { "type": "string", "enum": ["post", "comment"] },
+        "targetId": { "type": "string" },
+        "postId": { "type": "string" },
+        "reason": { "type": "string" },
+        "details": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "status": { "type": "string", "enum": ["pending", "reviewed", "resolved", "dismissed"] }
+      },
+      "required": ["reporterId", "targetType", "targetId", "reason", "status"]
     }
   },
   "firestore": {
@@ -104,6 +167,22 @@
     "/questionReports/{reportId}": {
       "schema": "QuestionReport",
       "description": "Reports submitted by students about question errors."
+    },
+    "/posts/{postId}": {
+      "schema": "ForumPost",
+      "description": "Community forum posts."
+    },
+    "/posts/{postId}/comments/{commentId}": {
+      "schema": "ForumComment",
+      "description": "Comments on a forum post."
+    },
+    "/posts/{postId}/likes/{userId}": {
+      "schema": "ForumLike",
+      "description": "Likes on a forum post indexed by user ID."
+    },
+    "/reports/{reportId}": {
+      "schema": "ForumReport",
+      "description": "Reports on forum posts or comments."
     }
   }
 }

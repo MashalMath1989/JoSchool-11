@@ -194,6 +194,7 @@ export const ResourceViewerModal: React.FC<ResourceViewerModalProps> = ({
         <AnimatePresence>
             <div className={`fixed inset-0 z-[100] flex items-center justify-center ${isFullScreen ? 'p-0' : 'p-3 sm:p-6'} bg-slate-900/80 backdrop-blur-md animate-fast-fade`} dir="rtl">
                 <motion.div 
+                    key="resource-viewer-card"
                     initial={{ opacity: 0, scale: 0.95, y: 10 }}
                     animate={{ opacity: 1, scale: 1, y: 0 }}
                     exit={{ opacity: 0, scale: 0.95, y: 10 }}

@@ -1,4 +1,4 @@
-import { doc, getDoc, setDoc, updateDoc, onSnapshot, collection, addDoc, serverTimestamp } from 'firebase/firestore';
+import { doc, getDoc, setDoc, updateDoc, deleteDoc, onSnapshot, collection, addDoc, serverTimestamp } from 'firebase/firestore';
 import { db, auth } from '../firebase';
 import { UserProgress } from '../types';
 
@@ -160,4 +160,20 @@ export const submitQuestionReport = async (report: QuestionReportData): Promise<
     throw error;
   }
 };
+
+/**
+ * Delete all Firestore data belonging to the user
+ * Required before deleting Firebase Auth user so security rules permit deletion
+ */
+export const deleteUserFirestoreData = async (userId: string): Promise<void> => {
+  const path = `users/${userId}`;
+  try {
+    const userDoc = doc(db, 'users', userId);
+    await deleteDoc(userDoc);
+  } catch (error) {
+    handleFirestoreError(error, OperationType.DELETE, path);
+    throw error;
+  }
+};
+
 

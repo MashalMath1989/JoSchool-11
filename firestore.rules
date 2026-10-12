@@ -32,6 +32,7 @@ service cloud.firestore {
       allow read: if isOwner(userId) && isValidId(userId);
       allow create: if isOwner(userId) && isValidId(userId) && isValidUser(request.resource.data);
       allow update: if isOwner(userId) && isValidId(userId) && isValidUser(request.resource.data);
+      allow delete: if isOwner(userId) && isValidId(userId);
     }
 
     // Friend Challenge rooms and participants
@@ -67,6 +68,71 @@ service cloud.firestore {
     match /questionReports/{reportId} {
       allow read, update, delete: if false;
       allow create: if isValidId(reportId) && isValidQuestionReport(request.resource.data);
+    }
+
+    // ========================================================
+    // FORUM RULES (منتدى الطلاب JoSchool11)
+    // ========================================================
+
+    function isAdmin() {
+      return isSignedIn() && request.auth.token.email == 'mechail.sbeatan1@gmail.com';
+    }
+
+    function isValidForumPost(data) {
+      return data.userId is string && data.userId == request.auth.uid &&
+             data.userName is string && data.userName.size() > 0 && data.userName.size() <= 100 &&
+             data.text is string && data.text.size() > 0 && data.text.size() <= 3000 &&
+             data.likesCount is number && data.likesCount >= 0 &&
+             data.commentsCount is number && data.commentsCount >= 0 &&
+             (data.imageUrl is string || !data.keys().hasAll(['imageUrl'])) &&
+             (data.userPhoto is string || !data.keys().hasAll(['userPhoto'])) &&
+             (data.userEmail is string || !data.keys().hasAll(['userEmail']));
+    }
+
+    function isValidForumComment(data) {
+      return data.userId is string && data.userId == request.auth.uid &&
+             data.userName is string && data.userName.size() > 0 && data.userName.size() <= 100 &&
+             data.text is string && data.text.size() > 0 && data.text.size() <= 1000 &&
+             (data.userPhoto is string || !data.keys().hasAll(['userPhoto']));
+    }
+
+    match /posts/{postId} {
+      // Anyone can read posts
+      allow read: if true;
+      // Registered users can create posts with their own UID
+      allow create: if isSignedIn() && isValidForumPost(request.resource.data);
+      // Only the author or admin can delete a post
+      allow delete: if isSignedIn() && (request.auth.uid == resource.data.userId || isAdmin());
+      // Updates allowed for likesCount & commentsCount increments
+      allow update: if isSignedIn();
+
+      // Likes subcollection (key = userId so user can only like once)
+      match /likes/{userId} {
+        allow read: if true;
+        allow create, delete: if isSignedIn() && request.auth.uid == userId;
+      }
+
+      // Comments subcollection
+      match /comments/{commentId} {
+        allow read: if true;
+        allow create: if isSignedIn() && isValidForumComment(request.resource.data);
+        allow delete: if isSignedIn() && (request.auth.uid == resource.data.userId || isAdmin());
+      }
+    }
+
+    // Forum Reports submitted by users
+    function isValidReport(data) {
+      return data.reporterId is string && data.reporterId == request.auth.uid &&
+             data.targetType in ['post', 'comment'] &&
+             data.reason is string && data.reason.size() > 0 &&
+             data.status == 'pending';
+    }
+
+    match /reports/{reportId} {
+      // Any signed in user can submit a report
+      allow create: if isSignedIn() && isValidReport(request.resource.data);
+      // Only admin can read, review, or delete reports
+      allow read, update, delete: if isAdmin();
     }
 
     // Default deny for everything else
