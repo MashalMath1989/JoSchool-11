@@ -124,7 +124,9 @@ export async function deleteUserAccount(password?: string): Promise<void> {
             `joschool_${uid}_has_seen_welcome`,
             'joschool_current_user_id',
             'joschool_app_state',
-            'joschool_has_seen_welcome'
+            'joschool_has_seen_welcome',
+            'joschool_is_logged_in',
+            'joschool_auth_cached_user'
         ];
         keysToRemove.forEach(k => localStorage.removeItem(k));
     } catch (e) {

@@ -5,6 +5,7 @@ import { SparklesIcon, MenuIcon, UserIcon, CalendarIcon, InfoIcon, LogOutIcon, X
 import { MessageSquareText } from 'lucide-react';
 import { User } from 'firebase/auth';
 import { LOGO_DATA_URI } from './logoDataUri';
+import { FEATURE_FLAGS } from './featureFlags';
 
 interface LandingPageProps {
     subjectsData?: Subject[];
@@ -482,16 +483,18 @@ const LandingPage: React.FC<LandingPageProps> = React.memo(({
                                 </AnimatePresence>
                             </div>
 
-                            {/* زر المنتدى على يسار زر القائمة المنسدلة بخلفية زرقاء */}
-                            <button
-                                id="forum-top-button"
-                                onClick={() => navigateTo(View.Forum)}
-                                className="w-10 h-10 bg-blue-600 hover:bg-blue-700 text-white border border-slate-900 rounded-lg shadow-sm flex items-center justify-center transition-all active:scale-95 shrink-0 cursor-pointer"
-                                title="منتدى الطلاب"
-                                aria-label="منتدى الطلاب"
-                            >
-                                <MessageSquareText className="w-5 h-5 text-white" />
-                            </button>
+                            {/* زر المنتدى على يسار زر القائمة المنسدلة بخلفية زرقاء - معطل ومزال مؤقتاً بناءً على طلب المستخدم */}
+                            {FEATURE_FLAGS.ENABLE_FORUM && (
+                                <button
+                                    id="forum-top-button"
+                                    onClick={() => navigateTo(View.Forum)}
+                                    className="w-10 h-10 bg-blue-600 hover:bg-blue-700 text-white border border-slate-900 rounded-lg shadow-sm flex items-center justify-center transition-all active:scale-95 shrink-0 cursor-pointer"
+                                    title="منتدى الطلاب"
+                                    aria-label="منتدى الطلاب"
+                                >
+                                    <MessageSquareText className="w-5 h-5 text-white" />
+                                </button>
+                            )}
                         </div>
                     )}
 

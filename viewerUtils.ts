@@ -25,7 +25,7 @@ export function getGoogleViewerUrl(url: string, embedded = true): string {
         if (trimmed.includes('/file/d/')) {
             fileId = trimmed.split('/file/d/')[1]?.split('/')[0]?.split('?')[0] || '';
         } else if (trimmed.includes('id=')) {
-            const match = trimmed.match(/[?&]id=([^&]+)/);
+            const match = trimmed.match(/[?&]id=([^&#]+)/);
             if (match && match[1]) fileId = match[1];
         }
         if (fileId) {
@@ -39,5 +39,7 @@ export function getGoogleViewerUrl(url: string, embedded = true): string {
         return embedded ? trimmed : trimmed.replace('/preview', '/view');
     }
 
-    return `https://docs.google.com/viewer?url=${encodeURIComponent(trimmed)}${embedded ? '&embedded=true' : ''}`;
+    return embedded 
+        ? `https://docs.google.com/viewer?embedded=true&url=${encodeURIComponent(trimmed)}`
+        : `https://docs.google.com/viewer?url=${encodeURIComponent(trimmed)}`;
 }

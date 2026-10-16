@@ -28,6 +28,13 @@ import LibraryPage from './LibraryPage';
 import FriendChallengePage from './FriendChallengePage';
 import ForumPage from './ForumPage';
 import DeleteAccountInfoPage from './DeleteAccountInfoPage';
+import { FEATURE_FLAGS } from './featureFlags';
+import { 
+    getCachedAuthUser, 
+    saveCachedAuthUser, 
+    clearCachedAuthUser, 
+    hasCachedAuthSession 
+} from './services/authStorage';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { LOGO_DATA_URI } from './logoDataUri';
 import { FriendChallenge } from './types';
@@ -572,8 +579,23 @@ const App: React.FC = () => {
     const timerRef = useRef<NodeJS.Timeout | null>(null);
     const lastSyncedProgressRef = useRef<UserProgress | null>(null);
 
-    const [user, setUser] = useState<User | null>(() => auth.currentUser);
-    const [isAuthenticating, setIsAuthenticating] = useState(true);
+    const getStorageKey = useCallback((suffix: string, userId?: string) => `joschool_${userId || 'guest'}_${suffix}`, []);
+
+    // Replay state from isolated storage based on user
+    const loadStateForUser = useCallback((userId?: string) => {
+        try {
+            const key = `joschool_${userId || 'guest'}_app_state`;
+            const saved = localStorage.getItem(key);
+            if (!saved) return null;
+            return JSON.parse(saved);
+        } catch (e) {
+            return null;
+        }
+    }, []);
+
+    const initialCachedUser = getCachedAuthUser();
+    const [user, setUser] = useState<User | null>(() => initialCachedUser);
+    const [isAuthenticating, setIsAuthenticating] = useState(() => !initialCachedUser);
 
     // Fallback safety timeout: only fires if Firebase completely hangs/fails (4s)
     useEffect(() => {
@@ -582,8 +604,6 @@ const App: React.FC = () => {
         }, 4000);
         return () => clearTimeout(timer);
     }, []);
-
-    const getStorageKey = useCallback((suffix: string, userId?: string) => `joschool_${userId || 'guest'}_${suffix}`, []);
 
     // Initial state cleanup for legacy shared progress
     useEffect(() => {
@@ -602,20 +622,17 @@ const App: React.FC = () => {
         });
     }, []);
 
-    // Replay state from isolated storage based on user
-    const loadStateForUser = useCallback((userId?: string) => {
-        try {
-            const key = getStorageKey('app_state', userId);
-            const saved = localStorage.getItem(key);
-            if (!saved) return null;
-            return JSON.parse(saved);
-        } catch (e) {
-            return null;
-        }
-    }, [getStorageKey]);
-
     const [viewHistory, setViewHistory] = useState<View[]>(() => {
         try {
+            const cachedUser = getCachedAuthUser();
+            if (cachedUser) {
+                // If user is already logged in, enter directly into the main interface (Landing Page)
+                const savedState = loadStateForUser(cachedUser.uid);
+                if (savedState?.viewHistory && Array.isArray(savedState.viewHistory) && savedState.viewHistory.length > 0) {
+                    return savedState.viewHistory;
+                }
+                return [View.Landing];
+            }
             const hasSeen = localStorage.getItem('joschool_has_seen_welcome') === 'true';
             return hasSeen ? [View.Landing] : [View.Welcome];
         } catch {
@@ -698,7 +715,27 @@ const App: React.FC = () => {
         }
     }), []);
 
-    const [userProgress, setUserProgress] = useState<UserProgress>(getDefaultProgress());
+    const [userProgress, setUserProgress] = useState<UserProgress>(() => {
+        try {
+            const cachedUser = getCachedAuthUser();
+            const progressKey = `joschool_${cachedUser?.uid || 'guest'}_user_progress`;
+            const savedProgress = localStorage.getItem(progressKey);
+            if (savedProgress) {
+                const parsed = JSON.parse(savedProgress);
+                const sanitizedFavorites = parsed?.favoriteQuestions 
+                    ? parsed.favoriteQuestions.filter((q: any) => typeof q === 'object' && q !== null)
+                    : [];
+                return {
+                    ...getDefaultProgress(),
+                    ...parsed,
+                    favoriteQuestions: sanitizedFavorites
+                };
+            }
+        } catch (e) {
+            // ignore
+        }
+        return getDefaultProgress();
+    });
 
     const [pendingExamData, setPendingExamData] = useState<{
         lesson: any;
@@ -713,11 +750,35 @@ const App: React.FC = () => {
 
     // Effect to handle user identity and isolated state loading
     useEffect(() => {
-        const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
-            const newUid = currentUser?.uid;
+        const unsubscribe = onAuthStateChanged(auth, async (currentUser) => {
+            if (!currentUser) {
+                // If we have a cached active session, Firebase may report null on the initial tick
+                // before reading persistence from IndexedDB. Wait for authStateReady() before treating as logged out.
+                if (hasCachedAuthSession()) {
+                    try {
+                        await auth.authStateReady();
+                    } catch (e) {
+                        // ignore
+                    }
+
+                    if (auth.currentUser) {
+                        currentUser = auth.currentUser;
+                    } else {
+                        clearCachedAuthUser();
+                    }
+                }
+            }
+
+            if (currentUser) {
+                saveCachedAuthUser(currentUser);
+            } else {
+                clearCachedAuthUser();
+            }
+
+            const activeUid = currentUser?.uid;
 
             // 1. Reset/Load progress
-            const progressKey = getStorageKey('user_progress', newUid);
+            const progressKey = getStorageKey('user_progress', activeUid);
             const savedProgress = localStorage.getItem(progressKey);
             if (savedProgress) {
                 try {
@@ -738,7 +799,7 @@ const App: React.FC = () => {
             }
 
             // 2. Reset/Load session state
-            const state = loadStateForUser(newUid);
+            const state = loadStateForUser(activeUid);
             if (state) {
                 if (state.viewHistory) setViewHistory(state.viewHistory);
                 if (state.selectedSubject) setSelectedSubject(state.selectedSubject);
@@ -761,9 +822,9 @@ const App: React.FC = () => {
                 if (state.examNumber !== undefined) setExamNumber(state.examNumber);
                 if (state.expandedUnitIndices) setExpandedUnitIndices(state.expandedUnitIndices);
                 if (state.expandedLessonKeys) setExpandedLessonKeys(state.expandedLessonKeys);
-            } else {
-                // Start fresh for new account or guest
-                const hasSeen = localStorage.getItem(getStorageKey('has_seen_welcome', newUid)) === 'true';
+            } else if (!currentUser) {
+                // Start fresh only if no user is authenticated
+                const hasSeen = localStorage.getItem(getStorageKey('has_seen_welcome', activeUid)) === 'true';
                 setViewHistory(hasSeen ? [View.Landing] : [View.Welcome]);
                 setSelectedSubject(null);
                 setSessionTitle('');
@@ -779,6 +840,12 @@ const App: React.FC = () => {
                 setExamNumber(null);
                 setExpandedUnitIndices([]);
                 setExpandedLessonKeys([]);
+            } else {
+                // Logged in user: ensure they land on the main interface (Landing)
+                const hasSeen = localStorage.getItem(getStorageKey('has_seen_welcome', activeUid)) === 'true';
+                if (hasSeen) {
+                    setViewHistory(prev => (prev.length === 0 || prev[prev.length - 1] === View.Welcome) ? [View.Landing] : prev);
+                }
             }
 
             // Simultaneously update user and end authenticating in a single atomic render
@@ -2230,6 +2297,9 @@ const App: React.FC = () => {
     const confirmLogout = async () => {
         try {
             setShowLogoutConfirmation(false);
+            clearCachedAuthUser();
+            setUser(null);
+            setIsAuthenticating(false);
             await signOut(auth);
             goToHome();
         } catch (error) {
@@ -2455,7 +2525,7 @@ const App: React.FC = () => {
             }
 
             // Log current view state for debugging
-            if (isAuthenticating) {
+            if (isAuthenticating && !user) {
                 return (
                     <div className="flex flex-col items-center justify-center min-h-[70vh] py-20 px-6 text-center" dir="rtl">
                         <div className="relative w-28 h-28 mx-auto mb-8 flex items-center justify-center">
@@ -2476,6 +2546,27 @@ const App: React.FC = () => {
             }
 
             if (!user) {
+                // If there is still a cached session pending verification by authStateReady, do not flash AuthPage
+                if (hasCachedAuthSession()) {
+                    return (
+                        <div className="flex flex-col items-center justify-center min-h-[70vh] py-20 px-6 text-center" dir="rtl">
+                            <div className="relative w-28 h-28 mx-auto mb-8 flex items-center justify-center">
+                                <div className="absolute inset-0 border-4 border-slate-100 rounded-full"></div>
+                                <motion.div 
+                                    className="absolute inset-0 border-4 border-[#1d5bfc] rounded-full border-t-transparent"
+                                    animate={{ rotate: 360 }}
+                                    transition={{ duration: 1, repeat: Infinity, ease: "linear" }}
+                                />
+                                <div className="w-20 h-20 bg-white rounded-2xl p-2 shadow-sm border border-slate-100 flex items-center justify-center overflow-hidden">
+                                    <img src={LOGO_DATA_URI} alt="JoSchool" className="w-full h-auto object-contain" />
+                                </div>
+                            </div>
+                            <h3 className="text-2xl font-black text-slate-800 mb-2">JoSchool 11</h3>
+                            <p className="text-slate-500 font-bold text-sm">جاري بدء التطبيق...</p>
+                        </div>
+                    );
+                }
+
                 console.log("App: No user, showing AuthPage");
                 return <AuthPage />;
             }
@@ -2732,6 +2823,21 @@ const App: React.FC = () => {
                         />
                     );
                 case View.Forum:
+                    // خاصية المنتدى معطلة ومزالة مؤقتاً بناءً على طلب المستخدم
+                    if (!FEATURE_FLAGS.ENABLE_FORUM) {
+                        return (
+                            <LandingPage 
+                                subjectsData={subjectsData} 
+                                navigateTo={(view, subject, title) => {
+                                    if (subject) setSelectedSubject(subject);
+                                    navigateTo(view, title);
+                                }} 
+                                View={View} 
+                                user={user}
+                                handleLogout={handleLogout}
+                            />
+                        );
+                    }
                     return (
                         <ForumPage 
                             user={user}

@@ -13,6 +13,7 @@ import { motion } from 'framer-motion';
 import { AlertCircle, CheckCircle2, ExternalLink } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { LOGO_DATA_URI } from './logoDataUri';
+import { saveCachedAuthUser } from './services/authStorage';
 
 interface AuthPageProps {
     initialSuccessMessage?: string;
@@ -48,6 +49,7 @@ const AuthPage: React.FC<AuthPageProps> = ({ initialSuccessMessage }) => {
                 const result = await getRedirectResult(auth);
                 if (result?.user) {
                     console.log("Logged in successfully via redirect on page load:", result.user.email);
+                    saveCachedAuthUser(result.user);
                 }
             } catch (err: any) {
                 console.warn("Redirect check notice:", err?.code || err);
@@ -76,7 +78,10 @@ const AuthPage: React.FC<AuthPageProps> = ({ initialSuccessMessage }) => {
         
         try {
             console.log("Initiating Google sign-in with popup...");
-            await signInWithPopup(auth, googleProvider);
+            const res = await signInWithPopup(auth, googleProvider);
+            if (res?.user) {
+                saveCachedAuthUser(res.user);
+            }
             return;
         } catch (popupErr: any) {
             if (popupErr.code === 'auth/popup-closed-by-user' || popupErr.code === 'auth/cancelled-popup-request') {
@@ -183,11 +188,17 @@ const AuthPage: React.FC<AuthPageProps> = ({ initialSuccessMessage }) => {
         setError('');
         try {
             if (isLogin) {
-                await signInWithEmailAndPassword(auth, cleanEmail, cleanPassword);
+                const cred = await signInWithEmailAndPassword(auth, cleanEmail, cleanPassword);
+                if (cred?.user) {
+                    saveCachedAuthUser(cred.user);
+                }
             } else {
                 const userCredential = await createUserWithEmailAndPassword(auth, cleanEmail, cleanPassword);
                 if (name.trim()) {
                     await updateProfile(userCredential.user, { displayName: name.trim() });
+                }
+                if (userCredential?.user) {
+                    saveCachedAuthUser(userCredential.user);
                 }
             }
         } catch (err: any) {
