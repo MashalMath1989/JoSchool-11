@@ -1,8 +1,11 @@
 [{
-      "relation": ["delegate_permission/common.handle_all_urls"],
-      "target": {
-        "namespace": "android_app",
-        "package_name": "app.netlify.joschool11.twa",
-        "sha256_cert_fingerprints": ["9B:AF:32:0E:18:1E:03:5B:36:4D:98:64:56:E3:EB:15:C7:01:54:E6:19:BF:82:4F:67:2C:07:D2:A9:21:13:7F"]
-      }
-    }]
+  "relation": ["delegate_permission/common.handle_all_urls"],
+  "target": {
+    "namespace": "android_app",
+    "package_name": "app.netlify.joschool11.twa",
+    "sha256_cert_fingerprints": [
+      "9B:AF:32:0E:18:1E:03:5B:36:4D:98:64:56:E3:EB:15:C7:01:54:E6:19:BF:82:4F:67:2C:07:D2:A9:21:13:7F",
+      "A2:1A:9A:5D:57:03:4A:31:C3:B1:F5:B1:47:E6:F0:71:E1:A2:06:87:10:9E:03:FB:7A:21:26:59:78:D9:2A:56"
+    ]
+  }
+}]
