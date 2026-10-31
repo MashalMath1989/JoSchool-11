@@ -19,6 +19,7 @@ export enum View {
   FriendChallenge,
   Results,
   Forum,
+  About,
 }
 
 export enum Grade {

@@ -60,7 +60,7 @@ const SessionsListPage: React.FC<SessionsListPageProps> = ({ navigateTo, onBack 
                     <div className="flex items-center gap-4">
                         <div className="w-12 h-12 rounded-xl bg-sky-50 flex items-center justify-center border border-sky-200 select-none overflow-hidden p-1">
                             <img 
-                                src="https://i.postimg.cc/XvYQrc5C/FB-IMG-1780984890803.jpg" 
+                                src="https://raw.githubusercontent.com/MashalMath/Pdf_Library/main/IMG_abd3ab04-e6fc-4c58-82e0-b187efc7fee6.jpg" 
                                 alt="2008 Session" 
                                 className="w-full h-full object-cover rounded-lg"
                                 referrerPolicy="no-referrer"
@@ -81,7 +81,7 @@ const SessionsListPage: React.FC<SessionsListPageProps> = ({ navigateTo, onBack 
                     <div className="flex items-center gap-4">
                         <div className="w-12 h-12 rounded-xl bg-purple-50 flex items-center justify-center border border-purple-200 select-none overflow-hidden p-1">
                             <img 
-                                src="https://i.postimg.cc/XvYQrc5C/FB-IMG-1780984890803.jpg" 
+                                src="https://raw.githubusercontent.com/MashalMath/Pdf_Library/main/IMG_abd3ab04-e6fc-4c58-82e0-b187efc7fee6.jpg" 
                                 alt="2008 Supplementary Session" 
                                 className="w-full h-full object-cover rounded-lg"
                                 referrerPolicy="no-referrer"

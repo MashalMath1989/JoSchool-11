@@ -379,14 +379,19 @@ const AuthPage: React.FC<AuthPageProps> = ({ initialSuccessMessage }) => {
                     </button>
                 </div>
 
-                <div className="mt-4 pt-3 border-t border-slate-100 text-center">
-                    <Link
-                        to="/delete-account-info"
-                        className="text-[11px] font-bold text-slate-500 hover:text-slate-800 transition-colors inline-flex items-center gap-1.5"
-                    >
-                        <span>دليل وسياسة حذف الحساب (متجر Google Play)</span>
-                        <ExternalLink className="w-3 h-3" />
-                    </Link>
+                <div className="mt-4 pt-3 border-t border-slate-100 text-center space-y-1.5">
+                    <div>
+                        <Link
+                            to="/delete-account-info"
+                            className="text-[11px] font-bold text-slate-500 hover:text-slate-800 transition-colors inline-flex items-center gap-1.5"
+                        >
+                            <span>دليل وسياسة حذف الحساب (متجر Google Play)</span>
+                            <ExternalLink className="w-3 h-3" />
+                        </Link>
+                    </div>
+                    <p className="text-[10px] text-slate-400 font-bold">
+                        تطبيق تعليمي مستقل ولا يمثل وزارة التربية والتعليم أو أي جهة حكومية
+                    </p>
                 </div>
             </motion.div>
         </div>

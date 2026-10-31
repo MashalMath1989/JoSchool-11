@@ -6,6 +6,7 @@ import { MessageSquareText } from 'lucide-react';
 import { User } from 'firebase/auth';
 import { LOGO_DATA_URI } from './logoDataUri';
 import { FEATURE_FLAGS } from './featureFlags';
+import DisclaimerSection from './DisclaimerSection';
 
 interface LandingPageProps {
     subjectsData?: Subject[];
@@ -46,14 +47,9 @@ const MinistryScheduleModal: React.FC<{ isOpen: boolean; onClose: () => void }> 
                             <XIcon className="w-5 h-5 stroke-[2.5px]" />
                         </button>
 
-                        {/* Ministry Logo */}
-                        <div className="w-20 h-20 sm:w-24 sm:h-24 mx-auto mt-2 mb-5 rounded-2xl border border-slate-800 p-2 flex items-center justify-center bg-white shadow-xs">
-                            <img 
-                                src="https://raw.githubusercontent.com/MashalMath/Pdf_Library/main/Ministry_Logo.jpg" 
-                                alt="وزارة التربية والتعليم" 
-                                className="w-full h-full object-contain"
-                                referrerPolicy="no-referrer"
-                            />
+                        {/* Exam Schedule Icon (No government logo) */}
+                        <div className="w-20 h-20 sm:w-24 sm:h-24 mx-auto mt-2 mb-5 rounded-2xl border-2 border-slate-900 p-2 flex items-center justify-center bg-amber-100/60 text-amber-700 shadow-xs">
+                            <CalendarIcon className="w-10 h-10 sm:w-12 sm:h-12" />
                         </div>
 
                         {/* Title */}
@@ -255,7 +251,7 @@ const SubjectGrid = React.memo(({
                     <h2 className="text-base sm:text-xl font-black text-slate-800 leading-tight">{title}</h2>
                 </div>
                 
-                {showAchievements && <CountdownTimer />}
+                {showAchievements && FEATURE_FLAGS.SHOW_MINISTRY_SCHEDULE_CARD && <CountdownTimer />}
 
                 {showAchievements && (
                     <button
@@ -362,6 +358,12 @@ const LandingPage: React.FC<LandingPageProps> = React.memo(({
             label: 'رسالة الترحيب (جيل 2010)', 
             icon: <SparklesIcon className="w-5 h-5 text-amber-500" />, 
             action: () => navigateTo(View.Welcome) 
+        },
+        { 
+            id: 'about', 
+            label: 'حول التطبيق وإخلاء المسؤولية', 
+            icon: <InfoIcon className="w-5 h-5 text-sky-600" />, 
+            action: () => navigateTo(View.About) 
         },
         { 
             id: 'profile', 
@@ -642,7 +644,7 @@ const LandingPage: React.FC<LandingPageProps> = React.memo(({
                 >
                     <div className="flex items-center gap-2">
                         <img 
-                            src="https://i.postimg.cc/XvYQrc5C/FB-IMG-1780984890803.jpg" 
+                            src="https://raw.githubusercontent.com/MashalMath/Pdf_Library/main/IMG_abd3ab04-e6fc-4c58-82e0-b187efc7fee6.jpg" 
                             alt="الدورات" 
                             className="w-8 h-8 rounded-full object-cover border border-slate-300 shadow-sm shrink-0" 
                             referrerPolicy="no-referrer"
@@ -715,6 +717,14 @@ const LandingPage: React.FC<LandingPageProps> = React.memo(({
                 >
                     <InstagramIcon className="w-full h-full" />
                 </motion.a>
+            </div>
+
+            {/* قسم إخلاء المسؤولية والمصادر الرسمية في أسفل الشاشة الرئيسية */}
+            <div id="disclaimer-section" className="mt-4 mb-6">
+                <DisclaimerSection 
+                    onOpenAbout={() => navigateTo(View.About)}
+                    showAboutButton={true}
+                />
             </div>
 
             {/* Additional Modals */}

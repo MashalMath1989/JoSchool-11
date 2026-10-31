@@ -150,10 +150,13 @@ const WelcomePage: React.FC<WelcomePageProps> = ({ onStart }) => {
             </main>
 
             {/* Footer */}
-            <footer className="w-full max-w-xl text-center pt-4 border-t border-slate-800/60 relative z-10">
+            <footer className="w-full max-w-xl text-center pt-4 border-t border-slate-800/60 relative z-10 space-y-1.5">
                 <p className="text-xs font-bold text-slate-400 flex items-center justify-center gap-1.5">
                     <CheckCircle2 className="w-4 h-4 text-emerald-400" />
                     <span>تطبيق JoSchool11 — رفيقك نحو العلامة الكاملة 💯</span>
+                </p>
+                <p className="text-[10px] text-slate-400 font-bold leading-normal">
+                    تطبيق تعليمي مستقل ولا يمثل وزارة التربية والتعليم أو أي جهة حكومية
                 </p>
             </footer>
         </div>

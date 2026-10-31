@@ -347,7 +347,7 @@ const SessionSubjectsPage: React.FC<SessionSubjectsPageProps> = ({
                             >
                                 <div className="w-16 h-16 rounded-2xl mx-auto mb-4 border border-slate-900 select-none overflow-hidden shadow-sm">
                                     <img 
-                                        src="https://i.postimg.cc/XvYQrc5C/FB-IMG-1780984890803.jpg" 
+                                        src="https://raw.githubusercontent.com/MashalMath/Pdf_Library/main/IMG_abd3ab04-e6fc-4c58-82e0-b187efc7fee6.jpg" 
                                         alt="دورة 2008" 
                                         className="w-full h-full object-cover"
                                         referrerPolicy="no-referrer"

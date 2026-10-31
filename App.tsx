@@ -28,6 +28,7 @@ import LibraryPage from './LibraryPage';
 import FriendChallengePage from './FriendChallengePage';
 import ForumPage from './ForumPage';
 import DeleteAccountInfoPage from './DeleteAccountInfoPage';
+import AboutPage from './AboutPage';
 import { FEATURE_FLAGS } from './featureFlags';
 import { 
     getCachedAuthUser, 
@@ -653,7 +654,7 @@ const App: React.FC = () => {
             show: true,
             title,
             message,
-            imageUrl: imageUrl || 'https://i.postimg.cc/XvYQrc5C/FB-IMG-1780984890803.jpg'
+            imageUrl: imageUrl || 'https://raw.githubusercontent.com/MashalMath/Pdf_Library/main/IMG_abd3ab04-e6fc-4c58-82e0-b187efc7fee6.jpg'
         });
     }, []);
     
@@ -1488,7 +1489,7 @@ const App: React.FC = () => {
             showNotice(
                 'عندما تقوم وزارة التربية والتعليم بإصدار نسخة الفصل الثاني لعام 2026/2027 سيتم عرض أحدث نسخة هنا',
                 'تنبيه',
-                'https://i.postimg.cc/XvYQrc5C/FB-IMG-1780984890803.jpg'
+                'https://raw.githubusercontent.com/MashalMath/Pdf_Library/main/IMG_abd3ab04-e6fc-4c58-82e0-b187efc7fee6.jpg'
             );
             return;
         }
@@ -2202,7 +2203,7 @@ const App: React.FC = () => {
             showNotice(
                 'أقرت وزارة التربية والتعليم مادة الرياضيات لطلاب الصف الحادي عشر الأكاديمي جيل 2010 لأول مرة لهذا العام 2026/2027 لذلك لا يتوفر امتحانات وزارة سابقة',
                 'تنبيه',
-                'https://i.postimg.cc/XvYQrc5C/FB-IMG-1780984890803.jpg'
+                'https://raw.githubusercontent.com/MashalMath/Pdf_Library/main/IMG_abd3ab04-e6fc-4c58-82e0-b187efc7fee6.jpg'
             );
             return;
         }
@@ -2522,6 +2523,23 @@ const App: React.FC = () => {
 
             if (isDeleteAccountInfoRoute) {
                 return <DeleteAccountInfoPage />;
+            }
+
+            const isAboutRoute = 
+                location.pathname === '/about' || 
+                location.pathname.startsWith('/about') ||
+                window.location.pathname.includes('/about');
+
+            if (isAboutRoute) {
+                return (
+                    <AboutPage 
+                        onBack={goToHome}
+                        navigateTo={(view, subject, title) => {
+                            if (subject) setSelectedSubject(subject);
+                            navigateTo(view, title);
+                        }}
+                    />
+                );
             }
 
             // Log current view state for debugging
@@ -2845,6 +2863,16 @@ const App: React.FC = () => {
                             onBack={goBack}
                         />
                     );
+                case View.About:
+                    return (
+                        <AboutPage 
+                            onBack={goBack}
+                            navigateTo={(view, subject, title) => {
+                                if (subject) setSelectedSubject(subject);
+                                navigateTo(view, title);
+                            }}
+                        />
+                    );
                 default: 
                     console.log("App: View not matched, showing LandingPage");
                     return (
@@ -2917,7 +2945,7 @@ const App: React.FC = () => {
                 )}
             </AnimatePresence>
 
-            {user && ![View.Welcome, View.Landing, View.Quiz, View.SubjectIndex, View.Results, View.SessionSubjects, View.Favorites, View.SessionsList, View.Library, View.FriendChallenge, View.Forum].includes(currentView) && (
+            {user && ![View.Welcome, View.Landing, View.Quiz, View.SubjectIndex, View.Results, View.SessionSubjects, View.Favorites, View.SessionsList, View.Library, View.FriendChallenge, View.Forum, View.About].includes(currentView) && (
                 <button 
                     onClick={goBack}
                     className={`fixed top-4 z-[9999] p-3 bg-white border border-slate-900 rounded-full shadow-lg text-slate-600 hover:text-primary transition-all active:scale-95 
@@ -3172,7 +3200,7 @@ const App: React.FC = () => {
                         </button>
                         <div className="w-16 h-16 rounded-full overflow-hidden border border-slate-900 shadow-md mx-auto mb-3 flex items-center justify-center bg-white shrink-0">
                             <img 
-                                src={noticeModal.imageUrl || "https://i.postimg.cc/XvYQrc5C/FB-IMG-1780984890803.jpg"} 
+                                src={noticeModal.imageUrl || "https://raw.githubusercontent.com/MashalMath/Pdf_Library/main/IMG_abd3ab04-e6fc-4c58-82e0-b187efc7fee6.jpg"} 
                                 alt="شعار التنبيه" 
                                 className="w-full h-full object-cover"
                                 referrerPolicy="no-referrer"
